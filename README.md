@@ -61,3 +61,7 @@ keyword resolver, and the `index` and `ask` commands.
 
     go build ./...
     go test ./...
+
+## License
+
+Proprietary. All rights reserved. See [LICENSE](LICENSE).
