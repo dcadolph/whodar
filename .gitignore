@@ -1,0 +1,23 @@
+# Binary
+/whodar
+/bin/
+/dist/
+
+# Go
+*.test
+*.out
+coverage.*
+
+# Editors
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+
+# Local index and ingested work data. Never commit under strict policy.
+/data/
+/index/
+.whodar/
+*.bleve
