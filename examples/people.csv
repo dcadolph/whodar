@@ -1,0 +1,8 @@
+name,email,title,team,org,manager,topics
+Jane Roe,jane.roe@example.com,Staff Engineer,Billing Platform,Payments,pat.poe@example.com,retries;idempotency;dunning
+Carol Roe,carol.roe@example.com,Software Engineer,Billing Platform,Payments,pat.poe@example.com,invoicing;refunds
+Pat Poe,pat.poe@example.com,Engineering Manager,Billing Platform,Payments,,roadmap;hiring;billing
+John Doe,john.doe@example.com,Senior SRE,Core Infra,Platform,kim.doe@example.com,kafka;kubernetes;oncall
+Kim Doe,kim.doe@example.com,Infrastructure Lead,Core Infra,Platform,,terraform;networking;reliability
+Sam Roe,sam.roe@example.com,Data Engineer,Analytics,Data,,etl;warehouse;dbt
+Lee Doe,lee.doe@example.com,Security Engineer,AppSec,Security,,authz;secrets;threat-modeling

@@ -62,6 +62,17 @@ keyword resolver, and the `index` and `ask` commands.
     go build ./...
     go test ./...
 
+## Quickstart
+
+    # Build an index from an org-chart CSV (see examples/people.csv).
+    go run . index --source org-csv --file examples/people.csv
+
+    # Ask who to talk to. Output is JSON; add --pretty to indent.
+    go run . ask --pretty "who do I talk to about billing retries"
+
+The index lives under ~/.whodar by default; override with --data-dir. The default
+egress policy is strict: nothing leaves the machine.
+
 ## License
 
 Proprietary. All rights reserved. See [LICENSE](LICENSE).
