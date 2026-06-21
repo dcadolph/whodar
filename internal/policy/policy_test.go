@@ -74,3 +74,14 @@ func TestWithModeLocked(t *testing.T) {
 		t.Errorf("unlocked change: got %v err %v, want open nil", got.Mode(), err)
 	}
 }
+
+// TestPrivateChannels verifies private ingest defaults on and can be pinned off.
+func TestPrivateChannels(t *testing.T) {
+	t.Parallel()
+	if !New(Strict, false).AllowPrivateChannels() {
+		t.Error("default policy should allow private-channel ingest")
+	}
+	if New(Strict, false).WithoutPrivateChannels().AllowPrivateChannels() {
+		t.Error("pinned-off policy should forbid private-channel ingest")
+	}
+}

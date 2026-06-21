@@ -55,6 +55,8 @@ type Policy struct {
 	mode Mode
 	// locked marks the policy as pinned and unoverridable when true.
 	locked bool
+	// privateOff, when true, forbids private-channel ingest regardless of flags.
+	privateOff bool
 }
 
 // New returns a Policy with the given mode and lock state.
@@ -72,6 +74,18 @@ func (p Policy) Mode() Mode { return p.mode }
 
 // Locked reports whether the policy is pinned and cannot be loosened.
 func (p Policy) Locked() bool { return p.locked }
+
+// AllowPrivateChannels reports whether ingesting private channels is permitted.
+// An organization can pin this off; user flags then cannot enable it.
+func (p Policy) AllowPrivateChannels() bool { return !p.privateOff }
+
+// WithoutPrivateChannels returns a copy that forbids private-channel ingest.
+// This is how an organization pins private ingest off.
+func (p Policy) WithoutPrivateChannels() Policy {
+	c := p
+	c.privateOff = true
+	return c
+}
 
 // AllowEgress reports whether sending nbytes to dest is permitted. Strict always
 // denies. Under Redacted and Open it permits; a Redacted caller is responsible

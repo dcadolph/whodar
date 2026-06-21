@@ -4,9 +4,13 @@ package connector
 
 import "context"
 
-// Record is one normalized observation about a person from a source: identity,
-// org placement, explicit topics, and free text mined for further topics.
+// Record is one normalized observation from a source. A KindPerson record
+// describes a person: identity, org placement, topics, and mined text. A
+// KindChannel record describes a place to ask, with the channel name, topic,
+// text, and active members.
 type Record struct {
+	// Kind classifies the record; the zero value is KindPerson.
+	Kind Kind
 	// PersonID is a stable per-source identifier; empty derives one from email.
 	PersonID string
 	// Name is the person's display name.
@@ -21,15 +25,30 @@ type Record struct {
 	Org string
 	// Manager is the manager's email or identifier, if known.
 	Manager string
-	// Topics are explicit expertise tags for the person.
+	// Topics are explicit expertise tags for the person or channel.
 	Topics []string
-	// Text is free-form text attributed to the person, mined for topics.
+	// Members lists person references active in a KindChannel record.
+	Members []string
+	// Text is free-form text attributed to the person or channel, mined for topics.
 	Text string
 	// Source names the origin connector, e.g. "org-csv".
 	Source string
 	// Weight scales this record's affinity contribution; zero means one.
 	Weight float64
 }
+
+// Kind classifies a record. For KindChannel records the person identity fields
+// are unused: Name is the channel name, Title is the channel topic, Text is the
+// purpose and sampled message text mined for affinity, and Members lists the
+// person references active in the channel.
+type Kind int
+
+const (
+	// KindPerson describes a person. It is the zero value.
+	KindPerson Kind = iota
+	// KindChannel describes a channel, a place to ask.
+	KindChannel
+)
 
 // Source fetches and normalizes records from one origin.
 type Source interface {

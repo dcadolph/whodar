@@ -133,3 +133,29 @@ func TestSlug(t *testing.T) {
 		})
 	}
 }
+
+// TestSearchChannels verifies channel ranking, reasons, and member ordering.
+func TestSearchChannels(t *testing.T) {
+	t.Parallel()
+	ix := New()
+	ix.Build([]connector.Record{
+		{Name: "Jane Roe", Email: "jane@x.com", Title: "Engineer", Topics: []string{"retries"}},
+		{Name: "Bob Lee", Email: "bob@x.com", Title: "SRE", Topics: []string{"kafka"}},
+		{Kind: connector.KindChannel, Name: "billing", Title: "retries and dunning",
+			Members: []string{"jane@x.com", "bob@x.com"}, Text: "billing platform"},
+	})
+
+	got := ix.SearchChannels("retries", 5)
+	if len(got) == 0 {
+		t.Fatal("no channel matches for retries")
+	}
+	if got[0].Channel.Name != "billing" {
+		t.Errorf("top channel = %q, want billing", got[0].Channel.Name)
+	}
+	if !slices.Contains(got[0].Reasons, "retries (topic)") {
+		t.Errorf("reasons %v missing retries (topic)", got[0].Reasons)
+	}
+	if len(got[0].TopMembers) == 0 || got[0].TopMembers[0].Email != "jane@x.com" {
+		t.Errorf("top member = %v, want jane@x.com first", got[0].TopMembers)
+	}
+}

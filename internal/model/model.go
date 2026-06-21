@@ -53,6 +53,20 @@ type Topic struct {
 	Name string
 }
 
+// Channel is a place to ask, such as a Slack channel.
+type Channel struct {
+	// ID uniquely identifies the channel.
+	ID ID
+	// Name is the channel name without any leading symbol.
+	Name string
+	// Topic is the channel's stated topic, shown to users.
+	Topic string
+	// Members lists the people active in the channel, by person ID.
+	Members []ID
+	// Topics maps a topic ID to the channel's affinity weight for it.
+	Topics map[ID]float64
+}
+
 // Graph holds the full set of entities whodar has indexed.
 type Graph struct {
 	// People maps person ID to person.
@@ -63,15 +77,18 @@ type Graph struct {
 	Orgs map[ID]*Org `json:"orgs"`
 	// Topics maps topic ID to topic.
 	Topics map[ID]*Topic `json:"topics"`
+	// Channels maps channel ID to channel.
+	Channels map[ID]*Channel `json:"channels"`
 }
 
 // NewGraph returns an empty graph with initialized maps.
 func NewGraph() *Graph {
 	return &Graph{
-		People: make(map[ID]*Person),
-		Teams:  make(map[ID]*Team),
-		Orgs:   make(map[ID]*Org),
-		Topics: make(map[ID]*Topic),
+		People:   make(map[ID]*Person),
+		Teams:    make(map[ID]*Team),
+		Orgs:     make(map[ID]*Org),
+		Topics:   make(map[ID]*Topic),
+		Channels: make(map[ID]*Channel),
 	}
 }
 
@@ -86,4 +103,17 @@ type Match struct {
 	Score float64
 	// Reasons explains why the person matched, for transparency.
 	Reasons []string
+}
+
+// ChannelMatch is a ranked channel answer: the channel, its score, the reasons
+// it matched, and the people most worth contacting there.
+type ChannelMatch struct {
+	// Channel is the matched channel.
+	Channel *Channel
+	// Score is the relevance score; higher is more relevant.
+	Score float64
+	// Reasons explains why the channel matched.
+	Reasons []string
+	// TopMembers are the most relevant active members, most relevant first.
+	TopMembers []*Person
 }

@@ -73,6 +73,25 @@ keyword resolver, and the `index` and `ask` commands.
 The index lives under ~/.whodar by default; override with --data-dir. The default
 egress policy is strict: nothing leaves the machine.
 
+## Slack
+
+Index a Slack workspace to learn which channels to ask in and who is active on a
+topic. Create a Slack app, add the bot scopes `channels:read`, `channels:history`,
+`users:read`, and `users:read.email` (add `groups:read` and `groups:history` for
+private channels), install it, and export the bot token:
+
+    export WHODAR_SLACK_TOKEN=xoxb-...
+
+    # Standard depth: 180 days, capped at 5000 messages per channel.
+    go run . index --source slack
+
+    # Also index private channels the token can read, if policy allows.
+    go run . index --source slack --include-private
+
+The token is read only from the environment, never from a flag, and is never
+logged or stored. Indexed message text stays on the machine under the strict
+policy. Private-channel ingest can be pinned off so user flags cannot enable it.
+
 ## License
 
 Proprietary. All rights reserved. See [LICENSE](LICENSE).

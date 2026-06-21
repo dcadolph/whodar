@@ -33,8 +33,8 @@ func TestIndexThenAsk(t *testing.T) {
 	if err := json.Unmarshal(out, &ans); err != nil {
 		t.Fatalf("decode answer: %v\n%s", err, out)
 	}
-	if len(ans.Matches) == 0 || ans.Matches[0].Email != "jane@x.com" {
-		t.Fatalf("top match = %+v, want jane@x.com", ans.Matches)
+	if len(ans.People) == 0 || ans.People[0].Email != "jane@x.com" {
+		t.Fatalf("top match = %+v, want jane@x.com", ans.People)
 	}
 }
 
