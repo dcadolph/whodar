@@ -2,8 +2,12 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -13,7 +17,11 @@ import (
 	"github.com/dcadolph/whodar/internal/web"
 )
 
-// newServeCmd builds the serve command, which runs the web UI on localhost.
+// shutdownTimeout bounds how long serve waits for in-flight requests to finish.
+const shutdownTimeout = 5 * time.Second
+
+// newServeCmd builds the serve command, which runs the web UI on localhost and
+// shuts down cleanly on interrupt.
 func newServeCmd(opts *options) *cobra.Command {
 	var (
 		addr      string
@@ -45,8 +53,26 @@ func newServeCmd(opts *options) *cobra.Command {
 				return err
 			}
 			srv := &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 5 * time.Second}
+
+			ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+			defer stop()
+
+			errCh := make(chan error, 1)
+			go func() { errCh <- srv.ListenAndServe() }()
 			fmt.Fprintf(cmd.ErrOrStderr(), "whodar serving on http://%s (Ctrl-C to stop)\n", addr)
-			return srv.ListenAndServe()
+
+			select {
+			case err := <-errCh:
+				if errors.Is(err, http.ErrServerClosed) {
+					return nil
+				}
+				return err
+			case <-ctx.Done():
+				fmt.Fprintln(cmd.ErrOrStderr(), "whodar: shutting down")
+				shutCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+				defer cancel()
+				return srv.Shutdown(shutCtx)
+			}
 		},
 	}
 	f := cmd.Flags()
