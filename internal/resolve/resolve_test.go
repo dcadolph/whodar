@@ -21,8 +21,8 @@ func TestKeywordResolve(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
-	if len(got) != 1 || got[0].Person.Email != "jane@x.com" {
-		t.Fatalf("got %v, want one match for jane@x.com", got)
+	if len(got.People) != 1 || got.People[0].Person.Email != "jane@x.com" {
+		t.Fatalf("got %v, want one person match for jane@x.com", got.People)
 	}
 }
 

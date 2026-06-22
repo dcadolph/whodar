@@ -92,6 +92,23 @@ The token is read only from the environment, never from a flag, and is never
 logged or stored. Indexed message text stays on the machine under the strict
 policy. Private-channel ingest can be pinned off so user flags cannot enable it.
 
+## LLM mode
+
+By default whodar answers with the keyword resolver, which needs no model. For a
+more capable answer, point it at a local Ollama server. whodar retrieves
+candidates with the index, then asks the model to rank them and write a short
+recommendation. The model only sees retrieved candidates, so it cannot invent
+people or channels.
+
+    # Needs a local Ollama (https://ollama.com) with a model pulled.
+    ollama pull llama3.1
+    go run . ask --mode llm "who do I talk to about billing retries"
+    go run . ask --mode llm --model qwen2.5 "where do I ask about kafka"
+
+Ollama runs on the machine, so LLM mode is allowed under the strict policy. A
+non-local --ollama-url counts as egress and is refused unless the policy permits
+it.
+
 ## License
 
 Proprietary. All rights reserved. See [LICENSE](LICENSE).
