@@ -13,6 +13,9 @@ It is "who owns this?" and "which channel do I post in?". whodar turns scattered
 signal (Slack activity, org charts, code ownership, wikis) into a single, queryable
 map of expertise.
 
+New here? See [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) for an
+end-to-end walkthrough: install, index a source, and ask.
+
 ## How it works
 
 whodar pulls from pluggable connectors, normalizes everything into one graph of
