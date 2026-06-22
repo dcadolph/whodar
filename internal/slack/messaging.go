@@ -1,0 +1,56 @@
+package slack
+
+import (
+	"context"
+	"net/url"
+)
+
+// okResp decodes a response that carries only the standard envelope.
+type okResp struct {
+	apiMeta
+}
+
+// PostMessage posts text to a channel. When threadTS is set, the message is a
+// reply in that thread. Slack mrkdwn formatting in text is honored.
+func (c *Client) PostMessage(ctx context.Context, channel, threadTS, text string) error {
+	params := url.Values{"channel": {channel}, "text": {text}}
+	if threadTS != "" {
+		params.Set("thread_ts", threadTS)
+	}
+	var resp okResp
+	return c.do(ctx, "chat.postMessage", params, &resp)
+}
+
+// authTestResp decodes auth.test.
+type authTestResp struct {
+	apiMeta
+	// UserID is the authenticated bot's own user ID.
+	UserID string `json:"user_id"`
+}
+
+// AuthTest returns the authenticated bot's own user ID. The bot uses it to
+// ignore its own messages and to strip its mention from inbound text.
+func (c *Client) AuthTest(ctx context.Context) (string, error) {
+	var resp authTestResp
+	if err := c.do(ctx, "auth.test", url.Values{}, &resp); err != nil {
+		return "", err
+	}
+	return resp.UserID, nil
+}
+
+// connectionsOpenResp decodes apps.connections.open.
+type connectionsOpenResp struct {
+	apiMeta
+	// URL is the WebSocket URL for a Socket Mode session.
+	URL string `json:"url"`
+}
+
+// ConnectionsOpen opens a Socket Mode session and returns its WebSocket URL. It
+// requires an app-level token (xapp-), not the bot token.
+func (c *Client) ConnectionsOpen(ctx context.Context) (string, error) {
+	var resp connectionsOpenResp
+	if err := c.do(ctx, "apps.connections.open", url.Values{}, &resp); err != nil {
+		return "", err
+	}
+	return resp.URL, nil
+}
