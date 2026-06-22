@@ -1,0 +1,102 @@
+// Package web serves the whodar web UI: a search page and a JSON ask API over
+// the same engine the CLI uses.
+package web
+
+import (
+	"context"
+	"embed"
+	"encoding/json"
+	"fmt"
+	"html/template"
+	"io/fs"
+	"net/http"
+	"strconv"
+	"strings"
+
+	"github.com/dcadolph/whodar/internal/resolve"
+)
+
+// assets holds the embedded templates and static files.
+//
+//go:embed templates/*.html static/*
+var assets embed.FS
+
+// AskFunc resolves a query in the chosen mode and returns the answer.
+type AskFunc func(ctx context.Context, query, mode string, limit int) (resolve.Answer, error)
+
+// Config configures the web handler.
+type Config struct {
+	// Ask resolves queries; required.
+	Ask AskFunc
+	// Version is shown in the page footer.
+	Version string
+}
+
+// Handler returns the whodar web handler: an index page, embedded assets, and a
+// JSON ask API. It panics if cfg.Ask is nil.
+func Handler(cfg Config) (http.Handler, error) {
+	if cfg.Ask == nil {
+		panic("web: Handler requires an Ask function")
+	}
+	tmpl, err := template.ParseFS(assets, "templates/index.html")
+	if err != nil {
+		return nil, fmt.Errorf("web: parse templates: %w", err)
+	}
+	static, err := fs.Sub(assets, "static")
+	if err != nil {
+		return nil, fmt.Errorf("web: static assets: %w", err)
+	}
+
+	mux := http.NewServeMux()
+	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(static))))
+	mux.HandleFunc("/api/ask", askHandler(cfg.Ask))
+	mux.HandleFunc("/", indexHandler(tmpl, cfg.Version))
+	return mux, nil
+}
+
+// indexHandler serves the search page at the root path.
+func indexHandler(tmpl *template.Template, version string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if err := tmpl.Execute(w, map[string]string{"Version": version}); err != nil {
+			http.Error(w, "template error", http.StatusInternalServerError)
+		}
+	}
+}
+
+// askHandler answers queries as JSON. It reads q, mode, and limit from the query
+// string and returns the same shape the CLI emits.
+func askHandler(ask AskFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		query := strings.TrimSpace(r.URL.Query().Get("q"))
+		if query == "" {
+			writeError(w, http.StatusBadRequest, "missing q")
+			return
+		}
+		limit := 5
+		if v := r.URL.Query().Get("limit"); v != "" {
+			if n, err := strconv.Atoi(v); err == nil && n > 0 {
+				limit = n
+			}
+		}
+
+		ans, err := ask(r.Context(), query, r.URL.Query().Get("mode"), limit)
+		if err != nil {
+			writeError(w, http.StatusBadGateway, err.Error())
+			return
+		}
+		_ = json.NewEncoder(w).Encode(ans.View(query))
+	}
+}
+
+// writeError writes a JSON error response with the given status.
+func writeError(w http.ResponseWriter, status int, msg string) {
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}

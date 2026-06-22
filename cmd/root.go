@@ -50,7 +50,7 @@ func newRootCmd() *cobra.Command {
 	pf.StringVar(&opts.policyName, "policy", opts.policyName, "Egress policy: strict, redacted, or open.")
 	pf.BoolVar(&opts.pretty, "pretty", false, "Indent JSON output.")
 
-	root.AddCommand(newIndexCmd(opts), newAskCmd(opts), newVersionCmd())
+	root.AddCommand(newIndexCmd(opts), newAskCmd(opts), newServeCmd(opts), newVersionCmd())
 	return root
 }
 

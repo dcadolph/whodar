@@ -109,6 +109,16 @@ Ollama runs on the machine, so LLM mode is allowed under the strict policy. A
 non-local --ollama-url counts as egress and is refused unless the policy permits
 it.
 
+## Web UI
+
+Run a local search page over the same engine:
+
+    go run . serve
+
+Open http://127.0.0.1:8765, type a question, and pick keyword or llm mode. The
+server binds to localhost only, so nothing leaves the machine. Override the
+address with --addr.
+
 ## License
 
 Proprietary. All rights reserved. See [LICENSE](LICENSE).

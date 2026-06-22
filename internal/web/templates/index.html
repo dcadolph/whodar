@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>whodar</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main>
+    <header>
+      <h1>whodar</h1>
+      <p class="tagline">Find who to talk to about X.</p>
+    </header>
+
+    <form id="ask-form" autocomplete="off">
+      <input id="q" name="q" type="text"
+             placeholder="who do I talk to about billing retries" autofocus>
+      <div class="controls">
+        <label for="mode">Mode</label>
+        <select id="mode" name="mode">
+          <option value="keyword">keyword (fast, no model)</option>
+          <option value="llm">llm (local model)</option>
+        </select>
+        <button type="submit">Ask</button>
+      </div>
+    </form>
+
+    <p id="status" class="status" role="status"></p>
+    <div id="summary" class="summary" hidden></div>
+
+    <section id="people-section" hidden>
+      <h2>People</h2>
+      <div id="people" class="cards"></div>
+    </section>
+
+    <section id="channels-section" hidden>
+      <h2>Channels</h2>
+      <div id="channels" class="cards"></div>
+    </section>
+  </main>
+
+  <footer>whodar {{.Version}}</footer>
+  <script src="/static/app.js"></script>
+</body>
+</html>
