@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/dcadolph/whodar/internal/resolve"
 )
 
 // TestIndexThenAsk runs the index and ask commands end to end over a temp CSV.
@@ -29,7 +31,7 @@ func TestIndexThenAsk(t *testing.T) {
 		t.Fatalf("ask: %v", err)
 	}
 
-	var ans answer
+	var ans resolve.JSONAnswer
 	if err := json.Unmarshal(out, &ans); err != nil {
 		t.Fatalf("decode answer: %v\n%s", err, out)
 	}
