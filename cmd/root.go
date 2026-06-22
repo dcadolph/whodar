@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -8,6 +10,12 @@ import (
 
 	"github.com/dcadolph/whodar/internal/policy"
 )
+
+// policyEnvVar names the environment variable pointing to an org policy file.
+const policyEnvVar = "WHODAR_POLICY_FILE"
+
+// defaultPolicyFile is the path an organization can pin a policy at.
+const defaultPolicyFile = "/etc/whodar/policy.json"
 
 // options holds the shared flags resolved on the root command.
 type options struct {
@@ -35,13 +43,8 @@ func newRootCmd() *cobra.Command {
 		Short:         "Find who to talk to about X",
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
-			mode, err := policy.ParseMode(opts.policyName)
-			if err != nil {
-				return err
-			}
-			opts.pol = policy.New(mode, false)
-			return nil
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			return opts.resolvePolicy(cmd.Flags().Changed("policy"), cmd.ErrOrStderr())
 		},
 	}
 
@@ -52,6 +55,46 @@ func newRootCmd() *cobra.Command {
 
 	root.AddCommand(newIndexCmd(opts), newAskCmd(opts), newServeCmd(opts), newVersionCmd())
 	return root
+}
+
+// resolvePolicy sets o.pol from the org policy file and the user's flag. A
+// locked org policy wins and ignores the flag; otherwise the file supplies the
+// default mode and the flag may override it.
+func (o *options) resolvePolicy(policyChanged bool, errOut io.Writer) error {
+	cfg, found, err := policy.Load(policyFilePath())
+	if err != nil {
+		return err
+	}
+	if found && cfg.Locked {
+		pol, err := cfg.Policy()
+		if err != nil {
+			return fmt.Errorf("org policy: %w", err)
+		}
+		o.pol = pol
+		if policyChanged {
+			fmt.Fprintln(errOut, "whodar: --policy ignored; pinned by org policy")
+		}
+		return nil
+	}
+
+	mode := o.policyName
+	if found && !policyChanged && cfg.Mode != "" {
+		mode = cfg.Mode
+	}
+	parsed, err := policy.ParseMode(mode)
+	if err != nil {
+		return err
+	}
+	o.pol = policy.New(parsed, false)
+	return nil
+}
+
+// policyFilePath returns the org policy file path, preferring the environment.
+func policyFilePath() string {
+	if p := os.Getenv(policyEnvVar); p != "" {
+		return p
+	}
+	return defaultPolicyFile
 }
 
 // defaultDataDir returns the default data directory under the user's home.
