@@ -157,6 +157,45 @@ Open http://127.0.0.1:8765, type a question, and pick keyword or llm mode. The
 server binds to localhost only, so it is not reachable from the network. Stop it
 with Ctrl-C; it shuts down cleanly. Change the address with `--addr`.
 
+## Slack bot
+
+Let your team ask whodar from Slack directly. They mention the bot in a channel
+or send it a direct message, and the bot replies in place. Adding `--llm` to a
+message uses the model for that answer, and `--keyword` forces the fast path.
+
+### Scopes and events
+
+In addition to the read scopes from the Slack section, add the bot scopes
+`chat:write`, `app_mentions:read`, `im:history`, and `im:read`. Under Event
+Subscriptions, subscribe the bot to `app_mention` and `message.im`.
+
+### Socket Mode (no public URL)
+
+Best for a laptop or an internal host. Enable Socket Mode, create an app-level
+token that starts with `xapp-` with the `connections:write` scope, then run:
+
+    export WHODAR_SLACK_TOKEN=xoxb-...
+    export WHODAR_SLACK_APP_TOKEN=xapp-...
+    whodar bot --transport socket
+
+### Events API (public endpoint)
+
+Best for a hosted deployment. Point the Slack request URL at
+https://your-host/slack/events and run:
+
+    export WHODAR_SLACK_TOKEN=xoxb-...
+    export WHODAR_SLACK_SIGNING_SECRET=...
+    whodar bot --transport events --addr 0.0.0.0:8766
+
+The events transport verifies the Slack request signature and rejects requests
+with an old timestamp.
+
+### Default answer mode
+
+By default the bot answers with the keyword resolver. Set `--mode llm` to make
+the model the default, in which case Ollama must run on the bot's host. Either
+way, a user overrides per message with a trailing `--llm` or `--keyword`.
+
 ## Where your data lives
 
 The index is written to `~/.whodar/index.json` by default. Override the location
@@ -210,6 +249,8 @@ merges people by email, so one human is one entry.
 - `whodar ask [--mode keyword|llm] [--model NAME] [--limit N] [--pretty] QUESTION`
   answers a question.
 - `whodar serve [--addr HOST:PORT] [--mode keyword|llm]` runs the web UI.
+- `whodar bot [--transport socket|events] [--mode keyword|llm] [--addr HOST:PORT]`
+  runs the Slack bot.
 - `whodar version` prints the version.
 
 Shared flags: `--data-dir` sets the index location, `--policy` sets the egress

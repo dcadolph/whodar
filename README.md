@@ -122,6 +122,35 @@ Open http://127.0.0.1:8765, type a question, and pick keyword or llm mode. The
 server binds to localhost only, so nothing leaves the machine. Override the
 address with --addr.
 
+## Slack bot
+
+Let people ask whodar from Slack: mention the bot in a channel or send it a
+direct message. Add a trailing `--llm` to a message to use the model for that
+answer.
+
+The bot needs the read scopes from the Slack section plus `chat:write`,
+`app_mentions:read`, `im:history`, and `im:read`, and subscriptions to the
+`app_mention` and `message.im` events. Export the bot token:
+
+    export WHODAR_SLACK_TOKEN=xoxb-...
+
+Socket Mode needs no public URL and suits a laptop or internal host. Enable
+Socket Mode, create an app-level token (`xapp-`) with `connections:write`, then:
+
+    export WHODAR_SLACK_APP_TOKEN=xapp-...
+    whodar bot --transport socket
+
+The Events API suits a hosted deployment with a public HTTPS endpoint. Point the
+Slack request URL at https://your-host/slack/events and export the signing
+secret:
+
+    export WHODAR_SLACK_SIGNING_SECRET=...
+    whodar bot --transport events --addr 0.0.0.0:8766
+
+Set the default answer mode with `--mode keyword|llm`. Socket mode authenticates
+with the app token; the events transport verifies the Slack request signature
+and rejects stale requests.
+
 ## License
 
 Proprietary. All rights reserved. See [LICENSE](LICENSE).
