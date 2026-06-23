@@ -229,6 +229,10 @@ so people who left the org or channels that went away drop out, and new ones
 appear. Index Slack and an org chart into the same data directory and whodar
 merges people by email, so one human is one entry.
 
+Each run prints what joined and left since the last index, for example
+"+3 people, -1 people, +1 channels". Add `--changes-file changes.json` to write
+the full diff as JSON for a script or a report.
+
 ## Troubleshooting
 
 | Message                                             | Cause                              | Fix                                          |

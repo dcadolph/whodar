@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -21,6 +23,7 @@ func newIndexCmd(opts *options) *cobra.Command {
 		includePrivate bool
 		sinceDays      int
 		maxMessages    int
+		changesFile    string
 	)
 	cmd := &cobra.Command{
 		Use:   "index",
@@ -47,13 +50,26 @@ func newIndexCmd(opts *options) *cobra.Command {
 
 			ix := index.New()
 			ix.Build(recs)
+
+			var changes index.Changes
+			if old, lerr := index.Load(opts.indexPath()); lerr == nil {
+				changes = index.Diff(old.Graph, ix.Graph)
+			}
 			if err := ix.Save(opts.indexPath()); err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.ErrOrStderr(),
+
+			out := cmd.ErrOrStderr()
+			fmt.Fprintf(out,
 				"indexed %d people, %d channels, %d teams, %d topics into %s\n",
 				len(ix.Graph.People), len(ix.Graph.Channels), len(ix.Graph.Teams),
 				len(ix.Graph.Topics), opts.indexPath())
+			reportChanges(out, changes)
+			if changesFile != "" {
+				if err := writeChangesFile(changesFile, changes); err != nil {
+					return err
+				}
+			}
 			return nil
 		},
 	}
@@ -63,6 +79,7 @@ func newIndexCmd(opts *options) *cobra.Command {
 	f.BoolVar(&includePrivate, "include-private", false, "Ingest private Slack channels if policy allows.")
 	f.IntVar(&sinceDays, "since-days", 180, "Slack history window in days.")
 	f.IntVar(&maxMessages, "max-messages", 5000, "Slack message cap per channel.")
+	f.StringVar(&changesFile, "changes-file", "", "Write the index diff as JSON to this path.")
 	return cmd
 }
 
@@ -92,4 +109,45 @@ func fetchSlack(cmd *cobra.Command, opts *options, a slackArgs) ([]connector.Rec
 		Log:            cmd.ErrOrStderr(),
 	})
 	return src.Fetch(cmd.Context())
+}
+
+// reportChanges prints a one-line summary and capped lists of who and what
+// joined or left since the last index.
+func reportChanges(w io.Writer, c index.Changes) {
+	if c.Empty() {
+		return
+	}
+	fmt.Fprintf(w, "changes since last index: %s\n", c.Summary())
+	printChangeList(w, "joined", c.PeopleJoined)
+	printChangeList(w, "left", c.PeopleLeft)
+	printChangeList(w, "new channels", c.ChannelsAdded)
+	printChangeList(w, "gone channels", c.ChannelsRemoved)
+}
+
+// printChangeList prints up to a fixed number of items under a label, noting
+// any remainder.
+func printChangeList(w io.Writer, label string, items []string) {
+	const limit = 15
+	if len(items) == 0 {
+		return
+	}
+	shown := items
+	if len(shown) > limit {
+		shown = shown[:limit]
+	}
+	fmt.Fprintf(w, "  %s: %s", label, strings.Join(shown, ", "))
+	if len(items) > limit {
+		fmt.Fprintf(w, ", and %d more", len(items)-limit)
+	}
+	fmt.Fprintln(w)
+}
+
+// writeChangesFile writes the changes as JSON to path.
+func writeChangesFile(path string, c index.Changes) error {
+	f, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("changes file: %w", err)
+	}
+	defer f.Close()
+	return writeJSON(f, c, true)
 }
