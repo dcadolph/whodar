@@ -68,6 +68,10 @@ type Index struct {
 	channelPostings map[string]map[model.ID]float64
 	// channelTexts holds normalized per-channel field text for reason lookup.
 	channelTexts map[model.ID]*channelText
+	// personVecs holds per-person embedding vectors when present.
+	personVecs map[model.ID][]float32
+	// channelVecs holds per-channel embedding vectors when present.
+	channelVecs map[model.ID][]float32
 }
 
 // New returns an empty index with initialized maps.
@@ -78,6 +82,8 @@ func New() *Index {
 		texts:           make(map[model.ID]*personText),
 		channelPostings: make(map[string]map[model.ID]float64),
 		channelTexts:    make(map[model.ID]*channelText),
+		personVecs:      make(map[model.ID][]float32),
+		channelVecs:     make(map[model.ID][]float32),
 	}
 }
 
@@ -104,6 +110,8 @@ func (ix *Index) Build(records []connector.Record) {
 	ix.texts = texts
 	ix.channelPostings = channelPostings
 	ix.channelTexts = channelTexts
+	ix.personVecs = make(map[model.ID][]float32)
+	ix.channelVecs = make(map[model.ID][]float32)
 }
 
 // buildPerson merges one person record into the graph and postings.
@@ -400,6 +408,10 @@ type snapshot struct {
 	ChannelPostings map[string]map[model.ID]float64 `json:"channel_postings"`
 	// ChannelTexts holds normalized per-channel field text.
 	ChannelTexts map[model.ID]*channelText `json:"channel_texts"`
+	// PersonVecs holds per-person embedding vectors.
+	PersonVecs map[model.ID][]float32 `json:"person_vecs,omitempty"`
+	// ChannelVecs holds per-channel embedding vectors.
+	ChannelVecs map[model.ID][]float32 `json:"channel_vecs,omitempty"`
 }
 
 // Save writes the index to path as JSON, creating parent directories as needed.
@@ -421,6 +433,8 @@ func (ix *Index) Save(path string) error {
 		Texts:           ix.texts,
 		ChannelPostings: ix.channelPostings,
 		ChannelTexts:    ix.channelTexts,
+		PersonVecs:      ix.personVecs,
+		ChannelVecs:     ix.channelVecs,
 	}
 	if err := enc.Encode(snap); err != nil {
 		return fmt.Errorf("index: encode: %w", err)
@@ -446,6 +460,8 @@ func Load(path string) (*Index, error) {
 		texts:           snap.Texts,
 		channelPostings: snap.ChannelPostings,
 		channelTexts:    snap.ChannelTexts,
+		personVecs:      snap.PersonVecs,
+		channelVecs:     snap.ChannelVecs,
 	}
 	if ix.Graph == nil {
 		ix.Graph = model.NewGraph()
@@ -464,6 +480,12 @@ func Load(path string) (*Index, error) {
 	}
 	if ix.channelTexts == nil {
 		ix.channelTexts = make(map[model.ID]*channelText)
+	}
+	if ix.personVecs == nil {
+		ix.personVecs = make(map[model.ID][]float32)
+	}
+	if ix.channelVecs == nil {
+		ix.channelVecs = make(map[model.ID][]float32)
 	}
 	return ix, nil
 }
