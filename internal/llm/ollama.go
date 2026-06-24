@@ -38,6 +38,8 @@ type Ollama struct {
 	baseURL string
 	// model is the model name to chat with.
 	model string
+	// embedModel is the model name used for embeddings.
+	embedModel string
 	// http performs requests.
 	http Doer
 }
@@ -63,9 +65,18 @@ func WithBaseURL(u string) Option {
 	}
 }
 
+// WithEmbedModel overrides the embedding model.
+func WithEmbedModel(name string) Option {
+	return func(o *Ollama) {
+		if name != "" {
+			o.embedModel = name
+		}
+	}
+}
+
 // New returns an Ollama client for model, defaulting the model when empty.
 func New(model string, opts ...Option) *Ollama {
-	o := &Ollama{baseURL: defaultBaseURL, model: model, http: http.DefaultClient}
+	o := &Ollama{baseURL: defaultBaseURL, model: model, embedModel: defaultEmbedModel, http: http.DefaultClient}
 	if o.model == "" {
 		o.model = defaultModel
 	}
