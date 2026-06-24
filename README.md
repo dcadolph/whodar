@@ -116,6 +116,17 @@ Ollama runs on the machine, so LLM mode is allowed under the strict policy. A
 non-local --ollama-url counts as egress and is refused unless the policy permits
 it.
 
+## Semantic search
+
+Build the index with embeddings to match on meaning, not only words:
+
+    ollama pull nomic-embed-text
+    go run . index --source org-csv --file examples/people.csv --embed
+    go run . ask --mode semantic "who handles failed payments"
+
+The llm mode also retrieves candidates with embeddings when the index has them.
+See docs/GETTING_STARTED.md for detail.
+
 ## Web UI
 
 Run a local search page over the same engine:
