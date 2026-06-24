@@ -40,7 +40,7 @@ func newRootCmd() *cobra.Command {
 
 	root := &cobra.Command{
 		Use:           "whodar",
-		Short:         "Find who to talk to about X",
+		Short:         "Know who knows",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {

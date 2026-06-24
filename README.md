@@ -1,6 +1,10 @@
+<p align="center">
+  <img src="docs/whodar-banner.png" alt="whodar - know who knows" width="100%">
+</p>
+
 # whodar
 
-Find who to talk to about X.
+Know who knows.
 
 `whodar` answers "who do I talk to about billing retries?" by indexing the people,
 teams, topics, and channels across your work tools, then ranking who and where to
