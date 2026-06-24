@@ -1,0 +1,33 @@
+version: 2
+project_name: whodar
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - main: .
+    binary: whodar
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X github.com/dcadolph/whodar/cmd.version={{.Version}}
+
+archives:
+  - formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+checksum:
+  name_template: checksums.txt
+
+release:
+  draft: true
