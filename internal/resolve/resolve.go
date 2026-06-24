@@ -69,6 +69,13 @@ type Chatter interface {
 	Chat(ctx context.Context, system, user string) (string, error)
 }
 
+// Embedder turns text into a vector for semantic retrieval. The llm package's
+// Ollama client satisfies it.
+type Embedder interface {
+	// Embed returns the embedding vector for text.
+	Embed(ctx context.Context, text string) ([]float32, error)
+}
+
 // llmSystem instructs the model to rank only provided candidates and reply as
 // JSON, keeping the answer grounded in real data.
 const llmSystem = `You help an employee find who to talk to and which channel to ask in.
@@ -88,14 +95,18 @@ type LLM struct {
 	ix *index.Index
 	// chat is the model client.
 	chat Chatter
+	// embedder retrieves candidates semantically when set and the index has
+	// embeddings; nil falls back to keyword retrieval.
+	embedder Embedder
 }
 
-// NewLLM returns an LLM resolver. It panics if ix or chat is nil.
-func NewLLM(ix *index.Index, chat Chatter) *LLM {
+// NewLLM returns an LLM resolver. The embedder may be nil, in which case
+// candidates are retrieved by keyword. It panics if ix or chat is nil.
+func NewLLM(ix *index.Index, chat Chatter, embedder Embedder) *LLM {
 	if ix == nil || chat == nil {
 		panic("resolve: NewLLM requires a non-nil index and chat client")
 	}
-	return &LLM{ix: ix, chat: chat}
+	return &LLM{ix: ix, chat: chat, embedder: embedder}
 }
 
 // llmResult is the JSON the model is asked to return.
@@ -113,8 +124,7 @@ type llmResult struct {
 // back to keyword order and uses the raw reply as the summary.
 func (l *LLM) Resolve(ctx context.Context, query string, limit int) (Answer, error) {
 	n := candidateN(limit)
-	people := l.ix.Search(query, n)
-	channels := l.ix.SearchChannels(query, n)
+	people, channels := l.retrieve(ctx, query, n)
 	if len(people) == 0 && len(channels) == 0 {
 		return Answer{}, nil
 	}
@@ -137,6 +147,18 @@ func (l *LLM) Resolve(ctx context.Context, query string, limit int) (Answer, err
 		Channels: capChannels(reorderChannels(channels, out.Channels), limit),
 		Summary:  strings.TrimSpace(out.Summary),
 	}, nil
+}
+
+// retrieve gets candidate people and channels, semantically when an embedder is
+// configured and the index has vectors, otherwise by keyword. A failed query
+// embedding falls back to keyword retrieval.
+func (l *LLM) retrieve(ctx context.Context, query string, n int) ([]model.Match, []model.ChannelMatch) {
+	if l.embedder != nil && l.ix.HasEmbeddings() {
+		if vec, err := l.embedder.Embed(ctx, query); err == nil {
+			return l.ix.SemanticPeople(vec, n), l.ix.SemanticChannels(vec, n)
+		}
+	}
+	return l.ix.Search(query, n), l.ix.SearchChannels(query, n)
 }
 
 // candidateN returns how many candidates to retrieve for the model, a small
@@ -251,4 +273,33 @@ func capChannels(matches []model.ChannelMatch, limit int) []model.ChannelMatch {
 		return matches[:limit]
 	}
 	return matches
+}
+
+// Semantic is a resolver that ranks purely by embedding similarity. It needs an
+// embedder and an index built with embeddings; it uses no chat model.
+type Semantic struct {
+	// ix holds the entity vectors.
+	ix *index.Index
+	// embedder embeds the query.
+	embedder Embedder
+}
+
+// NewSemantic returns a Semantic resolver. It panics if ix or embedder is nil.
+func NewSemantic(ix *index.Index, embedder Embedder) *Semantic {
+	if ix == nil || embedder == nil {
+		panic("resolve: NewSemantic requires a non-nil index and embedder")
+	}
+	return &Semantic{ix: ix, embedder: embedder}
+}
+
+// Resolve embeds the query and ranks people and channels by cosine similarity.
+func (s *Semantic) Resolve(ctx context.Context, query string, limit int) (Answer, error) {
+	vec, err := s.embedder.Embed(ctx, query)
+	if err != nil {
+		return Answer{}, fmt.Errorf("semantic resolve: %w", err)
+	}
+	return Answer{
+		People:   s.ix.SemanticPeople(vec, limit),
+		Channels: s.ix.SemanticChannels(vec, limit),
+	}, nil
 }

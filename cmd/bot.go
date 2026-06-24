@@ -41,12 +41,13 @@ func (s slackReplier) Reply(ctx context.Context, channel, threadTS, text string)
 // Socket Mode or the Events API.
 func newBotCmd(opts *options) *cobra.Command {
 	var (
-		transport string
-		mode      string
-		model     string
-		ollamaURL string
-		addr      string
-		limit     int
+		transport  string
+		mode       string
+		model      string
+		embedModel string
+		ollamaURL  string
+		addr       string
+		limit      int
 	)
 	cmd := &cobra.Command{
 		Use:   "bot",
@@ -71,7 +72,7 @@ func newBotCmd(opts *options) *cobra.Command {
 				if reqMode == "" {
 					reqMode = mode
 				}
-				res, err := pickResolver(ix, opts, reqMode, model, ollamaURL)
+				res, err := pickResolver(ix, opts, reqMode, model, embedModel, ollamaURL)
 				if err != nil {
 					return resolve.Answer{}, err
 				}
@@ -92,9 +93,10 @@ func newBotCmd(opts *options) *cobra.Command {
 	}
 	f := cmd.Flags()
 	f.StringVar(&transport, "transport", "socket", "Slack transport: socket or events.")
-	f.StringVar(&mode, "mode", "keyword", "Default answer mode: keyword or llm.")
-	f.StringVar(&model, "model", "", "Ollama model for llm mode.")
-	f.StringVar(&ollamaURL, "ollama-url", "http://localhost:11434", "Ollama base URL for llm mode.")
+	f.StringVar(&mode, "mode", "keyword", "Default answer mode: keyword, semantic, or llm.")
+	f.StringVar(&model, "model", "", "Ollama chat model for llm mode.")
+	f.StringVar(&embedModel, "embed-model", "", "Ollama embed model for semantic/llm mode.")
+	f.StringVar(&ollamaURL, "ollama-url", "http://localhost:11434", "Ollama base URL.")
 	f.StringVar(&addr, "addr", "127.0.0.1:8766", "Address for the events transport HTTP server.")
 	f.IntVar(&limit, "limit", 5, "Maximum results per section.")
 	return cmd

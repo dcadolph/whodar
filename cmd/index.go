@@ -24,6 +24,9 @@ func newIndexCmd(opts *options) *cobra.Command {
 		sinceDays      int
 		maxMessages    int
 		changesFile    string
+		embed          bool
+		embedModel     string
+		ollamaURL      string
 	)
 	cmd := &cobra.Command{
 		Use:   "index",
@@ -50,6 +53,18 @@ func newIndexCmd(opts *options) *cobra.Command {
 
 			ix := index.New()
 			ix.Build(recs)
+
+			if embed {
+				if err := guardLLMHost(opts.pol, ollamaURL); err != nil {
+					return err
+				}
+				fmt.Fprintf(cmd.ErrOrStderr(),
+					"embedding %d people and %d channels via Ollama...\n",
+					len(ix.Graph.People), len(ix.Graph.Channels))
+				if err := ix.Embed(cmd.Context(), newOllama("", embedModel, ollamaURL)); err != nil {
+					return fmt.Errorf("embed: %w", err)
+				}
+			}
 
 			var changes index.Changes
 			if old, lerr := index.Load(opts.indexPath()); lerr == nil {
@@ -80,6 +95,9 @@ func newIndexCmd(opts *options) *cobra.Command {
 	f.IntVar(&sinceDays, "since-days", 180, "Slack history window in days.")
 	f.IntVar(&maxMessages, "max-messages", 5000, "Slack message cap per channel.")
 	f.StringVar(&changesFile, "changes-file", "", "Write the index diff as JSON to this path.")
+	f.BoolVar(&embed, "embed", false, "Generate embeddings via Ollama for semantic search.")
+	f.StringVar(&embedModel, "embed-model", "", "Ollama embed model (default nomic-embed-text).")
+	f.StringVar(&ollamaURL, "ollama-url", "http://localhost:11434", "Ollama base URL for --embed.")
 	return cmd
 }
 

@@ -45,7 +45,7 @@ func TestLLMResolveRanksAndSummarizes(t *testing.T) {
 	chat := &fakeChat{
 		reply: `{"summary":"Talk to Jane Roe in #billing.","people":["jane@x.com"],"channels":["billing"]}`,
 	}
-	ans, err := NewLLM(llmIndex(), chat).Resolve(context.Background(), "retries", 5)
+	ans, err := NewLLM(llmIndex(), chat, nil).Resolve(context.Background(), "retries", 5)
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
@@ -69,7 +69,7 @@ func TestLLMGroundsToCandidates(t *testing.T) {
 	chat := &fakeChat{
 		reply: `{"summary":"x","people":["ghost@x.com","jane@x.com"],"channels":["nope"]}`,
 	}
-	ans, err := NewLLM(llmIndex(), chat).Resolve(context.Background(), "retries", 5)
+	ans, err := NewLLM(llmIndex(), chat, nil).Resolve(context.Background(), "retries", 5)
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestLLMGroundsToCandidates(t *testing.T) {
 func TestLLMChatError(t *testing.T) {
 	t.Parallel()
 	chat := &fakeChat{err: errors.New("boom")}
-	if _, err := NewLLM(llmIndex(), chat).Resolve(context.Background(), "retries", 5); err == nil {
+	if _, err := NewLLM(llmIndex(), chat, nil).Resolve(context.Background(), "retries", 5); err == nil {
 		t.Fatal("want error from chat failure, got nil")
 	}
 }
@@ -103,7 +103,7 @@ func TestLLMChatError(t *testing.T) {
 func TestLLMToleratesNonJSON(t *testing.T) {
 	t.Parallel()
 	chat := &fakeChat{reply: "just a sentence"}
-	ans, err := NewLLM(llmIndex(), chat).Resolve(context.Background(), "retries", 5)
+	ans, err := NewLLM(llmIndex(), chat, nil).Resolve(context.Background(), "retries", 5)
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
@@ -122,8 +122,8 @@ func TestNewLLMNil(t *testing.T) {
 		Name string
 		Run  func()
 	}{
-		{Name: "nil index", Run: func() { NewLLM(nil, &fakeChat{}) }},
-		{Name: "nil chat", Run: func() { NewLLM(index.New(), nil) }},
+		{Name: "nil index", Run: func() { NewLLM(nil, &fakeChat{}, nil) }},
+		{Name: "nil chat", Run: func() { NewLLM(index.New(), nil, nil) }},
 	} {
 		t.Run(tc.Name, func(t *testing.T) {
 			t.Parallel()

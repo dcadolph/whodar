@@ -24,10 +24,11 @@ const shutdownTimeout = 5 * time.Second
 // shuts down cleanly on interrupt.
 func newServeCmd(opts *options) *cobra.Command {
 	var (
-		addr      string
-		mode      string
-		model     string
-		ollamaURL string
+		addr       string
+		mode       string
+		model      string
+		embedModel string
+		ollamaURL  string
 	)
 	cmd := &cobra.Command{
 		Use:   "serve",
@@ -41,7 +42,7 @@ func newServeCmd(opts *options) *cobra.Command {
 				if reqMode == "" {
 					reqMode = mode
 				}
-				res, err := pickResolver(ix, opts, reqMode, model, ollamaURL)
+				res, err := pickResolver(ix, opts, reqMode, model, embedModel, ollamaURL)
 				if err != nil {
 					return resolve.Answer{}, err
 				}
@@ -77,8 +78,9 @@ func newServeCmd(opts *options) *cobra.Command {
 	}
 	f := cmd.Flags()
 	f.StringVar(&addr, "addr", "127.0.0.1:8765", "Address to listen on.")
-	f.StringVar(&mode, "mode", "keyword", "Default resolver: keyword or llm.")
-	f.StringVar(&model, "model", "", "Ollama model for llm mode.")
-	f.StringVar(&ollamaURL, "ollama-url", "http://localhost:11434", "Ollama base URL for llm mode.")
+	f.StringVar(&mode, "mode", "keyword", "Default resolver: keyword, semantic, or llm.")
+	f.StringVar(&model, "model", "", "Ollama chat model for llm mode.")
+	f.StringVar(&embedModel, "embed-model", "", "Ollama embed model for semantic/llm mode.")
+	f.StringVar(&ollamaURL, "ollama-url", "http://localhost:11434", "Ollama base URL.")
 	return cmd
 }
