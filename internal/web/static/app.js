@@ -82,20 +82,62 @@ function chips(parent, items) {
 
 function personCard(p) {
   const card = el("div", "card");
-  card.appendChild(el("div", "name", p.name || p.email || "unknown"));
+  const name = el("div", "name");
+  if (p.email) {
+    const link = el("a", null, p.name || p.email);
+    link.href = "mailto:" + p.email;
+    name.appendChild(link);
+  } else {
+    name.appendChild(document.createTextNode(p.name || "unknown"));
+  }
+  const copyText = ((p.name || "") + (p.email ? " <" + p.email + ">" : "")).trim();
+  if (copyText) name.appendChild(copyButton(copyText));
+  card.appendChild(name);
+
   const sub = [p.title, p.team].filter(Boolean).join(" · ");
   if (sub) card.appendChild(el("div", "sub", sub));
-  if (p.email) card.appendChild(el("div", "sub", p.email));
   chips(card, p.reasons);
   return card;
 }
 
 function channelCard(c) {
   const card = el("div", "card");
-  card.appendChild(el("div", "name", "#" + c.name));
+  const name = el("div", "name", "#" + c.name);
+  name.appendChild(copyButton("#" + c.name));
+  card.appendChild(name);
   if (c.topic) card.appendChild(el("div", "sub", c.topic));
-  const members = (c.members || []).map((m) => m.name).filter(Boolean);
-  if (members.length) card.appendChild(el("div", "sub", "Active: " + members.join(", ")));
+
+  const members = c.members || [];
+  if (members.length) {
+    const sub = el("div", "sub");
+    sub.appendChild(document.createTextNode("Active: "));
+    members.forEach((m, i) => {
+      if (i) sub.appendChild(document.createTextNode(", "));
+      if (m.email) {
+        const link = el("a", null, m.name || m.email);
+        link.href = "mailto:" + m.email;
+        sub.appendChild(link);
+      } else {
+        sub.appendChild(document.createTextNode(m.name || ""));
+      }
+    });
+    card.appendChild(sub);
+  }
   chips(card, c.reasons);
   return card;
+}
+
+function copyButton(text) {
+  const button = el("button", "copy", "copy");
+  button.type = "button";
+  button.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      button.textContent = "copied";
+      setTimeout(() => (button.textContent = "copy"), 1200);
+    } catch (err) {
+      button.textContent = "failed";
+    }
+  });
+  return button;
 }
