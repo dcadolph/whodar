@@ -15,6 +15,9 @@ import (
 // slackTokenEnv is the environment variable holding the Slack bot token.
 const slackTokenEnv = "WHODAR_SLACK_TOKEN"
 
+// githubTokenEnv is the environment variable holding the GitHub token.
+const githubTokenEnv = "WHODAR_GITHUB_TOKEN"
+
 // newIndexCmd builds the index command, which ingests a source into the index.
 func newIndexCmd(opts *options) *cobra.Command {
 	var (
@@ -27,6 +30,10 @@ func newIndexCmd(opts *options) *cobra.Command {
 		embed          bool
 		embedModel     string
 		ollamaURL      string
+		repos          []string
+		githubOrg      string
+		maxRepos       int
+		githubEmails   bool
 	)
 	cmd := &cobra.Command{
 		Use:   "index",
@@ -49,8 +56,10 @@ func newIndexCmd(opts *options) *cobra.Command {
 					return fmt.Errorf("%w: --file (CODEOWNERS path or repo root) required for codeowners", ErrBadArgs)
 				}
 				recs, err = connector.NewCodeOwners(file).Fetch(cmd.Context())
+			case "github":
+				recs, err = fetchGitHub(cmd, githubArgs{repos, githubOrg, maxRepos, githubEmails})
 			default:
-				return fmt.Errorf("%w: %q (want org-csv, slack, or codeowners)", ErrUnknownSource, source)
+				return fmt.Errorf("%w: %q (want org-csv, slack, codeowners, or github)", ErrUnknownSource, source)
 			}
 			if err != nil {
 				return err
@@ -103,6 +112,10 @@ func newIndexCmd(opts *options) *cobra.Command {
 	f.BoolVar(&embed, "embed", false, "Generate embeddings via Ollama for semantic search.")
 	f.StringVar(&embedModel, "embed-model", "", "Ollama embed model (default nomic-embed-text).")
 	f.StringVar(&ollamaURL, "ollama-url", "http://localhost:11434", "Ollama base URL for --embed.")
+	f.StringArrayVar(&repos, "repo", nil, "GitHub repo owner/name (repeatable).")
+	f.StringVar(&githubOrg, "github-org", "", "GitHub org to index all repositories of.")
+	f.IntVar(&maxRepos, "max-repos", 0, "Cap repositories taken from --github-org (0 = all).")
+	f.BoolVar(&githubEmails, "github-emails", false, "Resolve GitHub user emails to join other sources.")
 	return cmd
 }
 
@@ -130,6 +143,33 @@ func fetchSlack(cmd *cobra.Command, opts *options, a slackArgs) ([]connector.Rec
 		SinceDays:      a.sinceDays,
 		MaxMessages:    a.maxMessages,
 		Log:            cmd.ErrOrStderr(),
+	})
+	return src.Fetch(cmd.Context())
+}
+
+// githubArgs holds the GitHub-specific index flags.
+type githubArgs struct {
+	// repos is the list of owner/name repositories.
+	repos []string
+	// org adds every repository in the org.
+	org string
+	// maxRepos caps repositories taken from the org.
+	maxRepos int
+	// emails resolves user emails to join other sources.
+	emails bool
+}
+
+// fetchGitHub builds GitHub records from the configured repositories or org.
+func fetchGitHub(cmd *cobra.Command, a githubArgs) ([]connector.Record, error) {
+	token := os.Getenv(githubTokenEnv)
+	if token == "" {
+		return nil, fmt.Errorf("%w: set %s", ErrBadArgs, githubTokenEnv)
+	}
+	if len(a.repos) == 0 && a.org == "" {
+		return nil, fmt.Errorf("%w: --repo or --github-org required for github", ErrBadArgs)
+	}
+	src := connector.NewGitHub(token, connector.GitHubOptions{
+		Repos: a.repos, Org: a.org, MaxRepos: a.maxRepos, ResolveEmails: a.emails, Log: cmd.ErrOrStderr(),
 	})
 	return src.Fetch(cmd.Context())
 }
