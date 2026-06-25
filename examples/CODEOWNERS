@@ -1,0 +1,9 @@
+# Example CODEOWNERS for whodar. Index it with:
+#   whodar index --source codeowners --file examples/CODEOWNERS
+/internal/billing/      @jane-roe   billing-team@example.com
+/internal/invoicing/    @carol-roe
+/internal/infra/        @kim-doe
+/internal/security/     @lee-doe    @example/appsec
+/internal/analytics/    @sam-roe
+*.tf                    @kim-doe
+/docs/                  @pat-poe

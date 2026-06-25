@@ -44,8 +44,13 @@ func newIndexCmd(opts *options) *cobra.Command {
 				recs, err = connector.NewOrgCSV(file).Fetch(cmd.Context())
 			case "slack":
 				recs, err = fetchSlack(cmd, opts, slackArgs{includePrivate, sinceDays, maxMessages})
+			case "codeowners":
+				if file == "" {
+					return fmt.Errorf("%w: --file (CODEOWNERS path or repo root) required for codeowners", ErrBadArgs)
+				}
+				recs, err = connector.NewCodeOwners(file).Fetch(cmd.Context())
 			default:
-				return fmt.Errorf("%w: %q (want org-csv or slack)", ErrUnknownSource, source)
+				return fmt.Errorf("%w: %q (want org-csv, slack, or codeowners)", ErrUnknownSource, source)
 			}
 			if err != nil {
 				return err
@@ -89,7 +94,7 @@ func newIndexCmd(opts *options) *cobra.Command {
 		},
 	}
 	f := cmd.Flags()
-	f.StringVar(&source, "source", "org-csv", "Source type: org-csv or slack.")
+	f.StringVar(&source, "source", "org-csv", "Source type: org-csv, slack, or codeowners.")
 	f.StringVar(&file, "file", "", "Path to the source file (org-csv).")
 	f.BoolVar(&includePrivate, "include-private", false, "Ingest private Slack channels if policy allows.")
 	f.IntVar(&sinceDays, "since-days", 180, "Slack history window in days.")
