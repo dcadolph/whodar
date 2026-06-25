@@ -1,0 +1,20 @@
+[Unit]
+Description=whodar Slack bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=whodar
+Group=whodar
+EnvironmentFile=/etc/whodar/bot.env
+ExecStart=/usr/local/bin/whodar bot --transport socket --data-dir /var/lib/whodar
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/whodar
+
+[Install]
+WantedBy=multi-user.target

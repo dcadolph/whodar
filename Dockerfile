@@ -1,0 +1,17 @@
+# Build whodar and run it from a minimal image. The web UI and the Slack bot
+# both run from this image; the default command serves the web UI.
+FROM golang:1.26 AS build
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+ARG VERSION=dev
+RUN CGO_ENABLED=0 go build \
+    -ldflags "-s -w -X github.com/dcadolph/whodar/cmd.version=${VERSION}" \
+    -o /out/whodar .
+
+FROM gcr.io/distroless/static-debian12
+COPY --from=build /out/whodar /whodar
+USER nonroot:nonroot
+ENTRYPOINT ["/whodar"]
+CMD ["serve", "--addr", "0.0.0.0:8765"]
