@@ -25,6 +25,29 @@ var codeStop = map[string]bool{
 	"json": true, "html": true, "css": true, "sh": true, "tf": true, "sql": true,
 }
 
+// extTopics maps file extensions to the topic words people search for, so an
+// owner of "*.tf" surfaces under "terraform".
+var extTopics = map[string]string{
+	"tf": "terraform", "tfvars": "terraform", "tfstate": "terraform",
+	"py": "python", "rb": "ruby", "js": "javascript", "jsx": "javascript",
+	"ts": "typescript", "tsx": "typescript", "go": "golang", "rs": "rust",
+	"java": "java", "kt": "kotlin", "swift": "swift", "scala": "scala",
+	"cc": "cpp", "cpp": "cpp", "hpp": "cpp", "cs": "csharp", "php": "php",
+	"clj": "clojure", "ex": "elixir", "erl": "erlang", "hs": "haskell",
+	"lua": "lua", "sh": "shell", "bash": "shell", "ps1": "powershell",
+	"sql": "sql", "graphql": "graphql", "proto": "protobuf",
+	"yml": "yaml", "yaml": "yaml", "toml": "toml", "html": "html",
+	"css": "css", "scss": "css", "md": "markdown",
+}
+
+// fileTopics maps special filenames with no extension to a topic.
+var fileTopics = map[string]string{
+	"dockerfile": "docker", "makefile": "make", "jenkinsfile": "jenkins",
+	"vagrantfile": "vagrant", "gemfile": "ruby", "rakefile": "ruby",
+	"go.mod": "golang", "go.sum": "golang", "package.json": "javascript",
+	"cargo.toml": "rust", "requirements.txt": "python",
+}
+
 // CodeOwners is a Source that reads a CODEOWNERS file and maps each owner to the
 // topics implied by the paths they own. It answers "who owns this system".
 type CodeOwners struct {
@@ -128,11 +151,21 @@ func ownerRecord(owner string, patterns []string) Record {
 }
 
 // topicsFromPatterns derives topic tags from the path segments of patterns,
-// dropping generic directory names and file extensions.
+// mapping file extensions and special filenames to the words people search and
+// dropping generic directory names.
 func topicsFromPatterns(patterns []string) []string {
 	seen := make(map[string]bool)
 	var topics []string
+	add := func(t string) {
+		if t != "" && !seen[t] {
+			seen[t] = true
+			topics = append(topics, t)
+		}
+	}
 	for _, p := range patterns {
+		for _, name := range patternNames(p) {
+			add(name)
+		}
 		for _, seg := range strings.Split(p, "/") {
 			seg = strings.Trim(seg, "*?.")
 			if seg == "" {
@@ -143,12 +176,30 @@ func topicsFromPatterns(patterns []string) []string {
 				if len(part) < 3 || codeStop[part] {
 					continue
 				}
-				if !seen[part] {
-					seen[part] = true
-					topics = append(topics, part)
-				}
+				add(part)
 			}
 		}
 	}
 	return topics
+}
+
+// patternNames maps a pattern's file extension or special filename to the topic
+// words people search, so "*.tf" surfaces under "terraform".
+func patternNames(pattern string) []string {
+	base := pattern
+	if i := strings.LastIndex(base, "/"); i >= 0 {
+		base = base[i+1:]
+	}
+	base = strings.ToLower(strings.Trim(base, "*?"))
+
+	var out []string
+	if name := fileTopics[base]; name != "" {
+		out = append(out, name)
+	}
+	if i := strings.LastIndex(base, "."); i >= 0 {
+		if name := extTopics[base[i+1:]]; name != "" {
+			out = append(out, name)
+		}
+	}
+	return out
 }
