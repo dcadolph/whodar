@@ -220,6 +220,31 @@ By default the bot answers with the keyword resolver. Set `--mode llm` to make
 the model the default, in which case Ollama must run on the bot's host. Either
 way, a user overrides per message with a trailing `--llm` or `--keyword`.
 
+## GitHub and Jira
+
+Index code and tickets to learn who works on what.
+
+GitHub needs a token in WHODAR_GITHUB_TOKEN with repository read access:
+
+    export WHODAR_GITHUB_TOKEN=ghp-...
+    whodar index --source github --repo your-org/your-repo
+    whodar index --source github --github-org your-org --github-emails
+
+It reads contributors, pull request authors, reviewers, assignees, labels and
+titles, non-pull-request issues, repository topics, and CODEOWNERS, weighted by
+how much each person works on a topic.
+
+Jira needs a site URL and an API token, created at id.atlassian.com:
+
+    export WHODAR_JIRA_URL=https://your-site.atlassian.net
+    export WHODAR_JIRA_EMAIL=you@example.com
+    export WHODAR_JIRA_TOKEN=...
+    whodar index --source jira --jira-project SEC --jira-project OPS
+
+It reads issue assignees and reporters, weighted by components, labels, summary
+words, and project. Use --jira-jql for a custom query. When emails are visible,
+these people merge with Slack and the org chart by email.
+
 ## Where your data lives
 
 The index is written to `~/.whodar/index.json` by default. Override the location
@@ -274,6 +299,8 @@ the full diff as JSON for a script or a report.
 - `whodar index --source org-csv --file FILE` builds the index from a CSV.
 - `whodar index --source slack [--include-private] [--since-days N] [--max-messages N]`
   builds the index from Slack.
+- `whodar index --source github (--repo owner/name | --github-org ORG)` indexes GitHub.
+- `whodar index --source jira (--jira-project KEY | --jira-jql JQL)` indexes Jira.
 - `whodar ask [--mode keyword|semantic|llm] [--limit N] [--pretty] QUESTION`
   answers a question.
 - `whodar index ... --embed` adds embeddings for semantic and llm retrieval.

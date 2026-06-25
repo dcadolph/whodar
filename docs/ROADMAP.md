@@ -6,9 +6,8 @@ single interface, each item below is additive and changes nothing downstream.
 
 ## More sources
 
-- GitHub: CODEOWNERS, pull request and issue authors and reviewers, repository
-  topics, and team membership, through the GitHub API.
-- Jira: issue assignees, reporters, components, and project leads.
+GitHub and Jira are shipped. Still to come:
+
 - Confluence and other wikis: page authors and space owners.
 - PagerDuty or Opsgenie: on-call schedules and service owners.
 - Git history: commit authors per path, for repositories without CODEOWNERS.

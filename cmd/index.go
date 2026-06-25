@@ -18,6 +18,13 @@ const slackTokenEnv = "WHODAR_SLACK_TOKEN"
 // githubTokenEnv is the environment variable holding the GitHub token.
 const githubTokenEnv = "WHODAR_GITHUB_TOKEN"
 
+// Jira environment variables for the site URL, email, and API token.
+const (
+	jiraURLEnv   = "WHODAR_JIRA_URL"
+	jiraEmailEnv = "WHODAR_JIRA_EMAIL"
+	jiraTokenEnv = "WHODAR_JIRA_TOKEN"
+)
+
 // newIndexCmd builds the index command, which ingests a source into the index.
 func newIndexCmd(opts *options) *cobra.Command {
 	var (
@@ -34,6 +41,10 @@ func newIndexCmd(opts *options) *cobra.Command {
 		githubOrg      string
 		maxRepos       int
 		githubEmails   bool
+		jiraURL        string
+		jiraProjects   []string
+		jiraJQL        string
+		maxIssues      int
 	)
 	cmd := &cobra.Command{
 		Use:   "index",
@@ -58,8 +69,10 @@ func newIndexCmd(opts *options) *cobra.Command {
 				recs, err = connector.NewCodeOwners(file).Fetch(cmd.Context())
 			case "github":
 				recs, err = fetchGitHub(cmd, githubArgs{repos, githubOrg, maxRepos, githubEmails})
+			case "jira":
+				recs, err = fetchJira(cmd, jiraArgs{jiraURL, jiraProjects, jiraJQL, maxIssues})
 			default:
-				return fmt.Errorf("%w: %q (want org-csv, slack, codeowners, or github)", ErrUnknownSource, source)
+				return fmt.Errorf("%w: %q (want org-csv, slack, codeowners, github, or jira)", ErrUnknownSource, source)
 			}
 			if err != nil {
 				return err
@@ -116,6 +129,10 @@ func newIndexCmd(opts *options) *cobra.Command {
 	f.StringVar(&githubOrg, "github-org", "", "GitHub org to index all repositories of.")
 	f.IntVar(&maxRepos, "max-repos", 0, "Cap repositories taken from --github-org (0 = all).")
 	f.BoolVar(&githubEmails, "github-emails", false, "Resolve GitHub user emails to join other sources.")
+	f.StringVar(&jiraURL, "jira-url", "", "Jira site URL (or WHODAR_JIRA_URL).")
+	f.StringArrayVar(&jiraProjects, "jira-project", nil, "Jira project key (repeatable).")
+	f.StringVar(&jiraJQL, "jira-jql", "", "Jira JQL query (overrides --jira-project).")
+	f.IntVar(&maxIssues, "max-issues", 1000, "Cap Jira issues read.")
 	return cmd
 }
 
@@ -170,6 +187,37 @@ func fetchGitHub(cmd *cobra.Command, a githubArgs) ([]connector.Record, error) {
 	}
 	src := connector.NewGitHub(token, connector.GitHubOptions{
 		Repos: a.repos, Org: a.org, MaxRepos: a.maxRepos, ResolveEmails: a.emails, Log: cmd.ErrOrStderr(),
+	})
+	return src.Fetch(cmd.Context())
+}
+
+// jiraArgs holds the Jira-specific index flags.
+type jiraArgs struct {
+	// url is the Jira site URL.
+	url string
+	// projects scopes the search to these project keys.
+	projects []string
+	// jql overrides the query.
+	jql string
+	// maxIssues caps issues read.
+	maxIssues int
+}
+
+// fetchJira builds Jira records, reading the URL and credentials from flags and
+// the environment.
+func fetchJira(cmd *cobra.Command, a jiraArgs) ([]connector.Record, error) {
+	site := a.url
+	if site == "" {
+		site = os.Getenv(jiraURLEnv)
+	}
+	email := os.Getenv(jiraEmailEnv)
+	token := os.Getenv(jiraTokenEnv)
+	if site == "" || email == "" || token == "" {
+		return nil, fmt.Errorf("%w: set --jira-url (or %s), %s, and %s",
+			ErrBadArgs, jiraURLEnv, jiraEmailEnv, jiraTokenEnv)
+	}
+	src := connector.NewJira(site, email, token, connector.JiraOptions{
+		Projects: a.projects, JQL: a.jql, MaxIssues: a.maxIssues, Log: cmd.ErrOrStderr(),
 	})
 	return src.Fetch(cmd.Context())
 }
