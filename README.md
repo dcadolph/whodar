@@ -6,9 +6,14 @@
 
 Know who knows.
 
-`whodar` answers "who do I talk to about billing retries?" by indexing the people,
-teams, topics, and channels across your work tools, then ranking who and where to
-ask. The name is who + radar: a radar that finds the right person.
+Every org runs on a hidden tax: you have the question but not the name. So you
+guess at channels, ping the wrong people, and lose an afternoon to "who owns
+this?"
+
+whodar ends that. Point it at your work tools (Slack, GitHub, an org chart, code
+ownership) and ask in plain language. It names the person to talk to and the
+channel to ask in, and shows why it picked them. It runs fully local by default,
+with or without an LLM.
 
 ## Why
 
