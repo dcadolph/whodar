@@ -29,5 +29,20 @@ archives:
 checksum:
   name_template: checksums.txt
 
+homebrew_casks:
+  - name: whodar
+    repository:
+      owner: dcadolph
+      name: homebrew-whodar
+      branch: main
+    homepage: "https://github.com/dcadolph/whodar"
+    description: "Know who knows. Find who to talk to about X across your work tools."
+    hooks:
+      post:
+        install: |
+          if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/whodar"]
+          end
+
 release:
-  draft: true
+  draft: false
