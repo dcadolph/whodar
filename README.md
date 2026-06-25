@@ -69,10 +69,22 @@ keyword resolver, and the `index` and `ask` commands.
     go build ./...
     go test ./...
 
+## Install
+
+    make install        # into $GOBIN
+    make build          # ./whodar
+
+Container images build from the included Dockerfile. See docs/DEPLOY.md for
+Docker and systemd deployment, docs/ARCHITECTURE.md for the design, and
+CONTRIBUTING.md to add a data source.
+
 ## Quickstart
 
     # Build an index from an org-chart CSV (see examples/people.csv).
     go run . index --source org-csv --file examples/people.csv
+
+    # Or index code ownership (see examples/CODEOWNERS).
+    go run . index --source codeowners --file examples/CODEOWNERS
 
     # Ask who to talk to. Output is JSON; add --pretty to indent.
     go run . ask --pretty "who do I talk to about billing retries"
