@@ -76,12 +76,20 @@ keyword resolver, and the `index` and `ask` commands.
 
 ## Install
 
+    brew install dcadolph/whodar/whodar
+
+Or with Go:
+
+    go install github.com/dcadolph/whodar@latest
+
+Or from source:
+
     make install        # into $GOBIN
     make build          # ./whodar
 
-Container images build from the included Dockerfile. See docs/DEPLOY.md for
-Docker and systemd deployment, docs/ARCHITECTURE.md for the design, and
-CONTRIBUTING.md to add a data source.
+Prebuilt binaries are attached to each release. Container images build from the
+included Dockerfile. See docs/DEPLOY.md for Docker and systemd deployment,
+docs/ARCHITECTURE.md for the design, and CONTRIBUTING.md to add a data source.
 
 ## Quickstart
 
@@ -185,4 +193,5 @@ and rejects stale requests.
 
 ## License
 
-Proprietary. All rights reserved. See [LICENSE](LICENSE).
+Licensed under the GNU Affero General Public License v3.0. See [LICENSE](LICENSE).
+Copyright 2026 dcadolph.

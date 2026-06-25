@@ -2,7 +2,7 @@ BINARY  := whodar
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X github.com/dcadolph/whodar/cmd.version=$(VERSION)
 
-.PHONY: build install test vet fmt lint clean
+.PHONY: build install test vet fmt lint release clean
 
 build:
 	go build -ldflags "$(LDFLAGS)" -o $(BINARY) .
@@ -21,6 +21,9 @@ fmt:
 
 lint:
 	golangci-lint run
+
+release:
+	goreleaser release --clean
 
 clean:
 	rm -f $(BINARY)
