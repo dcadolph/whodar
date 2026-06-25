@@ -147,6 +147,30 @@ Ollama runs on your machine, so LLM mode is allowed under the default strict
 policy. Pointing `--ollama-url` at a non-local host counts as leaving the
 machine and is refused unless the policy permits it.
 
+## Semantic search (embeddings)
+
+Keyword search matches words. Semantic search matches meaning, so "who handles
+failed payments" can find the person tagged with "billing retries" even with no
+shared word. It uses a local embedding model through Ollama.
+
+1. Pull an embedding model:
+
+       ollama pull nomic-embed-text
+
+2. Build the index with embeddings:
+
+       whodar index --source org-csv --file examples/people.csv --embed
+
+3. Search by meaning, or let the LLM use semantic retrieval:
+
+       whodar ask --mode semantic "who handles failed payments"
+       whodar ask --mode llm "who handles failed payments"
+
+Embeddings are stored in the index. The semantic mode ranks by them directly,
+and the llm mode uses them to retrieve candidates before the model ranks and
+summarizes. Set the model with --embed-model. The embedder runs locally, so it
+is allowed under the strict policy.
+
 ## Web UI
 
 Prefer a search box to the terminal:
@@ -250,8 +274,9 @@ the full diff as JSON for a script or a report.
 - `whodar index --source org-csv --file FILE` builds the index from a CSV.
 - `whodar index --source slack [--include-private] [--since-days N] [--max-messages N]`
   builds the index from Slack.
-- `whodar ask [--mode keyword|llm] [--model NAME] [--limit N] [--pretty] QUESTION`
+- `whodar ask [--mode keyword|semantic|llm] [--limit N] [--pretty] QUESTION`
   answers a question.
+- `whodar index ... --embed` adds embeddings for semantic and llm retrieval.
 - `whodar serve [--addr HOST:PORT] [--mode keyword|llm]` runs the web UI.
 - `whodar bot [--transport socket|events] [--mode keyword|llm] [--addr HOST:PORT]`
   runs the Slack bot.
