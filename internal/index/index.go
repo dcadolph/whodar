@@ -87,31 +87,31 @@ func New() *Index {
 	}
 }
 
-// Build replaces the index contents with data derived from records. Person
-// records merge by email or name; channel records merge by name.
+// Build replaces the index contents with data derived from records.
 func (ix *Index) Build(records []connector.Record) {
-	g := model.NewGraph()
-	postings := make(map[string]map[model.ID]float64)
-	texts := make(map[model.ID]*personText)
-	channelPostings := make(map[string]map[model.ID]float64)
-	channelTexts := make(map[model.ID]*channelText)
+	ix.Graph = model.NewGraph()
+	ix.postings = make(map[string]map[model.ID]float64)
+	ix.texts = make(map[model.ID]*personText)
+	ix.channelPostings = make(map[string]map[model.ID]float64)
+	ix.channelTexts = make(map[model.ID]*channelText)
+	ix.personVecs = make(map[model.ID][]float32)
+	ix.channelVecs = make(map[model.ID][]float32)
+	ix.Add(records)
+}
 
+// Add merges records into the current index, accumulating onto whatever is
+// already present. Person records merge by email or id, channel records by
+// name. It leaves embeddings unchanged; call Embed to refresh vectors after
+// adding.
+func (ix *Index) Add(records []connector.Record) {
 	for _, rec := range records {
 		switch rec.Kind {
 		case connector.KindChannel:
-			buildChannel(g, channelPostings, channelTexts, rec)
+			buildChannel(ix.Graph, ix.channelPostings, ix.channelTexts, rec)
 		default:
-			buildPerson(g, postings, texts, rec)
+			buildPerson(ix.Graph, ix.postings, ix.texts, rec)
 		}
 	}
-
-	ix.Graph = g
-	ix.postings = postings
-	ix.texts = texts
-	ix.channelPostings = channelPostings
-	ix.channelTexts = channelTexts
-	ix.personVecs = make(map[model.ID][]float32)
-	ix.channelVecs = make(map[model.ID][]float32)
 }
 
 // buildPerson merges one person record into the graph and postings.

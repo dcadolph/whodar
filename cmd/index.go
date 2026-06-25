@@ -10,6 +10,7 @@ import (
 
 	"github.com/dcadolph/whodar/internal/connector"
 	"github.com/dcadolph/whodar/internal/index"
+	"github.com/dcadolph/whodar/internal/model"
 )
 
 // slackTokenEnv is the environment variable holding the Slack bot token.
@@ -45,6 +46,7 @@ func newIndexCmd(opts *options) *cobra.Command {
 		jiraProjects   []string
 		jiraJQL        string
 		maxIssues      int
+		merge          bool
 	)
 	cmd := &cobra.Command{
 		Use:   "index",
@@ -78,8 +80,20 @@ func newIndexCmd(opts *options) *cobra.Command {
 				return err
 			}
 
+			var prev *model.Graph
+			if old, lerr := index.Load(opts.indexPath()); lerr == nil {
+				prev = old.Graph
+			}
+
 			ix := index.New()
-			ix.Build(recs)
+			if merge {
+				if base, lerr := index.Load(opts.indexPath()); lerr == nil {
+					ix = base
+				}
+				ix.Add(recs)
+			} else {
+				ix.Build(recs)
+			}
 
 			if embed {
 				if err := guardLLMHost(opts.pol, ollamaURL); err != nil {
@@ -93,10 +107,7 @@ func newIndexCmd(opts *options) *cobra.Command {
 				}
 			}
 
-			var changes index.Changes
-			if old, lerr := index.Load(opts.indexPath()); lerr == nil {
-				changes = index.Diff(old.Graph, ix.Graph)
-			}
+			changes := index.Diff(prev, ix.Graph)
 			if err := ix.Save(opts.indexPath()); err != nil {
 				return err
 			}
@@ -122,6 +133,7 @@ func newIndexCmd(opts *options) *cobra.Command {
 	f.IntVar(&sinceDays, "since-days", 180, "Slack history window in days.")
 	f.IntVar(&maxMessages, "max-messages", 5000, "Slack message cap per channel.")
 	f.StringVar(&changesFile, "changes-file", "", "Write the index diff as JSON to this path.")
+	f.BoolVar(&merge, "merge", false, "Merge into the existing index instead of replacing it.")
 	f.BoolVar(&embed, "embed", false, "Generate embeddings via Ollama for semantic search.")
 	f.StringVar(&embedModel, "embed-model", "", "Ollama embed model (default nomic-embed-text).")
 	f.StringVar(&ollamaURL, "ollama-url", "http://localhost:11434", "Ollama base URL for --embed.")

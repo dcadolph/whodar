@@ -273,10 +273,16 @@ running their own copy stays free to opt in.
 
 ## Updating the index
 
-Re-run the same index command to refresh. A new run replaces the previous index,
-so people who left the org or channels that went away drop out, and new ones
-appear. Index Slack and an org chart into the same data directory and whodar
-merges people by email, so one human is one entry.
+By default a new run replaces the index, so people who left the org or channels
+that went away drop out and new ones appear. To combine sources instead, add
+`--merge` and the run adds onto the existing index. People merge by email, so one
+human stays one entry across Slack, GitHub, Jira, the org chart, and code
+ownership:
+
+    whodar index --source org-csv --file people.csv
+    whodar index --source github --github-org your-org --merge
+    whodar index --source jira --jira-project PROJ --merge
+    whodar ask "who knows the billing service"
 
 Each run prints what joined and left since the last index, for example
 "+3 people, -1 people, +1 channels". Add `--changes-file changes.json` to write
@@ -301,6 +307,7 @@ the full diff as JSON for a script or a report.
   builds the index from Slack.
 - `whodar index --source github (--repo owner/name | --github-org ORG)` indexes GitHub.
 - `whodar index --source jira (--jira-project KEY | --jira-jql JQL)` indexes Jira.
+- `whodar index ... --merge` adds the source to the existing index instead of replacing it.
 - `whodar ask [--mode keyword|semantic|llm] [--limit N] [--pretty] QUESTION`
   answers a question.
 - `whodar index ... --embed` adds embeddings for semantic and llm retrieval.

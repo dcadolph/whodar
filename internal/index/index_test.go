@@ -174,3 +174,27 @@ func TestStemMatching(t *testing.T) {
 		}
 	}
 }
+
+// TestAddMerges verifies Add accumulates onto an existing index: it keeps old
+// signal, extends a person shared by email, and adds new people.
+func TestAddMerges(t *testing.T) {
+	t.Parallel()
+	ix := New()
+	ix.Build([]connector.Record{
+		{Name: "Jane", Email: "jane@x.com", Topics: []string{"billing"}},
+	})
+	ix.Add([]connector.Record{
+		{Name: "Jane Roe", Email: "jane@x.com", Topics: []string{"retries"}},
+		{Name: "Bob", Email: "bob@x.com", Topics: []string{"kafka"}},
+	})
+
+	if got := ix.Search("billing", 1); len(got) != 1 || got[0].Person.Email != "jane@x.com" {
+		t.Errorf("billing kept after merge: %v", got)
+	}
+	if got := ix.Search("retries", 1); len(got) != 1 || got[0].Person.Email != "jane@x.com" {
+		t.Errorf("jane gained retries from merge: %v", got)
+	}
+	if got := ix.Search("kafka", 1); len(got) != 1 || got[0].Person.Email != "bob@x.com" {
+		t.Errorf("bob added by merge: %v", got)
+	}
+}
