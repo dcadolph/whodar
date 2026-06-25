@@ -1,6 +1,10 @@
 package index
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/kljensen/snowball"
+)
 
 // stopwords are common words ignored during tokenization. They include the
 // filler words found in questions like "who do I talk to about X".
@@ -53,6 +57,17 @@ func slug(s string) string {
 		}
 	}
 	return strings.TrimRight(b.String(), "-")
+}
+
+// stem reduces a token to its root for matching, so "scans", "scan", and
+// "scanning" share a posting. It is applied only to posting keys and query
+// terms, never to displayed text, so reasons and names stay readable.
+func stem(token string) string {
+	s, err := snowball.Stem(token, "english", true)
+	if err != nil || s == "" {
+		return token
+	}
+	return s
 }
 
 // containsToken reports whether any phrase contains term as a whole token.

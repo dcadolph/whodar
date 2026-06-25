@@ -5,6 +5,7 @@ go 1.26.4
 require (
 	github.com/coder/websocket v1.8.15
 	github.com/google/go-cmp v0.7.0
+	github.com/kljensen/snowball v0.10.0
 	github.com/spf13/cobra v1.10.2
 )
 

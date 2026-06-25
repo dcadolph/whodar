@@ -159,3 +159,18 @@ func TestSearchChannels(t *testing.T) {
 		t.Errorf("top member = %v, want jane@x.com first", got[0].TopMembers)
 	}
 }
+
+// TestStemMatching verifies a query matches indexed terms across word forms.
+func TestStemMatching(t *testing.T) {
+	t.Parallel()
+	ix := New()
+	ix.Build([]connector.Record{
+		{Name: "Jane Roe", Email: "jane@x.com", Topics: []string{"scanning"}},
+	})
+	for _, q := range []string{"scans", "scan", "scanning"} {
+		got := ix.Search(q, 1)
+		if len(got) != 1 || got[0].Person.Email != "jane@x.com" {
+			t.Errorf("query %q: got %v, want jane@x.com", q, got)
+		}
+	}
+}
