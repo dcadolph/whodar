@@ -14,6 +14,7 @@ func TestParseCodeOwners(t *testing.T) {
 	in := "# comment\n" +
 		"/internal/billing/   @jane  @org/payments\n" +
 		"*.go                 jane@x.com\n" +
+		"*.tf                 @kim\n" +
 		"/internal/infra/     @kim\n"
 
 	recs, err := parseCodeOwners(context.Background(), strings.NewReader(in))
@@ -32,11 +33,13 @@ func TestParseCodeOwners(t *testing.T) {
 	if team := byName["@org/payments"]; team.PersonID != "codeowners:org/payments" {
 		t.Errorf("@org/payments id = %q", team.PersonID)
 	}
-	if email := byName["jane@x.com"]; email.Email != "jane@x.com" {
-		t.Errorf("email owner = %q, want jane@x.com", email.Email)
+	if email := byName["jane@x.com"]; email.Email != "jane@x.com" ||
+		!slices.Contains(email.Topics, "golang") {
+		t.Errorf("email owner = %+v, want jane@x.com with golang from *.go", email)
 	}
-	if kim := byName["@kim"]; !slices.Contains(kim.Topics, "infra") {
-		t.Errorf("@kim topics = %v, want infra", kim.Topics)
+	if kim := byName["@kim"]; !slices.Contains(kim.Topics, "infra") ||
+		!slices.Contains(kim.Topics, "terraform") {
+		t.Errorf("@kim topics = %v, want infra and terraform", kim.Topics)
 	}
 }
 
