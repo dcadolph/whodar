@@ -144,10 +144,11 @@ func buildPerson(
 	}
 	add := func(text string, fieldWeight float64) {
 		for _, tok := range tokenize(text) {
-			if postings[tok] == nil {
-				postings[tok] = make(map[model.ID]float64)
+			key := stem(tok)
+			if postings[key] == nil {
+				postings[key] = make(map[model.ID]float64)
 			}
-			postings[tok][pid] += fieldWeight * w
+			postings[key][pid] += fieldWeight * w
 		}
 	}
 	if rec.Title != "" {
@@ -209,10 +210,11 @@ func buildChannel(
 	}
 	add := func(text string, fieldWeight float64) {
 		for _, tok := range tokenize(text) {
-			if postings[tok] == nil {
-				postings[tok] = make(map[model.ID]float64)
+			key := stem(tok)
+			if postings[key] == nil {
+				postings[key] = make(map[model.ID]float64)
 			}
-			postings[tok][cid] += fieldWeight
+			postings[key][cid] += fieldWeight
 		}
 	}
 	add(rec.Name, weightChannelName)
@@ -336,7 +338,7 @@ func scoreByTerms(
 	scores := make(map[model.ID]float64)
 	matched := make(map[model.ID]map[string]bool)
 	for _, term := range terms {
-		posting := postings[term]
+		posting := postings[stem(term)]
 		if len(posting) == 0 {
 			continue
 		}
