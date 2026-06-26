@@ -22,22 +22,24 @@ explicitly change the policy.
 
 ## Install
 
-whodar is a private repository, so build it from source:
+Install with Homebrew:
 
-    git clone git@github.com:dcadolph/whodar.git
+    brew tap dcadolph/whodar
+    brew install whodar
+
+Or build from source, which needs Go 1.26 or newer:
+
+    git clone https://github.com/dcadolph/whodar.git
     cd whodar
     go build -o whodar .
-
-Move the binary somewhere on your PATH, for example:
-
     mkdir -p ~/bin && mv whodar ~/bin/
 
 Check it runs:
 
     whodar version
 
-The examples below use `whodar`. If you did not move the binary, use `go run .`
-from the repository instead.
+The examples below use `whodar`. From a source checkout without installing, use
+`go run .` from the repository instead.
 
 ## Try it in sixty seconds
 
@@ -220,9 +222,9 @@ By default the bot answers with the keyword resolver. Set `--mode llm` to make
 the model the default, in which case Ollama must run on the bot's host. Either
 way, a user overrides per message with a trailing `--llm` or `--keyword`.
 
-## GitHub and Jira
+## GitHub, Jira, and Confluence
 
-Index code and tickets to learn who works on what.
+Index code, tickets, and wiki pages to learn who works on what.
 
 GitHub needs a token in WHODAR_GITHUB_TOKEN with repository read access:
 
@@ -296,12 +298,17 @@ running their own copy stays free to opt in.
 By default a new run replaces the index, so people who left the org or channels
 that went away drop out and new ones appear. To combine sources instead, add
 `--merge` and the run adds onto the existing index. People merge by email, so one
-human stays one entry across Slack, GitHub, Jira, the org chart, and code
-ownership:
+human stays one entry across the org chart, Slack, GitHub, Jira, Confluence,
+PagerDuty, and code ownership.
+
+Start with the org chart, then merge every other source onto it:
 
     whodar index --source org-csv --file people.csv
+    whodar index --source slack --merge
     whodar index --source github --github-org your-org --merge
     whodar index --source jira --jira-project PROJ --merge
+    whodar index --source confluence --confluence-space ENG --merge
+    whodar index --source pagerduty --merge
     whodar ask "who knows the billing service"
 
 Each run prints what joined and left since the last index, for example

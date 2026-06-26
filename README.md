@@ -4,23 +4,17 @@
 
 # whodar
 
-Know who knows.
-
-Every org runs on a hidden tax: you have the question but not the name. So you
-guess at channels, ping the wrong people, and lose an afternoon to "who owns
-this?"
-
-whodar ends that. Point it at your work tools (Slack, GitHub, Jira, Confluence,
-PagerDuty, an org chart, code ownership) and ask in plain language. It names the person to talk to and the
-channel to ask in, and shows why it picked them. It runs fully local by default,
-with or without an LLM.
+whodar helps you find who to ask at work. Point it at the tools your org already
+uses (Slack, GitHub, Jira, Confluence, PagerDuty, an org chart, code ownership)
+and ask a question in plain words. It returns the people to talk to and the
+channels to ask in, with the reason it picked each one. It runs locally by
+default, with or without an LLM.
 
 ## Why
 
-Even after years inside a large org, the hard question is rarely the work itself.
-It is "who owns this?" and "which channel do I post in?". whodar turns scattered
-signal (Slack activity, org charts, code ownership, wikis) into a single, queryable
-map of expertise.
+In a large org the hard part is often not the work but knowing who to ask. That
+knowledge is spread across Slack, org charts, code ownership, and wikis. whodar
+gathers it into one index you can query.
 
 New here? See [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) for an
 end-to-end walkthrough: install, index a source, and ask.
@@ -47,8 +41,8 @@ people, teams, and topics, and serves queries through swappable resolvers.
 
 ## Data governance
 
-Indexed work data is sensitive. whodar treats data egress as a first-class,
-enforced policy rather than a convention.
+Indexed work data is sensitive, so whodar enforces where it can go rather than
+leaving that to convention.
 
 - Default policy is strict: nothing leaves the machine. Only the keyword resolver
   and a local LLM are permitted.
@@ -56,18 +50,19 @@ enforced policy rather than a convention.
   reach the network unless the policy allows it.
 - An organization can pin the policy through a locked config that user flags
   cannot override. A managed deployment stays strict; a personal one can opt in.
-- Cloud LLMs are supported by design but disabled under strict policy, gated
-  behind explicit opt-in with redaction.
+- Cloud LLMs are supported but off under strict policy. Turning one on takes an
+  explicit opt-in, with redaction.
 
 ## Frontends
 
-The engine is shared. The CLI ships first. A local web UI, a Slack bot, and a
-service reuse the same core.
+All frontends share one engine. The CLI, a local web UI, a Slack bot, and a
+service all reuse the same core.
 
 ## Status
 
-Early scaffolding. Building the first vertical slice: an org-chart connector, the
-keyword resolver, and the `index` and `ask` commands.
+Working and released. Seven sources (org chart, Slack, GitHub, Jira, Confluence,
+PagerDuty, and code ownership), keyword and local LLM answers, a web UI, and a
+Slack bot. Prebuilt binaries ship with each release.
 
 ## Build
 
@@ -76,7 +71,8 @@ keyword resolver, and the `index` and `ask` commands.
 
 ## Install
 
-    brew install dcadolph/whodar/whodar
+    brew tap dcadolph/whodar
+    brew install whodar
 
 Or with Go:
 
