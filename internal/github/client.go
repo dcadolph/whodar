@@ -123,25 +123,36 @@ type PullRequest struct {
 	Labels []label `json:"labels"`
 	// RequestedReviewers are users asked to review.
 	RequestedReviewers []account `json:"requested_reviewers"`
+	// Assignees are users assigned to the pull request.
+	Assignees []account `json:"assignees"`
 }
 
 // Author returns the pull request author's login.
 func (p PullRequest) Author() string { return p.User.Login }
 
 // LabelNames returns the label names.
-func (p PullRequest) LabelNames() []string {
-	out := make([]string, 0, len(p.Labels))
-	for _, l := range p.Labels {
-		out = append(out, l.Name)
+func (p PullRequest) LabelNames() []string { return labelNames(p.Labels) }
+
+// Reviewers returns the requested reviewers' logins.
+func (p PullRequest) Reviewers() []string { return accountLogins(p.RequestedReviewers) }
+
+// AssigneeLogins returns the assignees' logins.
+func (p PullRequest) AssigneeLogins() []string { return accountLogins(p.Assignees) }
+
+// accountLogins returns the logins of accounts.
+func accountLogins(accs []account) []string {
+	out := make([]string, 0, len(accs))
+	for _, a := range accs {
+		out = append(out, a.Login)
 	}
 	return out
 }
 
-// Reviewers returns the requested reviewers' logins.
-func (p PullRequest) Reviewers() []string {
-	out := make([]string, 0, len(p.RequestedReviewers))
-	for _, r := range p.RequestedReviewers {
-		out = append(out, r.Login)
+// labelNames returns the names of labels.
+func labelNames(labels []label) []string {
+	out := make([]string, 0, len(labels))
+	for _, l := range labels {
+		out = append(out, l.Name)
 	}
 	return out
 }
