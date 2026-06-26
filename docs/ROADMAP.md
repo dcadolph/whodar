@@ -6,10 +6,10 @@ single interface, each item below is additive and changes nothing downstream.
 
 ## More sources
 
-GitHub, Jira, and Confluence are shipped. Still to come:
+GitHub, Jira, Confluence, and PagerDuty are shipped. Still to come:
 
-- PagerDuty or Opsgenie: on-call schedules and service owners.
 - Git history: commit authors per path, for repositories without CODEOWNERS.
+- Opsgenie: on-call schedules and service owners.
 
 Each maps its data to people, teams, topics, and channels, and joins other
 sources by email, so one person stays one entry across them.

@@ -254,6 +254,17 @@ WHODAR_CONFLUENCE_TOKEN:
 It reads page creators and last editors, weighted by labels, title words, and
 space. Use --confluence-cql for a custom query.
 
+## PagerDuty
+
+Index services and on-call schedules to learn who answers for what. Create a
+read-only API token in PagerDuty and export it:
+
+    export WHODAR_PAGERDUTY_TOKEN=...
+    whodar index --source pagerduty --merge
+
+It reads every service and the people currently on call, giving each on-call
+person the topics of the services they answer for.
+
 ## Where your data lives
 
 The index is written to `~/.whodar/index.json` by default. Override the location
@@ -317,6 +328,7 @@ the full diff as JSON for a script or a report.
 - `whodar index --source github (--repo owner/name | --github-org ORG)` indexes GitHub.
 - `whodar index --source jira (--jira-project KEY | --jira-jql JQL)` indexes Jira.
 - `whodar index --source confluence (--confluence-space KEY | --confluence-cql CQL)` indexes Confluence.
+- `whodar index --source pagerduty` indexes PagerDuty services and on-call.
 - `whodar index ... --merge` adds the source to the existing index instead of replacing it.
 - `whodar ask [--mode keyword|semantic|llm] [--limit N] [--pretty] QUESTION`
   answers a question.

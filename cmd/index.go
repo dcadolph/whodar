@@ -19,6 +19,9 @@ const slackTokenEnv = "WHODAR_SLACK_TOKEN"
 // githubTokenEnv is the environment variable holding the GitHub token.
 const githubTokenEnv = "WHODAR_GITHUB_TOKEN"
 
+// pagerdutyTokenEnv is the environment variable holding the PagerDuty token.
+const pagerdutyTokenEnv = "WHODAR_PAGERDUTY_TOKEN"
+
 // Jira environment variables for the site URL, email, and API token.
 const (
 	jiraURLEnv   = "WHODAR_JIRA_URL"
@@ -86,8 +89,10 @@ func newIndexCmd(opts *options) *cobra.Command {
 				recs, err = fetchJira(cmd, jiraArgs{jiraURL, jiraProjects, jiraJQL, maxIssues})
 			case "confluence":
 				recs, err = fetchConfluence(cmd, confluenceArgs{confluenceSpaces, confluenceCQL, maxPages})
+			case "pagerduty":
+				recs, err = fetchPagerDuty(cmd)
 			default:
-				return fmt.Errorf("%w: %q (want org-csv, slack, codeowners, github, jira, or confluence)", ErrUnknownSource, source)
+				return fmt.Errorf("%w: %q (want org-csv, slack, codeowners, github, jira, confluence, or pagerduty)", ErrUnknownSource, source)
 			}
 			if err != nil {
 				return err
@@ -140,7 +145,7 @@ func newIndexCmd(opts *options) *cobra.Command {
 		},
 	}
 	f := cmd.Flags()
-	f.StringVar(&source, "source", "org-csv", "Source type: org-csv, slack, codeowners, github, jira, or confluence.")
+	f.StringVar(&source, "source", "org-csv", "Source type: org-csv, slack, codeowners, github, jira, confluence, or pagerduty.")
 	f.StringVar(&file, "file", "", "Path to the source file (org-csv).")
 	f.BoolVar(&includePrivate, "include-private", false, "Ingest private Slack channels if policy allows.")
 	f.IntVar(&sinceDays, "since-days", 180, "Slack history window in days.")
@@ -272,6 +277,16 @@ func fetchConfluence(cmd *cobra.Command, a confluenceArgs) ([]connector.Record, 
 	src := connector.NewConfluence(site, email, token, connector.ConfluenceOptions{
 		Spaces: a.spaces, CQL: a.cql, MaxPages: a.maxPages, Log: cmd.ErrOrStderr(),
 	})
+	return src.Fetch(cmd.Context())
+}
+
+// fetchPagerDuty builds PagerDuty records from services and on-call data.
+func fetchPagerDuty(cmd *cobra.Command) ([]connector.Record, error) {
+	token := os.Getenv(pagerdutyTokenEnv)
+	if token == "" {
+		return nil, fmt.Errorf("%w: set %s", ErrBadArgs, pagerdutyTokenEnv)
+	}
+	src := connector.NewPagerDuty(token, connector.PagerDutyOptions{Log: cmd.ErrOrStderr()})
 	return src.Fetch(cmd.Context())
 }
 
