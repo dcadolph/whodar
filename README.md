@@ -11,7 +11,7 @@ guess at channels, ping the wrong people, and lose an afternoon to "who owns
 this?"
 
 whodar ends that. Point it at your work tools (Slack, GitHub, Jira, Confluence,
-an org chart, code ownership) and ask in plain language. It names the person to talk to and the
+PagerDuty, an org chart, code ownership) and ask in plain language. It names the person to talk to and the
 channel to ask in, and shows why it picked them. It runs fully local by default,
 with or without an LLM.
 
