@@ -15,6 +15,21 @@ import (
 // ErrNoRepos indicates no repositories were given to the GitHub connector.
 var ErrNoRepos = errors.New("github: no repositories (use repos or an org)")
 
+// maxTopicWeight caps how many times one topic counts for a person, so a heavy
+// contributor outranks a one-off without a single topic dominating the score.
+const maxTopicWeight = 4
+
+// noiseWords are common pull request and issue title words that carry no topic.
+var noiseWords = map[string]bool{
+	"fix": true, "fixes": true, "fixed": true, "add": true, "adds": true,
+	"added": true, "update": true, "updates": true, "updated": true,
+	"remove": true, "removes": true, "bump": true, "the": true, "and": true,
+	"for": true, "with": true, "from": true, "into": true, "that": true,
+	"this": true, "use": true, "uses": true, "new": true, "support": true,
+	"make": true, "when": true, "not": true, "via": true, "run": true,
+	"set": true, "get": true, "all": true, "out": true, "try": true,
+}
+
 // GitHubOptions configures the GitHub connector.
 type GitHubOptions struct {
 	// Repos is a list of "owner/name" repositories to index.
@@ -37,8 +52,10 @@ func (o GitHubOptions) withDefaults() GitHubOptions {
 	return o
 }
 
-// GitHub is a Source that ingests repositories: contributors, pull request
-// authors and reviewers, repository topics, and CODEOWNERS.
+// GitHub is a Source that ingests repositories. It weights people by what they
+// actually work on: pull request and issue labels and titles for authors,
+// reviewers, and assignees, plus repository topics for contributors and
+// CODEOWNERS for path ownership.
 type GitHub struct {
 	// client calls the GitHub API.
 	client *github.Client
@@ -60,25 +77,26 @@ func NewGitHubWithClient(client *github.Client, opts GitHubOptions) *GitHub {
 	return &GitHub{client: client, opts: opts.withDefaults()}
 }
 
-// Fetch reads each repository and returns person records for contributors,
-// pull request authors and reviewers, and CODEOWNERS owners.
+// Fetch reads each repository and returns person records weighted by topic.
 func (g *GitHub) Fetch(ctx context.Context) ([]Record, error) {
 	repos, err := g.repoList(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	topics := make(map[string]map[string]bool) // login -> topic set
-	add := func(login string, ts ...string) {
-		if login == "" {
+	counts := make(map[string]map[string]int) // login -> token -> count
+	bump := func(login string, tokens []string) {
+		if login == "" || len(tokens) == 0 {
 			return
 		}
-		if topics[login] == nil {
-			topics[login] = make(map[string]bool)
+		c := counts[login]
+		if c == nil {
+			c = make(map[string]int)
+			counts[login] = c
 		}
-		for _, t := range ts {
-			if t = strings.TrimSpace(strings.ToLower(t)); t != "" {
-				topics[login][t] = true
+		for _, t := range tokens {
+			if t = strings.ToLower(strings.TrimSpace(t)); t != "" {
+				c[t]++
 			}
 		}
 	}
@@ -93,14 +111,14 @@ func (g *GitHub) Fetch(ctx context.Context) ([]Record, error) {
 		if err != nil {
 			return nil, fmt.Errorf("github repo %s: %w", full, err)
 		}
-		repoTopics := repoTopicSet(repo)
+		repoTokens := repoTopicSet(repo)
 
 		cons, err := g.client.Contributors(ctx, owner, name)
 		if err != nil {
 			return nil, fmt.Errorf("github contributors %s: %w", full, err)
 		}
 		for _, c := range cons {
-			add(c.Login, repoTopics...)
+			bump(c.Login, repoTokens)
 		}
 
 		pulls, err := g.client.PullRequests(ctx, owner, name)
@@ -108,11 +126,30 @@ func (g *GitHub) Fetch(ctx context.Context) ([]Record, error) {
 			return nil, fmt.Errorf("github pulls %s: %w", full, err)
 		}
 		for _, pr := range pulls {
-			labels := pr.LabelNames()
-			add(pr.Author(), repoTopics...)
-			add(pr.Author(), labels...)
-			for _, rev := range pr.Reviewers() {
-				add(rev, labels...)
+			tokens := append(pr.LabelNames(), titleTokens(pr.Title)...)
+			bump(pr.Author(), tokens)
+			for _, u := range pr.Reviewers() {
+				bump(u, tokens)
+			}
+			for _, u := range pr.AssigneeLogins() {
+				bump(u, tokens)
+			}
+		}
+
+		issues, err := g.client.Issues(ctx, owner, name)
+		if err != nil {
+			return nil, fmt.Errorf("github issues %s: %w", full, err)
+		}
+		var issueCount int
+		for _, is := range issues {
+			if is.IsPullRequest() {
+				continue
+			}
+			issueCount++
+			tokens := append(is.LabelNames(), titleTokens(is.Title)...)
+			bump(is.Author(), tokens)
+			for _, u := range is.AssigneeLogins() {
+				bump(u, tokens)
 			}
 		}
 
@@ -121,14 +158,15 @@ func (g *GitHub) Fetch(ctx context.Context) ([]Record, error) {
 				codeOwnerRecords = append(codeOwnerRecords, recs...)
 			}
 		}
-		fmt.Fprintf(g.opts.Log, "github: indexed %s (%d contributors, %d pulls)\n", full, len(cons), len(pulls))
+		fmt.Fprintf(g.opts.Log, "github: indexed %s (%d contributors, %d pulls, %d issues)\n",
+			full, len(cons), len(pulls), issueCount)
 	}
 
-	accounts := g.resolveAccounts(ctx, topics)
+	accounts := g.resolveAccounts(ctx, counts)
 
-	records := make([]Record, 0, len(topics)+len(codeOwnerRecords))
-	for login, set := range topics {
-		records = append(records, githubPersonRecord(login, set, accounts[login]))
+	records := make([]Record, 0, len(counts)+len(codeOwnerRecords))
+	for login, tokenCounts := range counts {
+		records = append(records, githubPersonRecord(login, expandTopics(tokenCounts), accounts[login]))
 	}
 	records = append(records, codeOwnerRecords...)
 	return records, nil
@@ -157,7 +195,7 @@ func (g *GitHub) repoList(ctx context.Context) ([]string, error) {
 }
 
 // resolveAccounts looks up each login's profile when email resolution is on.
-func (g *GitHub) resolveAccounts(ctx context.Context, logins map[string]map[string]bool) map[string]github.Account {
+func (g *GitHub) resolveAccounts(ctx context.Context, logins map[string]map[string]int) map[string]github.Account {
 	accounts := make(map[string]github.Account)
 	if !g.opts.ResolveEmails {
 		return accounts
@@ -182,8 +220,8 @@ func (g *GitHub) codeOwners(ctx context.Context, owner, name string) []byte {
 
 // githubPersonRecord builds a person record. A resolved email lets the person
 // join other sources; otherwise the handle keys the record.
-func githubPersonRecord(login string, topicSet map[string]bool, a github.Account) Record {
-	rec := Record{Kind: KindPerson, Source: "github", Weight: 1, Topics: sortedKeys(topicSet)}
+func githubPersonRecord(login string, topics []string, a github.Account) Record {
+	rec := Record{Kind: KindPerson, Source: "github", Weight: 1, Topics: topics}
 	if a.Email != "" {
 		rec.Email = strings.ToLower(a.Email)
 		rec.Name = a.Name
@@ -201,14 +239,45 @@ func githubPersonRecord(login string, topicSet map[string]bool, a github.Account
 }
 
 // repoTopicSet derives a repo's topic tags from its GitHub topics and the words
-// of its name.
+// of its name and description.
 func repoTopicSet(repo github.Repo) []string {
 	out := append([]string(nil), repo.Topics...)
-	for _, part := range strings.FieldsFunc(repo.Name, func(r rune) bool {
-		return r == '-' || r == '_' || r == '/' || r == ' '
+	out = append(out, titleTokens(repo.Name)...)
+	out = append(out, titleTokens(repo.Description)...)
+	return out
+}
+
+// titleTokens splits text into lowercase topic words, dropping short tokens,
+// generic code words, and common title filler.
+func titleTokens(s string) []string {
+	var out []string
+	for _, f := range strings.FieldsFunc(strings.ToLower(s), func(r rune) bool {
+		return !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9')
 	}) {
-		if len(part) >= 3 && !codeStop[strings.ToLower(part)] {
-			out = append(out, part)
+		if len(f) >= 3 && !codeStop[f] && !noiseWords[f] {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// expandTopics turns per-token counts into a topic slice with each token
+// repeated by its capped count, so volume of work raises a person's score.
+func expandTopics(counts map[string]int) []string {
+	tokens := make([]string, 0, len(counts))
+	for t := range counts {
+		tokens = append(tokens, t)
+	}
+	sort.Strings(tokens)
+
+	var out []string
+	for _, t := range tokens {
+		n := counts[t]
+		if n > maxTopicWeight {
+			n = maxTopicWeight
+		}
+		for i := 0; i < n; i++ {
+			out = append(out, t)
 		}
 	}
 	return out
@@ -221,14 +290,4 @@ func splitRepo(full string) (owner, name string, ok bool) {
 		return "", "", false
 	}
 	return owner, name, true
-}
-
-// sortedKeys returns the map keys sorted, for deterministic output.
-func sortedKeys(set map[string]bool) []string {
-	out := make([]string, 0, len(set))
-	for k := range set {
-		out = append(out, k)
-	}
-	sort.Strings(out)
-	return out
 }
