@@ -6,9 +6,8 @@ single interface, each item below is additive and changes nothing downstream.
 
 ## More sources
 
-GitHub and Jira are shipped. Still to come:
+GitHub, Jira, and Confluence are shipped. Still to come:
 
-- Confluence and other wikis: page authors and space owners.
 - PagerDuty or Opsgenie: on-call schedules and service owners.
 - Git history: commit authors per path, for repositories without CODEOWNERS.
 
