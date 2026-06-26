@@ -245,6 +245,15 @@ It reads issue assignees and reporters, weighted by components, labels, summary
 words, and project. Use --jira-jql for a custom query. When emails are visible,
 these people merge with Slack and the org chart by email.
 
+Confluence uses the same Atlassian site and token as Jira, so the Jira
+credentials work, or set WHODAR_CONFLUENCE_URL, WHODAR_CONFLUENCE_EMAIL, and
+WHODAR_CONFLUENCE_TOKEN:
+
+    whodar index --source confluence --confluence-space ENG --confluence-space OPS
+
+It reads page creators and last editors, weighted by labels, title words, and
+space. Use --confluence-cql for a custom query.
+
 ## Where your data lives
 
 The index is written to `~/.whodar/index.json` by default. Override the location
@@ -307,6 +316,7 @@ the full diff as JSON for a script or a report.
   builds the index from Slack.
 - `whodar index --source github (--repo owner/name | --github-org ORG)` indexes GitHub.
 - `whodar index --source jira (--jira-project KEY | --jira-jql JQL)` indexes Jira.
+- `whodar index --source confluence (--confluence-space KEY | --confluence-cql CQL)` indexes Confluence.
 - `whodar index ... --merge` adds the source to the existing index instead of replacing it.
 - `whodar ask [--mode keyword|semantic|llm] [--limit N] [--pretty] QUESTION`
   answers a question.

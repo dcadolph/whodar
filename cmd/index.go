@@ -26,27 +26,38 @@ const (
 	jiraTokenEnv = "WHODAR_JIRA_TOKEN"
 )
 
+// Confluence environment variables. They fall back to the Jira ones because
+// both use the same Atlassian site and token.
+const (
+	confluenceURLEnv   = "WHODAR_CONFLUENCE_URL"
+	confluenceEmailEnv = "WHODAR_CONFLUENCE_EMAIL"
+	confluenceTokenEnv = "WHODAR_CONFLUENCE_TOKEN"
+)
+
 // newIndexCmd builds the index command, which ingests a source into the index.
 func newIndexCmd(opts *options) *cobra.Command {
 	var (
-		source         string
-		file           string
-		includePrivate bool
-		sinceDays      int
-		maxMessages    int
-		changesFile    string
-		embed          bool
-		embedModel     string
-		ollamaURL      string
-		repos          []string
-		githubOrg      string
-		maxRepos       int
-		githubEmails   bool
-		jiraURL        string
-		jiraProjects   []string
-		jiraJQL        string
-		maxIssues      int
-		merge          bool
+		source           string
+		file             string
+		includePrivate   bool
+		sinceDays        int
+		maxMessages      int
+		changesFile      string
+		embed            bool
+		embedModel       string
+		ollamaURL        string
+		repos            []string
+		githubOrg        string
+		maxRepos         int
+		githubEmails     bool
+		jiraURL          string
+		jiraProjects     []string
+		jiraJQL          string
+		maxIssues        int
+		merge            bool
+		confluenceSpaces []string
+		confluenceCQL    string
+		maxPages         int
 	)
 	cmd := &cobra.Command{
 		Use:   "index",
@@ -73,8 +84,10 @@ func newIndexCmd(opts *options) *cobra.Command {
 				recs, err = fetchGitHub(cmd, githubArgs{repos, githubOrg, maxRepos, githubEmails})
 			case "jira":
 				recs, err = fetchJira(cmd, jiraArgs{jiraURL, jiraProjects, jiraJQL, maxIssues})
+			case "confluence":
+				recs, err = fetchConfluence(cmd, confluenceArgs{confluenceSpaces, confluenceCQL, maxPages})
 			default:
-				return fmt.Errorf("%w: %q (want org-csv, slack, codeowners, github, or jira)", ErrUnknownSource, source)
+				return fmt.Errorf("%w: %q (want org-csv, slack, codeowners, github, jira, or confluence)", ErrUnknownSource, source)
 			}
 			if err != nil {
 				return err
@@ -127,7 +140,7 @@ func newIndexCmd(opts *options) *cobra.Command {
 		},
 	}
 	f := cmd.Flags()
-	f.StringVar(&source, "source", "org-csv", "Source type: org-csv, slack, or codeowners.")
+	f.StringVar(&source, "source", "org-csv", "Source type: org-csv, slack, codeowners, github, jira, or confluence.")
 	f.StringVar(&file, "file", "", "Path to the source file (org-csv).")
 	f.BoolVar(&includePrivate, "include-private", false, "Ingest private Slack channels if policy allows.")
 	f.IntVar(&sinceDays, "since-days", 180, "Slack history window in days.")
@@ -145,6 +158,9 @@ func newIndexCmd(opts *options) *cobra.Command {
 	f.StringArrayVar(&jiraProjects, "jira-project", nil, "Jira project key (repeatable).")
 	f.StringVar(&jiraJQL, "jira-jql", "", "Jira JQL query (overrides --jira-project).")
 	f.IntVar(&maxIssues, "max-issues", 1000, "Cap Jira issues read.")
+	f.StringArrayVar(&confluenceSpaces, "confluence-space", nil, "Confluence space key (repeatable).")
+	f.StringVar(&confluenceCQL, "confluence-cql", "", "Confluence CQL query (overrides --confluence-space).")
+	f.IntVar(&maxPages, "max-pages", 2000, "Cap Confluence pages read.")
 	return cmd
 }
 
@@ -232,6 +248,41 @@ func fetchJira(cmd *cobra.Command, a jiraArgs) ([]connector.Record, error) {
 		Projects: a.projects, JQL: a.jql, MaxIssues: a.maxIssues, Log: cmd.ErrOrStderr(),
 	})
 	return src.Fetch(cmd.Context())
+}
+
+// confluenceArgs holds the Confluence-specific index flags.
+type confluenceArgs struct {
+	// spaces scopes the search to these space keys.
+	spaces []string
+	// cql overrides the query.
+	cql string
+	// maxPages caps pages read.
+	maxPages int
+}
+
+// fetchConfluence builds Confluence records. The URL and credentials fall back
+// to the Jira environment variables, since both use the same Atlassian site.
+func fetchConfluence(cmd *cobra.Command, a confluenceArgs) ([]connector.Record, error) {
+	site := firstNonEmpty(os.Getenv(confluenceURLEnv), os.Getenv(jiraURLEnv))
+	email := firstNonEmpty(os.Getenv(confluenceEmailEnv), os.Getenv(jiraEmailEnv))
+	token := firstNonEmpty(os.Getenv(confluenceTokenEnv), os.Getenv(jiraTokenEnv))
+	if site == "" || email == "" || token == "" {
+		return nil, fmt.Errorf("%w: set WHODAR_CONFLUENCE_URL, EMAIL, and TOKEN (or the Jira ones)", ErrBadArgs)
+	}
+	src := connector.NewConfluence(site, email, token, connector.ConfluenceOptions{
+		Spaces: a.spaces, CQL: a.cql, MaxPages: a.maxPages, Log: cmd.ErrOrStderr(),
+	})
+	return src.Fetch(cmd.Context())
+}
+
+// firstNonEmpty returns the first non-empty string.
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 // reportChanges prints a one-line summary and capped lists of who and what
