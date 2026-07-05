@@ -88,7 +88,7 @@ func (g *GitHub) Fetch(ctx context.Context) ([]Record, error) {
 	counts := make(map[string]map[string]int) // login -> token -> count
 	latest := make(map[string]time.Time)      // login -> most recent activity
 	bump := func(login string, tokens []string, t time.Time) {
-		if login == "" || len(tokens) == 0 {
+		if login == "" || len(tokens) == 0 || strings.HasSuffix(login, "[bot]") {
 			return
 		}
 		c := counts[login]
