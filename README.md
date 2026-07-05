@@ -39,6 +39,8 @@ people, teams, and topics, and serves queries through swappable resolvers.
   An optional local LLM resolver adds semantic ranking and a written answer.
 - Every answer says how sure it is. A confidence score separates a strong
   match from a least-bad one, and each result explains which words hit where.
+- Answers learn. Confirm or correct a result from the CLI or the web UI and
+  future rankings for that question move, without burying the evidence.
 
 ## Two modes
 

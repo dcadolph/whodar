@@ -23,4 +23,3 @@ sources by email or an alias file, so one person stays one entry across them.
 ## Experience
 
 - Result deep links: open a channel or a profile directly from an answer.
-- Feedback: let users confirm or correct an answer to improve ranking.

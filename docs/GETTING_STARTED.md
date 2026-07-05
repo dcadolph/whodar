@@ -135,6 +135,20 @@ counts as proof, a job title slightly less, a passing mention in chat half.
 The web UI and the Slack bot show it as strong, moderate, or weak, so a
 least-bad answer never dresses up as a sure one.
 
+## Confirm or correct answers
+
+When an answer is right, say so; when it is wrong, say that too. Votes adjust
+future rankings for that question and its close variants:
+
+    whodar feedback "billing retries" --person alice@corp.com --helpful
+    whodar feedback "billing retries" --channel payments --not-helpful
+
+The web UI has the same buttons on every result. Votes live in
+`feedback.json` next to the index, separate on purpose: re-indexing rebuilds
+the graph but keeps what people taught it. Boosted or lowered results say so
+in their reasons, and a few votes adjust ranking without ever burying the
+underlying evidence.
+
 ## LLM mode
 
 LLM mode retrieves candidates with the index, then asks a local model to rank
@@ -392,10 +406,14 @@ turns decay off entirely.
 - `whodar index --source jira (--jira-project KEY | --jira-jql JQL)` indexes Jira.
 - `whodar index --source confluence (--confluence-space KEY | --confluence-cql CQL)` indexes Confluence.
 - `whodar index --source pagerduty` indexes PagerDuty services and on-call.
+- `whodar index --source git --repo-path DIR [--git-since-days N] [--max-commits N]`
+  indexes local git history.
 - `whodar index ... --merge` adds the source to the existing index instead of replacing it.
 - `whodar ask [--mode keyword|semantic|llm] [--limit N] [--pretty] QUESTION`
   answers a question.
 - `whodar index ... --embed` adds embeddings for semantic and llm retrieval.
+- `whodar feedback QUESTION (--person ID | --channel NAME) (--helpful | --not-helpful)`
+  records a vote on an answer.
 - `whodar serve [--addr HOST:PORT] [--mode keyword|llm]` runs the web UI.
 - `whodar bot [--transport socket|events] [--mode keyword|llm] [--addr HOST:PORT]`
   runs the Slack bot.
