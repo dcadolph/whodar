@@ -11,11 +11,15 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/dcadolph/whodar/internal/connector"
 	"github.com/dcadolph/whodar/internal/identity"
 	"github.com/dcadolph/whodar/internal/model"
 )
+
+// DefaultHalfLife is the age at which a dated record's weight halves.
+const DefaultHalfLife = 180 * 24 * time.Hour
 
 // Field weights scale how strongly each signal contributes to a score. An
 // explicit topic or a channel name outweighs a title word, which outweighs a
@@ -76,6 +80,11 @@ type Index struct {
 	// resolver maps the identifiers a person accumulates across sources to one
 	// canonical identifier.
 	resolver *identity.Resolver
+	// halfLife is the age at which a dated record's weight halves; zero or
+	// negative disables recency decay.
+	halfLife time.Duration
+	// now returns the current time; tests pin it for deterministic decay.
+	now func() time.Time
 }
 
 // New returns an empty index with initialized maps.
@@ -89,7 +98,26 @@ func New() *Index {
 		personVecs:      make(map[model.ID][]float32),
 		channelVecs:     make(map[model.ID][]float32),
 		resolver:        identity.NewResolver(),
+		halfLife:        DefaultHalfLife,
+		now:             time.Now,
 	}
+}
+
+// SetHalfLife sets the age at which a dated record's weight halves. Zero or
+// negative disables recency decay.
+func (ix *Index) SetHalfLife(d time.Duration) { ix.halfLife = d }
+
+// decay returns the recency multiplier for a record dated t: one for undated
+// records, future dates, or disabled decay, halving per half-life of age.
+func (ix *Index) decay(t time.Time) float64 {
+	if t.IsZero() || ix.halfLife <= 0 {
+		return 1
+	}
+	age := ix.now().Sub(t)
+	if age <= 0 {
+		return 1
+	}
+	return math.Exp2(-float64(age) / float64(ix.halfLife))
 }
 
 // Build replaces the index contents with data derived from records.
@@ -109,13 +137,12 @@ func (ix *Index) Build(records []connector.Record) {
 // name. It leaves embeddings unchanged; call Embed to refresh vectors after
 // adding.
 func (ix *Index) Add(records []connector.Record) {
-	r := ix.identityResolver()
 	for _, rec := range records {
 		switch rec.Kind {
 		case connector.KindChannel:
-			buildChannel(ix.Graph, ix.channelPostings, ix.channelTexts, r, rec)
+			ix.buildChannel(rec)
 		default:
-			buildPerson(ix.Graph, ix.postings, ix.texts, r, rec)
+			ix.buildPerson(rec)
 		}
 	}
 }
@@ -143,13 +170,8 @@ func (ix *Index) identityResolver() *identity.Resolver {
 }
 
 // buildPerson merges one person record into the graph and postings.
-func buildPerson(
-	g *model.Graph,
-	postings map[string]map[model.ID]float64,
-	texts map[model.ID]*personText,
-	r *identity.Resolver,
-	rec connector.Record,
-) {
+func (ix *Index) buildPerson(rec connector.Record) {
+	g, postings, texts, r := ix.Graph, ix.postings, ix.texts, ix.identityResolver()
 	raw := personID(rec)
 	if raw == "" {
 		return
@@ -162,6 +184,7 @@ func buildPerson(
 	if w == 0 {
 		w = 1
 	}
+	w *= ix.decay(rec.Time)
 	p := g.People[pid]
 	if p == nil {
 		p = &model.Person{ID: pid, Topics: make(map[model.ID]float64)}
@@ -214,17 +237,13 @@ func buildPerson(
 }
 
 // buildChannel merges one channel record into the graph and channel postings.
-func buildChannel(
-	g *model.Graph,
-	postings map[string]map[model.ID]float64,
-	texts map[model.ID]*channelText,
-	r *identity.Resolver,
-	rec connector.Record,
-) {
+func (ix *Index) buildChannel(rec connector.Record) {
+	g, postings, texts, r := ix.Graph, ix.channelPostings, ix.channelTexts, ix.identityResolver()
 	cid := model.ID(slug(rec.Name))
 	if cid == "" {
 		return
 	}
+	d := ix.decay(rec.Time)
 	ch := g.Channels[cid]
 	if ch == nil {
 		ch = &model.Channel{ID: cid, Name: rec.Name, Topics: make(map[model.ID]float64)}
@@ -254,7 +273,7 @@ func buildChannel(
 			if postings[key] == nil {
 				postings[key] = make(map[model.ID]float64)
 			}
-			postings[key][cid] += fieldWeight
+			postings[key][cid] += fieldWeight * d
 		}
 	}
 	add(rec.Name, weightChannelName)
@@ -266,7 +285,7 @@ func buildChannel(
 		if g.Topics[tid] == nil {
 			g.Topics[tid] = &model.Topic{ID: tid, Name: strings.ToLower(top)}
 		}
-		ch.Topics[tid] += weightTopic
+		ch.Topics[tid] += weightTopic * d
 		ct.Topics = append(ct.Topics, strings.ToLower(top))
 		add(top, weightTopic)
 	}
@@ -512,6 +531,8 @@ func Load(path string) (*Index, error) {
 		personVecs:      snap.PersonVecs,
 		channelVecs:     snap.ChannelVecs,
 		resolver:        identity.NewResolver(),
+		halfLife:        DefaultHalfLife,
+		now:             time.Now,
 	}
 	ix.resolver.Restore(snap.Aliases)
 	if ix.Graph == nil {

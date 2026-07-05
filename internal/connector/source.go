@@ -2,7 +2,10 @@
 // into records the indexer merges into the expertise graph.
 package connector
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // Record is one normalized observation from a source. A KindPerson record
 // describes a person: identity, org placement, topics, and mined text. A
@@ -35,6 +38,9 @@ type Record struct {
 	Source string
 	// Weight scales this record's affinity contribution; zero means one.
 	Weight float64
+	// Time is when the described activity happened. The zero value marks the
+	// record as a current fact that never decays.
+	Time time.Time
 }
 
 // Kind classifies a record. For KindChannel records the person identity fields

@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -59,6 +60,7 @@ func newIndexCmd(opts *options) *cobra.Command {
 		maxIssues        int
 		merge            bool
 		aliasesFile      string
+		halfLifeDays     int
 		confluenceSpaces []string
 		confluenceCQL    string
 		maxPages         int
@@ -110,6 +112,7 @@ func newIndexCmd(opts *options) *cobra.Command {
 					ix = base
 				}
 			}
+			ix.SetHalfLife(time.Duration(halfLifeDays) * 24 * time.Hour)
 			if aliasesFile != "" {
 				if err := ix.LoadAliases(aliasesFile); err != nil {
 					return err
@@ -163,6 +166,8 @@ func newIndexCmd(opts *options) *cobra.Command {
 	f.BoolVar(&merge, "merge", false, "Merge into the existing index instead of replacing it.")
 	f.StringVar(&aliasesFile, "aliases", "",
 		"JSON file mapping a canonical id to its aliases, joining one person across sources.")
+	f.IntVar(&halfLifeDays, "half-life-days", 180,
+		"Days for a dated record's weight to halve; 0 disables recency decay.")
 	f.BoolVar(&embed, "embed", false, "Generate embeddings via Ollama for semantic search.")
 	f.StringVar(&embedModel, "embed-model", "", "Ollama embed model (default nomic-embed-text).")
 	f.StringVar(&ollamaURL, "ollama-url", "http://localhost:11434", "Ollama base URL for --embed.")
