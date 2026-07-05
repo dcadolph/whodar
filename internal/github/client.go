@@ -244,7 +244,7 @@ func (c *Client) get(ctx context.Context, path string, query url.Values, out any
 		}
 
 		if wait, ok := retryAfter(resp); ok {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			if attempt >= c.maxRetries {
 				return fmt.Errorf("github %s: %w", path, ErrRateLimited)
 			}
@@ -255,7 +255,7 @@ func (c *Client) get(ctx context.Context, path string, query url.Values, out any
 		}
 
 		body, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if err != nil {
 			return fmt.Errorf("github %s: read body: %w", path, err)
 		}

@@ -137,7 +137,7 @@ func (s *SocketRunner) Run(ctx context.Context) error {
 
 // session reads and dispatches frames until the connection ends.
 func (s *SocketRunner) session(ctx context.Context, conn wsConn) error {
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	for {
 		data, err := conn.Read(ctx)
 		if err != nil {

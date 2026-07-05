@@ -70,7 +70,7 @@ func (c *CodeOwners) Fetch(ctx context.Context) ([]Record, error) {
 	if err != nil {
 		return nil, fmt.Errorf("codeowners: open: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	return parseCodeOwners(ctx, f)
 }
 

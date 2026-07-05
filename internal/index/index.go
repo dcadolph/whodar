@@ -417,7 +417,7 @@ type snapshot struct {
 }
 
 // Save writes the index to path as JSON, creating parent directories as needed.
-func (ix *Index) Save(path string) error {
+func (ix *Index) Save(path string) (err error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("index: mkdir: %w", err)
 	}
@@ -425,7 +425,11 @@ func (ix *Index) Save(path string) error {
 	if err != nil {
 		return fmt.Errorf("index: create: %w", err)
 	}
-	defer f.Close()
+	defer func() {
+		if cerr := f.Close(); cerr != nil && err == nil {
+			err = fmt.Errorf("index: close: %w", cerr)
+		}
+	}()
 
 	enc := json.NewEncoder(f)
 	enc.SetIndent("", "  ")
@@ -450,7 +454,7 @@ func Load(path string) (*Index, error) {
 	if err != nil {
 		return nil, fmt.Errorf("index: open: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var snap snapshot
 	if err := json.NewDecoder(f).Decode(&snap); err != nil {

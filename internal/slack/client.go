@@ -249,16 +249,13 @@ func (c *Client) Channels(ctx context.Context, types string) ([]Channel, error) 
 	}
 }
 
-// History returns up to max messages from channelID newer than oldest, a Slack
-// timestamp string ("" means no lower bound). It stops at max messages or when
-// Slack reports no more pages.
-func (c *Client) History(ctx context.Context, channelID, oldest string, max int) ([]Message, error) {
+// History returns up to limit messages from channelID newer than oldest, a
+// Slack timestamp string ("" means no lower bound). It stops at limit messages
+// or when Slack reports no more pages.
+func (c *Client) History(ctx context.Context, channelID, oldest string, limit int) ([]Message, error) {
 	var all []Message
 	cursor := ""
-	for {
-		if max > 0 && len(all) >= max {
-			break
-		}
+	for limit <= 0 || len(all) < limit {
 		params := url.Values{
 			"channel": {channelID},
 			"limit":   {"200"},
@@ -279,8 +276,8 @@ func (c *Client) History(ctx context.Context, channelID, oldest string, max int)
 			break
 		}
 	}
-	if max > 0 && len(all) > max {
-		all = all[:max]
+	if limit > 0 && len(all) > limit {
+		all = all[:limit]
 	}
 	return all, nil
 }
@@ -304,7 +301,7 @@ func (c *Client) do(ctx context.Context, method string, params url.Values, out r
 
 		if resp.StatusCode == http.StatusTooManyRequests {
 			wait := retryAfter(resp)
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			if attempt >= c.maxRetries {
 				return fmt.Errorf("slack %s: %w", method, ErrRateLimited)
 			}
@@ -315,7 +312,7 @@ func (c *Client) do(ctx context.Context, method string, params url.Values, out r
 		}
 
 		body, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if err != nil {
 			return fmt.Errorf("slack %s: read body: %w", method, err)
 		}

@@ -180,7 +180,7 @@ func (c *Client) get(ctx context.Context, path string, params url.Values, out an
 
 		if resp.StatusCode == http.StatusTooManyRequests {
 			wait := retryAfter(resp)
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			if attempt >= c.maxRetries {
 				return fmt.Errorf("pagerduty %s: %w", path, ErrRateLimited)
 			}
@@ -191,7 +191,7 @@ func (c *Client) get(ctx context.Context, path string, params url.Values, out an
 		}
 
 		body, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if err != nil {
 			return fmt.Errorf("pagerduty %s: read body: %w", path, err)
 		}

@@ -332,11 +332,15 @@ func printChangeList(w io.Writer, label string, items []string) {
 }
 
 // writeChangesFile writes the changes as JSON to path.
-func writeChangesFile(path string, c index.Changes) error {
+func writeChangesFile(path string, c index.Changes) (err error) {
 	f, err := os.Create(path)
 	if err != nil {
 		return fmt.Errorf("changes file: %w", err)
 	}
-	defer f.Close()
+	defer func() {
+		if cerr := f.Close(); cerr != nil && err == nil {
+			err = fmt.Errorf("changes file: close: %w", cerr)
+		}
+	}()
 	return writeJSON(f, c, true)
 }
