@@ -11,6 +11,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/dcadolph/whodar/internal/connector"
@@ -98,6 +99,9 @@ type Index struct {
 	halfLife time.Duration
 	// now returns the current time; tests pin it for deterministic decay.
 	now func() time.Time
+	// fbRules are preprocessed user votes applied during ranking, held
+	// atomically so a running server can apply new votes mid-flight.
+	fbRules atomic.Pointer[[]fbRule]
 }
 
 // New returns an empty index with initialized maps.
@@ -315,6 +319,7 @@ func (ix *Index) Search(query string, limit int) []model.Match {
 		return nil
 	}
 	scores, matched := scoreByTerms(ix.postings, terms, len(ix.Graph.People))
+	nets := ix.feedbackNets(terms, false)
 
 	matches := make([]model.Match, 0, len(scores))
 	for pid, sc := range scores {
@@ -327,6 +332,10 @@ func (ix *Index) Search(query string, limit int) []model.Match {
 			team = ix.Graph.Teams[p.TeamID]
 		}
 		reasons, evidence := ix.reasons(pid, matched[pid])
+		if net := nets[pid]; net != 0 {
+			sc *= feedbackFactor(net)
+			reasons = append(reasons, feedbackReason(net))
+		}
 		coverage := float64(len(matched[pid])) / float64(len(terms))
 		matches = append(matches, model.Match{
 			Person:     p,
@@ -357,6 +366,7 @@ func (ix *Index) SearchChannels(query string, limit int) []model.ChannelMatch {
 	}
 	scores, matched := scoreByTerms(ix.channelPostings, terms, len(ix.Graph.Channels))
 	personScores, _ := scoreByTerms(ix.postings, terms, len(ix.Graph.People))
+	nets := ix.feedbackNets(terms, true)
 
 	matches := make([]model.ChannelMatch, 0, len(scores))
 	for cid, sc := range scores {
@@ -365,6 +375,10 @@ func (ix *Index) SearchChannels(query string, limit int) []model.ChannelMatch {
 			continue
 		}
 		reasons, evidence := ix.channelReasons(cid, matched[cid])
+		if net := nets[cid]; net != 0 {
+			sc *= feedbackFactor(net)
+			reasons = append(reasons, feedbackReason(net))
+		}
 		coverage := float64(len(matched[cid])) / float64(len(terms))
 		matches = append(matches, model.ChannelMatch{
 			Channel:    ch,
