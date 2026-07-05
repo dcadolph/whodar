@@ -118,6 +118,8 @@ type Issue struct {
 			// Name is the issue type name.
 			Name string `json:"name"`
 		} `json:"issuetype"`
+		// Updated is the last update time in Jira's ISO 8601 format.
+		Updated string `json:"updated"`
 	} `json:"fields"`
 }
 
@@ -147,7 +149,7 @@ func (c *Client) Search(ctx context.Context, jql string, max int) ([]Issue, erro
 			"jql":        {jql},
 			"startAt":    {strconv.Itoa(startAt)},
 			"maxResults": {strconv.Itoa(page)},
-			"fields":     {"summary,assignee,reporter,components,labels,project,issuetype"},
+			"fields":     {"summary,assignee,reporter,components,labels,project,issuetype,updated"},
 		}
 		var resp searchResponse
 		if err := c.get(ctx, searchPath, params, &resp); err != nil {

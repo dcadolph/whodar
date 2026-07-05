@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/dcadolph/whodar/internal/confluence"
 )
@@ -20,7 +21,8 @@ func TestConfluenceFetch(t *testing.T) {
 			`{"title":"Wiz scanning runbook","space":{"key":"SEC","name":"Security"},`+
 			`"metadata":{"labels":{"results":[{"name":"wiz"}]}},`+
 			`"history":{"createdBy":{"accountId":"a1","displayName":"Jane","email":"jane@x.com"}},`+
-			`"version":{"by":{"accountId":"a1","displayName":"Jane","email":"jane@x.com"}}},`+
+			`"version":{"by":{"accountId":"a1","displayName":"Jane","email":"jane@x.com"},`+
+			`"when":"2026-06-25T14:00:00.000Z"}},`+
 			`{"title":"Dashboard outage","space":{"key":"OPS","name":"Operations"},`+
 			`"metadata":{"labels":{"results":[{"name":"dashboard"}]}},`+
 			`"history":{"createdBy":{"accountId":"b1","displayName":"Bob"}},`+
@@ -49,5 +51,8 @@ func TestConfluenceFetch(t *testing.T) {
 	}
 	if bob := byKey["confluence:b1"]; !slices.Contains(bob.Topics, "dashboard") {
 		t.Errorf("bob topics = %v, want dashboard", bob.Topics)
+	}
+	if want := time.Date(2026, 6, 25, 14, 0, 0, 0, time.UTC); !byKey["jane@x.com"].Time.Equal(want) {
+		t.Errorf("jane time = %v, want the page edit time %v", byKey["jane@x.com"].Time, want)
 	}
 }

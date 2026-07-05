@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/dcadolph/whodar/internal/jira"
 )
@@ -21,7 +22,7 @@ func TestJiraFetch(t *testing.T) {
 			`"assignee":{"accountId":"a1","displayName":"Jane Roe","emailAddress":"jane@x.com"},`+
 			`"reporter":{"accountId":"p1","displayName":"Pat","emailAddress":"pat@x.com"},`+
 			`"components":[{"name":"scanning"}],"labels":["wiz"],`+
-			`"project":{"key":"SEC","name":"Security"}}},`+
+			`"project":{"key":"SEC","name":"Security"},"updated":"2026-06-20T09:30:00.000-0500"}},`+
 			`{"key":"OPS-2","fields":{"summary":"Dashboard down",`+
 			`"assignee":{"accountId":"b1","displayName":"Bob"},`+
 			`"labels":["dashboard"],"project":{"key":"OPS","name":"Operations"}}}]}`)
@@ -49,5 +50,12 @@ func TestJiraFetch(t *testing.T) {
 	}
 	if bob := byKey["jira:b1"]; !slices.Contains(bob.Topics, "dashboard") {
 		t.Errorf("bob topics = %v, want dashboard", bob.Topics)
+	}
+	zone := time.FixedZone("", -5*3600)
+	if want := time.Date(2026, 6, 20, 9, 30, 0, 0, zone); !byKey["jane@x.com"].Time.Equal(want) {
+		t.Errorf("jane time = %v, want the issue update time %v", byKey["jane@x.com"].Time, want)
+	}
+	if !byKey["jira:b1"].Time.IsZero() {
+		t.Errorf("bob time = %v, want zero for an issue without a date", byKey["jira:b1"].Time)
 	}
 }

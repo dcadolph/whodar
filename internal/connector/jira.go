@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/dcadolph/whodar/internal/jira"
 )
@@ -67,7 +68,8 @@ func (j *Jira) Fetch(ctx context.Context) ([]Record, error) {
 
 	counts := make(map[string]map[string]int)
 	users := make(map[string]jira.User)
-	bump := func(u *jira.User, tokens []string) {
+	latest := make(map[string]time.Time)
+	bump := func(u *jira.User, tokens []string, t time.Time) {
 		if u == nil {
 			return
 		}
@@ -80,25 +82,42 @@ func (j *Jira) Fetch(ctx context.Context) ([]Record, error) {
 			c = make(map[string]int)
 			counts[key] = c
 		}
-		for _, t := range tokens {
-			if t = strings.ToLower(strings.TrimSpace(t)); t != "" {
-				c[t]++
+		for _, tok := range tokens {
+			if tok = strings.ToLower(strings.TrimSpace(tok)); tok != "" {
+				c[tok]++
 			}
+		}
+		if t.After(latest[key]) {
+			latest[key] = t
 		}
 		users[key] = *u
 	}
 
 	for _, is := range issues {
 		tokens := issueTopics(is)
-		bump(is.Fields.Assignee, tokens)
-		bump(is.Fields.Reporter, tokens)
+		updated := jiraTime(is.Fields.Updated)
+		bump(is.Fields.Assignee, tokens, updated)
+		bump(is.Fields.Reporter, tokens, updated)
 	}
 
 	records := make([]Record, 0, len(counts))
 	for key, c := range counts {
-		records = append(records, jiraPersonRecord(users[key], expandTopics(c)))
+		rec := jiraPersonRecord(users[key], expandTopics(c))
+		rec.Time = latest[key]
+		records = append(records, rec)
 	}
 	return records, nil
+}
+
+// jiraTime parses Jira's ISO 8601 timestamp, such as
+// "2026-07-05T12:34:56.789-0500", returning the zero time when it does not
+// parse.
+func jiraTime(s string) time.Time {
+	t, err := time.Parse("2006-01-02T15:04:05.999-0700", s)
+	if err != nil {
+		return time.Time{}
+	}
+	return t
 }
 
 // jql returns the query: an explicit JQL, or a project scope, or all issues.

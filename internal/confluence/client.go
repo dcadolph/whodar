@@ -114,10 +114,12 @@ type Page struct {
 		// CreatedBy is the page's creator.
 		CreatedBy *User `json:"createdBy"`
 	} `json:"history"`
-	// Version holds the last editor.
+	// Version holds the last editor and edit time.
 	Version struct {
 		// By is the last editor.
 		By *User `json:"by"`
+		// When is the last edit time.
+		When time.Time `json:"when"`
 	} `json:"version"`
 }
 

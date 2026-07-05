@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/dcadolph/whodar/internal/confluence"
 )
@@ -67,7 +68,8 @@ func (c *Confluence) Fetch(ctx context.Context) ([]Record, error) {
 
 	counts := make(map[string]map[string]int)
 	users := make(map[string]confluence.User)
-	bump := func(u *confluence.User, tokens []string) {
+	latest := make(map[string]time.Time)
+	bump := func(u *confluence.User, tokens []string, t time.Time) {
 		if u == nil {
 			return
 		}
@@ -80,10 +82,13 @@ func (c *Confluence) Fetch(ctx context.Context) ([]Record, error) {
 			m = make(map[string]int)
 			counts[key] = m
 		}
-		for _, t := range tokens {
-			if t = strings.ToLower(strings.TrimSpace(t)); t != "" {
-				m[t]++
+		for _, tok := range tokens {
+			if tok = strings.ToLower(strings.TrimSpace(tok)); tok != "" {
+				m[tok]++
 			}
+		}
+		if t.After(latest[key]) {
+			latest[key] = t
 		}
 		users[key] = *u
 	}
@@ -91,13 +96,15 @@ func (c *Confluence) Fetch(ctx context.Context) ([]Record, error) {
 	for _, page := range pages {
 		tokens := pageTopics(page)
 		for _, u := range page.Authors() {
-			bump(u, tokens)
+			bump(u, tokens, page.Version.When)
 		}
 	}
 
 	records := make([]Record, 0, len(counts))
 	for key, m := range counts {
-		records = append(records, confluencePersonRecord(users[key], expandTopics(m)))
+		rec := confluencePersonRecord(users[key], expandTopics(m))
+		rec.Time = latest[key]
+		records = append(records, rec)
 	}
 	return records, nil
 }
