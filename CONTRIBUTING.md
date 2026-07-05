@@ -21,3 +21,8 @@ and docs/ROADMAP.md for sources planned next.
 
 Table-driven tests live alongside the code. Cover the happy path, the error
 paths, and edge cases. Run the full suite with make test before opening a change.
+
+internal/simorg simulates a whole company and serves each tool's wire format
+from in-process HTTP servers, so the full pipeline runs end to end with no
+credentials: every source, identity joins, recency, confidence, and feedback.
+When you add a source, add it to the simulation and its assertions.
