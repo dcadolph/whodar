@@ -1,5 +1,35 @@
 package resolve
 
+import "math"
+
+// Confidence labels partition the zero-to-one confidence range for display.
+const (
+	// strongConfidence is the floor of a strong match.
+	strongConfidence = 0.75
+	// moderateConfidence is the floor of a moderate match.
+	moderateConfidence = 0.45
+)
+
+// ConfidenceLabel names a confidence value for display: strong, moderate, or
+// weak. It returns the empty string for zero, when confidence is unknown.
+func ConfidenceLabel(c float64) string {
+	switch {
+	case c <= 0:
+		return ""
+	case c >= strongConfidence:
+		return "strong"
+	case c >= moderateConfidence:
+		return "moderate"
+	default:
+		return "weak"
+	}
+}
+
+// roundConfidence trims a confidence to two decimals for stable JSON output.
+func roundConfidence(c float64) float64 {
+	return math.Round(c*100) / 100
+}
+
 // JSONAnswer is a flat, JSON-friendly view of an Answer, shared by the CLI and
 // the web server so both emit the same shape.
 type JSONAnswer struct {
@@ -28,6 +58,9 @@ type JSONPerson struct {
 	Identities []string `json:"identities,omitempty"`
 	// Score is the relevance score.
 	Score float64 `json:"score"`
+	// Confidence estimates how trustworthy the match is, from zero to one.
+	// Zero means unknown and is omitted.
+	Confidence float64 `json:"confidence,omitempty"`
 	// Reasons explains why the person matched.
 	Reasons []string `json:"reasons,omitempty"`
 }
@@ -40,6 +73,9 @@ type JSONChannel struct {
 	Topic string `json:"topic,omitempty"`
 	// Score is the relevance score.
 	Score float64 `json:"score"`
+	// Confidence estimates how trustworthy the match is, from zero to one.
+	// Zero means unknown and is omitted.
+	Confidence float64 `json:"confidence,omitempty"`
 	// Reasons explains why the channel matched.
 	Reasons []string `json:"reasons,omitempty"`
 	// Members are the most relevant people active in the channel.
@@ -63,11 +99,12 @@ func (a Answer) View(query string) JSONAnswer {
 	}
 	for _, m := range a.People {
 		jp := JSONPerson{
-			Name:    m.Person.Name,
-			Email:   m.Person.Email,
-			Title:   m.Person.Title,
-			Score:   m.Score,
-			Reasons: m.Reasons,
+			Name:       m.Person.Name,
+			Email:      m.Person.Email,
+			Title:      m.Person.Title,
+			Score:      m.Score,
+			Confidence: roundConfidence(m.Confidence),
+			Reasons:    m.Reasons,
 		}
 		for _, id := range m.Person.Identities {
 			jp.Identities = append(jp.Identities, string(id))
@@ -79,10 +116,11 @@ func (a Answer) View(query string) JSONAnswer {
 	}
 	for _, c := range a.Channels {
 		jc := JSONChannel{
-			Name:    c.Channel.Name,
-			Topic:   c.Channel.Topic,
-			Score:   c.Score,
-			Reasons: c.Reasons,
+			Name:       c.Channel.Name,
+			Topic:      c.Channel.Topic,
+			Score:      c.Score,
+			Confidence: roundConfidence(c.Confidence),
+			Reasons:    c.Reasons,
 		}
 		for _, p := range c.TopMembers {
 			jc.Members = append(jc.Members, JSONMember{Name: p.Name, Email: p.Email})

@@ -32,6 +32,9 @@ func Format(query string, ans resolve.Answer) string {
 			if m.Team != nil && m.Team.Name != "" {
 				line += " (" + m.Team.Name + ")"
 			}
+			if label := resolve.ConfidenceLabel(m.Confidence); label != "" {
+				line += " · " + label + " match"
+			}
 			b.WriteString(line)
 			b.WriteString("\n")
 		}

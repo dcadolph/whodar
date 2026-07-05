@@ -80,6 +80,12 @@ function chips(parent, items) {
   parent.appendChild(wrap);
 }
 
+function confidenceBadge(c) {
+  if (!c) return null;
+  const label = c >= 0.75 ? "strong" : c >= 0.45 ? "moderate" : "weak";
+  return el("span", "conf conf-" + label, label);
+}
+
 function personCard(p) {
   const card = el("div", "card");
   const name = el("div", "name");
@@ -92,6 +98,8 @@ function personCard(p) {
   }
   const copyText = ((p.name || "") + (p.email ? " <" + p.email + ">" : "")).trim();
   if (copyText) name.appendChild(copyButton(copyText));
+  const badge = confidenceBadge(p.confidence);
+  if (badge) name.appendChild(badge);
   card.appendChild(name);
 
   const sub = [p.title, p.team].filter(Boolean).join(" · ");
@@ -104,6 +112,8 @@ function channelCard(c) {
   const card = el("div", "card");
   const name = el("div", "name", "#" + c.name);
   name.appendChild(copyButton("#" + c.name));
+  const badge = confidenceBadge(c.confidence);
+  if (badge) name.appendChild(badge);
   card.appendChild(name);
   if (c.topic) card.appendChild(el("div", "sub", c.topic));
 

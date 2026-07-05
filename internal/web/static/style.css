@@ -205,3 +205,26 @@ footer {
   color: var(--muted);
   font-size: 12px;
 }
+
+.conf {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-left: 8px;
+}
+
+.conf-strong {
+  background: rgba(22, 163, 74, 0.16);
+  color: #16a34a;
+}
+
+.conf-moderate {
+  background: rgba(217, 119, 6, 0.16);
+  color: #d97706;
+}
+
+.conf-weak {
+  background: rgba(220, 38, 38, 0.14);
+  color: #dc2626;
+}
