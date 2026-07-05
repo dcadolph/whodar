@@ -140,8 +140,8 @@ func ownerRecord(owner string, patterns []string) Record {
 		Name:   owner,
 		Topics: topicsFromPatterns(patterns),
 	}
-	if strings.HasPrefix(owner, "@") {
-		rec.PersonID = "codeowners:" + strings.ToLower(strings.TrimPrefix(owner, "@"))
+	if after, ok := strings.CutPrefix(owner, "@"); ok {
+		rec.PersonID = "codeowners:" + strings.ToLower(after)
 	} else if strings.Contains(owner, "@") {
 		rec.Email = strings.ToLower(owner)
 	} else {
@@ -166,12 +166,12 @@ func topicsFromPatterns(patterns []string) []string {
 		for _, name := range patternNames(p) {
 			add(name)
 		}
-		for _, seg := range strings.Split(p, "/") {
+		for seg := range strings.SplitSeq(p, "/") {
 			seg = strings.Trim(seg, "*?.")
 			if seg == "" {
 				continue
 			}
-			for _, part := range strings.Split(seg, ".") {
+			for part := range strings.SplitSeq(seg, ".") {
 				part = strings.ToLower(strings.TrimSpace(part))
 				if len(part) < 3 || codeStop[part] {
 					continue

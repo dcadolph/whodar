@@ -28,7 +28,6 @@ func newServer(t *testing.T, scripts map[string][]canned) *httptest.Server {
 	idx := make(map[string]int)
 	mux := http.NewServeMux()
 	for path, seq := range scripts {
-		seq := seq
 		mux.HandleFunc("/"+path, func(w http.ResponseWriter, _ *http.Request) {
 			mu.Lock()
 			i := idx[path]

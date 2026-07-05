@@ -272,11 +272,8 @@ func expandTopics(counts map[string]int) []string {
 
 	var out []string
 	for _, t := range tokens {
-		n := counts[t]
-		if n > maxTopicWeight {
-			n = maxTopicWeight
-		}
-		for i := 0; i < n; i++ {
+		n := min(counts[t], maxTopicWeight)
+		for range n {
 			out = append(out, t)
 		}
 	}

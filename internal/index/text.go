@@ -1,6 +1,7 @@
 package index
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/kljensen/snowball"
@@ -73,10 +74,8 @@ func stem(token string) string {
 // containsToken reports whether any phrase contains term as a whole token.
 func containsToken(phrases []string, term string) bool {
 	for _, ph := range phrases {
-		for _, tok := range tokenize(ph) {
-			if tok == term {
-				return true
-			}
+		if slices.Contains(tokenize(ph), term) {
+			return true
 		}
 	}
 	return false
