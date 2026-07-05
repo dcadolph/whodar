@@ -32,6 +32,8 @@ people, teams, and topics, and serves queries through swappable resolvers.
   alias file joins handle-only identifiers like a GitHub login or a Jira
   account id to the same person.
 - The index lives on disk and combines full-text search with affinity scoring.
+  Recent activity counts more: dated records lose half their weight per
+  half-life (180 days by default), so today's owner outranks one from years ago.
 - Resolvers answer a query. The keyword resolver needs no LLM and always works.
   An optional local LLM resolver adds semantic ranking and a written answer.
 

@@ -335,6 +335,22 @@ The mapping is saved in the index, so later runs keep joining without the flag.
 Joined identifiers appear in answers under `identities`, and a person's email
 always wins as the display identifier. See `examples/aliases.json`.
 
+## Recent activity counts more
+
+Activity ages. Someone who owned a topic three years ago is usually the wrong
+person to ask today, so dated records decay: a record loses half its weight per
+half-life, 180 days by default. Slack messages, GitHub pull requests and
+issues, Jira issues, and Confluence pages all carry their activity date. The
+org chart, CODEOWNERS, and PagerDuty on-call describe the present and never
+decay.
+
+Tune it at index time:
+
+    whodar index --source slack --merge --half-life-days 90
+
+A shorter half-life favors the people active right now; `--half-life-days 0`
+turns decay off entirely.
+
 ## Troubleshooting
 
 | Message                                             | Cause                              | Fix                                          |

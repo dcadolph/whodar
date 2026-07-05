@@ -12,15 +12,14 @@ GitHub, Jira, Confluence, and PagerDuty are shipped. Still to come:
 - Opsgenie: on-call schedules and service owners.
 
 Each maps its data to people, teams, topics, and channels, and joins other
-sources by email, so one person stays one entry across them.
+sources by email or an alias file, so one person stays one entry across them.
 
 ## Engine
 
 - Binary vector store: embeddings are kept as JSON today, which is heavy for
   large organizations. A compact on-disk format keeps the index small.
 - Incremental indexing: update only what changed instead of rebuilding.
-- Recency and confidence: weight recent activity higher and expose a confidence
-  signal on each answer.
+- Confidence: expose how sure the ranking is on each answer.
 
 ## Experience
 
