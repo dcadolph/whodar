@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dcadolph/whodar/internal/slack"
 )
@@ -52,6 +53,7 @@ func TestSlackFetch(t *testing.T) {
 	var channel *Record
 	people := make(map[string]Record)
 	janeTalksRetries := false
+	var janeTextTime time.Time
 	for i := range recs {
 		r := recs[i]
 		switch r.Kind {
@@ -63,6 +65,7 @@ func TestSlackFetch(t *testing.T) {
 			}
 			if r.PersonID == "jane@x.com" && strings.Contains(r.Text, "retries") {
 				janeTalksRetries = true
+				janeTextTime = r.Time
 			}
 		}
 	}
@@ -84,5 +87,11 @@ func TestSlackFetch(t *testing.T) {
 	}
 	if !janeTalksRetries {
 		t.Error("expected a person record giving Jane retries affinity from her messages")
+	}
+	if want := time.Unix(1, 0).UTC(); !janeTextTime.Equal(want) {
+		t.Errorf("jane text record time = %v, want %v", janeTextTime, want)
+	}
+	if want := time.Unix(2, 0).UTC(); !channel.Time.Equal(want) {
+		t.Errorf("channel time = %v, want the latest user message time %v", channel.Time, want)
 	}
 }

@@ -125,6 +125,8 @@ type PullRequest struct {
 	RequestedReviewers []account `json:"requested_reviewers"`
 	// Assignees are users assigned to the pull request.
 	Assignees []account `json:"assignees"`
+	// UpdatedAt is when the pull request last changed.
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // Author returns the pull request author's login.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"time"
 
@@ -118,11 +119,12 @@ func (s *Slack) Fetch(ctx context.Context) ([]Record, error) {
 				"slack: #%s hit the %d message cap; older messages skipped\n", ch.Name, s.opts.MaxMessages)
 		}
 
-		chRec, authorText := channelRecord(ch, msgs, byID)
+		chRec, authorText, authorLatest := channelRecord(ch, msgs, byID)
 		records = append(records, chRec)
 		for pid, text := range authorText {
 			records = append(records, Record{
 				Kind: KindPerson, Source: "slack", Weight: 1, PersonID: pid, Text: text,
+				Time: authorLatest[pid],
 			})
 		}
 		fmt.Fprintf(s.opts.Log, "slack: indexed #%s (%d messages)\n", ch.Name, len(msgs))
@@ -143,12 +145,17 @@ func personRecord(u slack.User) Record {
 	}
 }
 
-// channelRecord builds a channel record and the per-author message text mined
-// for personal affinity. System and bot messages are skipped.
-func channelRecord(ch slack.Channel, msgs []slack.Message, byID map[string]slack.User) (Record, map[string]string) {
+// channelRecord builds a channel record, the per-author message text mined
+// for personal affinity, and each author's latest message time. System and
+// bot messages are skipped.
+func channelRecord(
+	ch slack.Channel, msgs []slack.Message, byID map[string]slack.User,
+) (Record, map[string]string, map[string]time.Time) {
 	var members []string
 	seen := make(map[string]bool)
 	authorText := make(map[string]string)
+	authorLatest := make(map[string]time.Time)
+	var latest time.Time
 	var sample strings.Builder
 
 	for _, m := range msgs {
@@ -166,6 +173,14 @@ func channelRecord(ch slack.Channel, msgs []slack.Message, byID map[string]slack
 		if len(authorText[pid]) < maxAuthorText {
 			authorText[pid] += " " + m.Text
 		}
+		if ts := slackTime(m.TS); !ts.IsZero() {
+			if ts.After(authorLatest[pid]) {
+				authorLatest[pid] = ts
+			}
+			if ts.After(latest) {
+				latest = ts
+			}
+		}
 		if sample.Len() < sampleBudget {
 			sample.WriteString(" ")
 			sample.WriteString(m.Text)
@@ -180,8 +195,19 @@ func channelRecord(ch slack.Channel, msgs []slack.Message, byID map[string]slack
 		Title:   ch.Topic.Value,
 		Text:    strings.TrimSpace(ch.Purpose.Value + " " + sample.String()),
 		Members: members,
+		Time:    latest,
 	}
-	return rec, authorText
+	return rec, authorText, authorLatest
+}
+
+// slackTime parses a Slack epoch timestamp such as "1712345678.000100",
+// returning the zero time when it does not parse.
+func slackTime(ts string) time.Time {
+	sec, err := strconv.ParseFloat(ts, 64)
+	if err != nil || sec <= 0 {
+		return time.Time{}
+	}
+	return time.Unix(int64(sec), 0).UTC()
 }
 
 // slackPersonID resolves a stable person ID from a user, preferring email.

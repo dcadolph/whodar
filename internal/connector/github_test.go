@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/dcadolph/whodar/internal/github"
 )
@@ -29,11 +30,11 @@ func TestGitHubFetch(t *testing.T) {
 	mux.HandleFunc("/repos/o/r/pulls", func(w http.ResponseWriter, _ *http.Request) {
 		io.WriteString(w, `[{"title":"Fix wiz scan flakiness","user":{"login":"jane"},`+
 			`"labels":[{"name":"retries"}],"requested_reviewers":[{"login":"bob"}],`+
-			`"assignees":[{"login":"carol"}]}]`)
+			`"assignees":[{"login":"carol"}],"updated_at":"2026-07-01T10:00:00Z"}]`)
 	})
 	mux.HandleFunc("/repos/o/r/issues", func(w http.ResponseWriter, _ *http.Request) {
 		io.WriteString(w, `[{"user":{"login":"dan"},"labels":[{"name":"dashboard"}],`+
-			`"title":"Wiz dashboard broken"},`+
+			`"title":"Wiz dashboard broken","updated_at":"2026-06-15T08:00:00Z"},`+
 			`{"user":{"login":"ghost"},"labels":[{"name":"shouldskip"}],"title":"x",`+
 			`"pull_request":{"url":"y"}}]`)
 	})
@@ -57,6 +58,12 @@ func TestGitHubFetch(t *testing.T) {
 	if jane := byID["github:jane"]; !slices.Contains(jane.Topics, "wiz") ||
 		!slices.Contains(jane.Topics, "scan") || !slices.Contains(jane.Topics, "retries") {
 		t.Errorf("jane topics = %v, want wiz, scan, retries", jane.Topics)
+	}
+	if want := time.Date(2026, 7, 1, 10, 0, 0, 0, time.UTC); !byID["github:jane"].Time.Equal(want) {
+		t.Errorf("jane time = %v, want the PR update time %v", byID["github:jane"].Time, want)
+	}
+	if want := time.Date(2026, 6, 15, 8, 0, 0, 0, time.UTC); !byID["github:dan"].Time.Equal(want) {
+		t.Errorf("dan time = %v, want the issue update time %v", byID["github:dan"].Time, want)
 	}
 	if bob := byID["github:bob"]; !slices.Contains(bob.Topics, "wiz") {
 		t.Errorf("reviewer bob topics = %v, want wiz", bob.Topics)

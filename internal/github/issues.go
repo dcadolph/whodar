@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/url"
+	"time"
 )
 
 // Issue is the subset of an issue whodar reads. The GitHub issues endpoint also
@@ -19,6 +20,8 @@ type Issue struct {
 	Labels []label `json:"labels"`
 	// PullRequest is present when the issue is actually a pull request.
 	PullRequest json.RawMessage `json:"pull_request"`
+	// UpdatedAt is when the issue last changed.
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // IsPullRequest reports whether this issue is really a pull request.

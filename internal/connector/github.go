@@ -8,6 +8,7 @@ import (
 	"io"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/dcadolph/whodar/internal/github"
 )
@@ -85,7 +86,8 @@ func (g *GitHub) Fetch(ctx context.Context) ([]Record, error) {
 	}
 
 	counts := make(map[string]map[string]int) // login -> token -> count
-	bump := func(login string, tokens []string) {
+	latest := make(map[string]time.Time)      // login -> most recent activity
+	bump := func(login string, tokens []string, t time.Time) {
 		if login == "" || len(tokens) == 0 {
 			return
 		}
@@ -94,10 +96,13 @@ func (g *GitHub) Fetch(ctx context.Context) ([]Record, error) {
 			c = make(map[string]int)
 			counts[login] = c
 		}
-		for _, t := range tokens {
-			if t = strings.ToLower(strings.TrimSpace(t)); t != "" {
-				c[t]++
+		for _, tok := range tokens {
+			if tok = strings.ToLower(strings.TrimSpace(tok)); tok != "" {
+				c[tok]++
 			}
+		}
+		if t.After(latest[login]) {
+			latest[login] = t
 		}
 	}
 
@@ -118,7 +123,7 @@ func (g *GitHub) Fetch(ctx context.Context) ([]Record, error) {
 			return nil, fmt.Errorf("github contributors %s: %w", full, err)
 		}
 		for _, c := range cons {
-			bump(c.Login, repoTokens)
+			bump(c.Login, repoTokens, time.Time{})
 		}
 
 		pulls, err := g.client.PullRequests(ctx, owner, name)
@@ -127,12 +132,12 @@ func (g *GitHub) Fetch(ctx context.Context) ([]Record, error) {
 		}
 		for _, pr := range pulls {
 			tokens := append(pr.LabelNames(), titleTokens(pr.Title)...)
-			bump(pr.Author(), tokens)
+			bump(pr.Author(), tokens, pr.UpdatedAt)
 			for _, u := range pr.Reviewers() {
-				bump(u, tokens)
+				bump(u, tokens, pr.UpdatedAt)
 			}
 			for _, u := range pr.AssigneeLogins() {
-				bump(u, tokens)
+				bump(u, tokens, pr.UpdatedAt)
 			}
 		}
 
@@ -147,9 +152,9 @@ func (g *GitHub) Fetch(ctx context.Context) ([]Record, error) {
 			}
 			issueCount++
 			tokens := append(is.LabelNames(), titleTokens(is.Title)...)
-			bump(is.Author(), tokens)
+			bump(is.Author(), tokens, is.UpdatedAt)
 			for _, u := range is.AssigneeLogins() {
-				bump(u, tokens)
+				bump(u, tokens, is.UpdatedAt)
 			}
 		}
 
@@ -166,7 +171,9 @@ func (g *GitHub) Fetch(ctx context.Context) ([]Record, error) {
 
 	records := make([]Record, 0, len(counts)+len(codeOwnerRecords))
 	for login, tokenCounts := range counts {
-		records = append(records, githubPersonRecord(login, expandTopics(tokenCounts), accounts[login]))
+		rec := githubPersonRecord(login, expandTopics(tokenCounts), accounts[login])
+		rec.Time = latest[login]
+		records = append(records, rec)
 	}
 	records = append(records, codeOwnerRecords...)
 	return records, nil
