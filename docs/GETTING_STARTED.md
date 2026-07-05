@@ -129,6 +129,12 @@ read it yourself. Useful flags:
 The answer has two sections. People are who to talk to. Channels are where to
 ask, each with its most active members for that topic.
 
+Each keyword-mode result carries a `confidence` from zero to one: how much of
+the question matched, scaled by how strong the match is. An explicit topic
+counts as proof, a job title slightly less, a passing mention in chat half.
+The web UI and the Slack bot show it as strong, moderate, or weak, so a
+least-bad answer never dresses up as a sure one.
+
 ## LLM mode
 
 LLM mode retrieves candidates with the index, then asks a local model to rank

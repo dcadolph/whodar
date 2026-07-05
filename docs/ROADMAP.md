@@ -19,7 +19,6 @@ sources by email or an alias file, so one person stays one entry across them.
 - Binary vector store: embeddings are kept as JSON today, which is heavy for
   large organizations. A compact on-disk format keeps the index small.
 - Incremental indexing: update only what changed instead of rebuilding.
-- Confidence: expose how sure the ranking is on each answer.
 
 ## Experience
 

@@ -36,6 +36,8 @@ people, teams, and topics, and serves queries through swappable resolvers.
   half-life (180 days by default), so today's owner outranks one from years ago.
 - Resolvers answer a query. The keyword resolver needs no LLM and always works.
   An optional local LLM resolver adds semantic ranking and a written answer.
+- Every answer says how sure it is. A confidence score separates a strong
+  match from a least-bad one, and each result explains which words hit where.
 
 ## Two modes
 
