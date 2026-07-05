@@ -61,6 +61,9 @@ func newIndexCmd(opts *options) *cobra.Command {
 		merge            bool
 		aliasesFile      string
 		halfLifeDays     int
+		repoPaths        []string
+		gitSinceDays     int
+		maxCommits       int
 		confluenceSpaces []string
 		confluenceCQL    string
 		maxPages         int
@@ -94,8 +97,18 @@ func newIndexCmd(opts *options) *cobra.Command {
 				recs, err = fetchConfluence(cmd, confluenceArgs{confluenceSpaces, confluenceCQL, maxPages})
 			case "pagerduty":
 				recs, err = fetchPagerDuty(cmd)
+			case "git":
+				if len(repoPaths) == 0 {
+					return fmt.Errorf("%w: --repo-path is required for git", ErrBadArgs)
+				}
+				recs, err = connector.NewGitHistory(connector.GitOptions{
+					Paths:      repoPaths,
+					SinceDays:  gitSinceDays,
+					MaxCommits: maxCommits,
+					Log:        cmd.ErrOrStderr(),
+				}).Fetch(cmd.Context())
 			default:
-				return fmt.Errorf("%w: %q (want org-csv, slack, codeowners, github, jira, confluence, or pagerduty)", ErrUnknownSource, source)
+				return fmt.Errorf("%w: %q (want org-csv, slack, codeowners, github, jira, confluence, pagerduty, or git)", ErrUnknownSource, source)
 			}
 			if err != nil {
 				return err
@@ -157,7 +170,7 @@ func newIndexCmd(opts *options) *cobra.Command {
 		},
 	}
 	f := cmd.Flags()
-	f.StringVar(&source, "source", "org-csv", "Source type: org-csv, slack, codeowners, github, jira, confluence, or pagerduty.")
+	f.StringVar(&source, "source", "org-csv", "Source type: org-csv, slack, codeowners, github, jira, confluence, pagerduty, or git.")
 	f.StringVar(&file, "file", "", "Path to the source file (org-csv).")
 	f.BoolVar(&includePrivate, "include-private", false, "Ingest private Slack channels if policy allows.")
 	f.IntVar(&sinceDays, "since-days", 180, "Slack history window in days.")
@@ -168,6 +181,9 @@ func newIndexCmd(opts *options) *cobra.Command {
 		"JSON file mapping a canonical id to its aliases, joining one person across sources.")
 	f.IntVar(&halfLifeDays, "half-life-days", 180,
 		"Days for a dated record's weight to halve; 0 disables recency decay.")
+	f.StringArrayVar(&repoPaths, "repo-path", nil, "Local repository root for the git source (repeatable).")
+	f.IntVar(&gitSinceDays, "git-since-days", 365, "Git history window in days.")
+	f.IntVar(&maxCommits, "max-commits", 2000, "Commit cap per repository for the git source.")
 	f.BoolVar(&embed, "embed", false, "Generate embeddings via Ollama for semantic search.")
 	f.StringVar(&embedModel, "embed-model", "", "Ollama embed model (default nomic-embed-text).")
 	f.StringVar(&ollamaURL, "ollama-url", "http://localhost:11434", "Ollama base URL for --embed.")

@@ -156,31 +156,36 @@ func ownerRecord(owner string, patterns []string) Record {
 func topicsFromPatterns(patterns []string) []string {
 	seen := make(map[string]bool)
 	var topics []string
-	add := func(t string) {
-		if t != "" && !seen[t] {
-			seen[t] = true
-			topics = append(topics, t)
-		}
-	}
 	for _, p := range patterns {
-		for _, name := range patternNames(p) {
-			add(name)
-		}
-		for seg := range strings.SplitSeq(p, "/") {
-			seg = strings.Trim(seg, "*?.")
-			if seg == "" {
-				continue
-			}
-			for part := range strings.SplitSeq(seg, ".") {
-				part = strings.ToLower(strings.TrimSpace(part))
-				if len(part) < 3 || codeStop[part] {
-					continue
-				}
-				add(part)
+		for _, t := range pathTopics(p) {
+			if t != "" && !seen[t] {
+				seen[t] = true
+				topics = append(topics, t)
 			}
 		}
 	}
 	return topics
+}
+
+// pathTopics derives topic tokens from one path or pattern: extension and
+// special-filename names plus meaningful path segments, duplicates kept so
+// callers can weight by volume.
+func pathTopics(p string) []string {
+	out := append([]string(nil), patternNames(p)...)
+	for seg := range strings.SplitSeq(p, "/") {
+		seg = strings.Trim(seg, "*?.")
+		if seg == "" {
+			continue
+		}
+		for part := range strings.SplitSeq(seg, ".") {
+			part = strings.ToLower(strings.TrimSpace(part))
+			if len(part) < 3 || codeStop[part] {
+				continue
+			}
+			out = append(out, part)
+		}
+	}
+	return out
 }
 
 // patternNames maps a pattern's file extension or special filename to the topic
