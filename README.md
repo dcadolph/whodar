@@ -5,7 +5,8 @@
 # whodar
 
 whodar helps you find who to ask at work. Point it at the tools your org already
-uses (Slack, GitHub, Jira, Confluence, PagerDuty, an org chart, code ownership)
+uses (Slack, GitHub, Jira, Confluence, PagerDuty, git history, an org chart,
+code ownership)
 and ask a question in plain words. It returns the people to talk to and the
 channels to ask in, with the reason it picked each one. It runs locally by
 default, with or without an LLM.
@@ -67,9 +68,9 @@ service all reuse the same core.
 
 ## Status
 
-Working and released. Seven sources (org chart, Slack, GitHub, Jira, Confluence,
-PagerDuty, and code ownership), keyword and local LLM answers, a web UI, and a
-Slack bot. Prebuilt binaries ship with each release.
+Working and released. Eight sources (org chart, Slack, GitHub, Jira, Confluence,
+PagerDuty, git history, and code ownership), keyword and local LLM answers, a
+web UI, and a Slack bot. Prebuilt binaries ship with each release.
 
 ## Build
 

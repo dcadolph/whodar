@@ -273,6 +273,20 @@ read-only API token in PagerDuty and export it:
 It reads every service and the people currently on call, giving each on-call
 person the topics of the services they answer for.
 
+## Git history
+
+Index who actually commits to what. No tokens, no API: it reads local clones
+directly, so it works for any repository you can `git clone`, including ones
+with no CODEOWNERS file.
+
+    whodar index --source git --repo-path ~/src/billing --repo-path ~/src/infra --merge
+
+Each author gets the topics of the paths they touch, weighted by how often
+they touch them, so the person doing the work outranks a drive-by. Authors
+join other sources by commit email. Bot accounts such as dependabot are
+skipped. `--git-since-days` bounds the window (default 365) and
+`--max-commits` caps each repository (default 2000).
+
 ## Where your data lives
 
 The index is written to `~/.whodar/index.json` by default. Override the location
