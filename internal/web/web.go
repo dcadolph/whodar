@@ -12,7 +12,9 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/dcadolph/whodar/internal/feedback"
 	"github.com/dcadolph/whodar/internal/resolve"
 )
 
@@ -24,10 +26,15 @@ var assets embed.FS
 // AskFunc resolves a query in the chosen mode and returns the answer.
 type AskFunc func(ctx context.Context, query, mode string, limit int) (resolve.Answer, error)
 
+// FeedbackFunc records a user's vote on one result.
+type FeedbackFunc func(feedback.Entry) error
+
 // Config configures the web handler.
 type Config struct {
 	// Ask resolves queries; required.
 	Ask AskFunc
+	// Feedback records votes on results; nil disables the feedback API.
+	Feedback FeedbackFunc
 	// Version is shown in the page footer.
 	Version string
 }
@@ -50,6 +57,9 @@ func Handler(cfg Config) (http.Handler, error) {
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(static))))
 	mux.HandleFunc("/api/ask", askHandler(cfg.Ask))
+	if cfg.Feedback != nil {
+		mux.HandleFunc("/api/feedback", feedbackHandler(cfg.Feedback))
+	}
 	mux.HandleFunc("/", indexHandler(tmpl, cfg.Version))
 	return mux, nil
 }
@@ -92,6 +102,53 @@ func askHandler(ask AskFunc) http.HandlerFunc {
 			return
 		}
 		_ = json.NewEncoder(w).Encode(ans.View(query))
+	}
+}
+
+// feedbackHandler records a vote on one result. It accepts a POST with a JSON
+// body naming the query, the person or channel, and the vote direction.
+func feedbackHandler(record FeedbackFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method != http.MethodPost {
+			writeError(w, http.StatusMethodNotAllowed, "POST only")
+			return
+		}
+		var body struct {
+			// Query is the question the vote is about.
+			Query string `json:"query"`
+			// Person is the voted person's identifier.
+			Person string `json:"person"`
+			// Channel is the voted channel's name.
+			Channel string `json:"channel"`
+			// Vote is "helpful" or "not-helpful".
+			Vote string `json:"vote"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid JSON")
+			return
+		}
+		entry := feedback.Entry{
+			Query:   strings.TrimSpace(body.Query),
+			Person:  strings.TrimSpace(body.Person),
+			Channel: strings.TrimSpace(body.Channel),
+			Time:    time.Now(),
+		}
+		switch body.Vote {
+		case "helpful":
+			entry.Vote = feedback.Helpful
+		case "not-helpful":
+			entry.Vote = feedback.NotHelpful
+		}
+		if !entry.Valid() {
+			writeError(w, http.StatusBadRequest, feedback.ErrBadEntry.Error())
+			return
+		}
+		if err := record(entry); err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "recorded"})
 	}
 }
 

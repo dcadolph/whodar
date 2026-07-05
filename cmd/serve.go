@@ -12,6 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/dcadolph/whodar/internal/feedback"
 	"github.com/dcadolph/whodar/internal/index"
 	"github.com/dcadolph/whodar/internal/resolve"
 	"github.com/dcadolph/whodar/internal/web"
@@ -38,6 +39,7 @@ func newServeCmd(opts *options) *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("%w: run `whodar index` first: %w", ErrNoIndex, err)
 			}
+			store := applyFeedback(ix, opts, cmd.ErrOrStderr())
 			ask := func(ctx context.Context, query, reqMode string, limit int) (resolve.Answer, error) {
 				if reqMode == "" {
 					reqMode = mode
@@ -48,8 +50,18 @@ func newServeCmd(opts *options) *cobra.Command {
 				}
 				return res.Resolve(ctx, query, limit)
 			}
+			var vote web.FeedbackFunc
+			if store != nil {
+				vote = func(e feedback.Entry) error {
+					if err := store.Add(e); err != nil {
+						return err
+					}
+					ix.SetFeedback(store.All())
+					return nil
+				}
+			}
 
-			handler, err := web.Handler(web.Config{Ask: ask, Version: version})
+			handler, err := web.Handler(web.Config{Ask: ask, Feedback: vote, Version: version})
 			if err != nil {
 				return err
 			}

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dcadolph/whodar/internal/feedback"
 	"github.com/dcadolph/whodar/internal/model"
 	"github.com/dcadolph/whodar/internal/resolve"
 )
@@ -85,4 +86,55 @@ func TestNilAskPanics(t *testing.T) {
 		}
 	}()
 	_, _ = Handler(Config{})
+}
+
+// TestFeedbackAPI verifies the feedback endpoint records votes and rejects bad
+// requests.
+func TestFeedbackAPI(t *testing.T) {
+	t.Parallel()
+	var got feedback.Entry
+	ask := func(_ context.Context, _, _ string, _ int) (resolve.Answer, error) {
+		return resolve.Answer{}, nil
+	}
+	h, err := Handler(Config{
+		Ask:      ask,
+		Feedback: func(e feedback.Entry) error { got = e; return nil },
+		Version:  "test",
+	})
+	if err != nil {
+		t.Fatalf("Handler: %v", err)
+	}
+
+	body := `{"query":"billing retries","person":"jane@x.com","vote":"helpful"}`
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/feedback", strings.NewReader(body)))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200: %s", rec.Code, rec.Body.String())
+	}
+	if got.Query != "billing retries" || got.Person != "jane@x.com" || got.Vote != feedback.Helpful {
+		t.Errorf("recorded entry = %+v", got)
+	}
+
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/feedback", nil))
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Errorf("GET status = %d, want 405", rec.Code)
+	}
+
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/feedback",
+		strings.NewReader(`{"query":"","vote":"helpful"}`)))
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("invalid entry status = %d, want 400", rec.Code)
+	}
+}
+
+// TestFeedbackAPIDisabled verifies the endpoint is absent without a callback.
+func TestFeedbackAPIDisabled(t *testing.T) {
+	t.Parallel()
+	rec := httptest.NewRecorder()
+	testHandler(t).ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/feedback", nil))
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want 404 when feedback is disabled", rec.Code)
+	}
 }

@@ -54,8 +54,8 @@ function render(data) {
   const people = data.people || [];
   const channels = data.channels || [];
 
-  for (const p of people) peopleEl.appendChild(personCard(p));
-  for (const c of channels) channelsEl.appendChild(channelCard(c));
+  for (const p of people) peopleEl.appendChild(personCard(p, data.query));
+  for (const c of channels) channelsEl.appendChild(channelCard(c, data.query));
   peopleSection.hidden = people.length === 0;
   channelsSection.hidden = channels.length === 0;
 
@@ -86,7 +86,29 @@ function confidenceBadge(c) {
   return el("span", "conf conf-" + label, label);
 }
 
-function personCard(p) {
+function voteButtons(query, target) {
+  const wrap = el("div", "votes");
+  for (const [label, vote] of [["helpful", "helpful"], ["wrong", "not-helpful"]]) {
+    const button = el("button", "vote", label);
+    button.type = "button";
+    button.addEventListener("click", async () => {
+      try {
+        const res = await fetch("/api/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query, vote, ...target }),
+        });
+        wrap.replaceChildren(el("span", "voted", res.ok ? "thanks" : "failed"));
+      } catch (err) {
+        wrap.replaceChildren(el("span", "voted", "failed"));
+      }
+    });
+    wrap.appendChild(button);
+  }
+  return wrap;
+}
+
+function personCard(p, query) {
   const card = el("div", "card");
   const name = el("div", "name");
   if (p.email) {
@@ -105,10 +127,11 @@ function personCard(p) {
   const sub = [p.title, p.team].filter(Boolean).join(" · ");
   if (sub) card.appendChild(el("div", "sub", sub));
   chips(card, p.reasons);
+  if (query && p.id) card.appendChild(voteButtons(query, { person: p.id }));
   return card;
 }
 
-function channelCard(c) {
+function channelCard(c, query) {
   const card = el("div", "card");
   const name = el("div", "name", "#" + c.name);
   name.appendChild(copyButton("#" + c.name));
@@ -134,6 +157,7 @@ function channelCard(c) {
     card.appendChild(sub);
   }
   chips(card, c.reasons);
+  if (query && c.name) card.appendChild(voteButtons(query, { channel: c.name }));
   return card;
 }
 

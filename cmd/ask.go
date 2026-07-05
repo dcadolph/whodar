@@ -31,6 +31,7 @@ func newAskCmd(opts *options) *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("%w: run `whodar index` first: %w", ErrNoIndex, err)
 			}
+			applyFeedback(ix, opts, cmd.ErrOrStderr())
 			res, err := pickResolver(ix, opts, mode, model, embedModel, ollamaURL)
 			if err != nil {
 				return err

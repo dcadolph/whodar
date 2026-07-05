@@ -228,3 +228,30 @@ footer {
   background: rgba(220, 38, 38, 0.14);
   color: #dc2626;
 }
+
+.votes {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.vote {
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.vote:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.voted {
+  font-size: 12px;
+  color: var(--muted);
+}

@@ -34,6 +34,12 @@ func (o *options) indexPath() string {
 	return filepath.Join(o.dataDir, "index.json")
 }
 
+// feedbackPath returns the feedback file path under the data directory. It is
+// separate from the index so votes survive re-indexing.
+func (o *options) feedbackPath() string {
+	return filepath.Join(o.dataDir, "feedback.json")
+}
+
 // newRootCmd builds the root command, wires shared flags, and adds subcommands.
 func newRootCmd() *cobra.Command {
 	opts := &options{dataDir: defaultDataDir(), policyName: "strict"}
@@ -54,7 +60,8 @@ func newRootCmd() *cobra.Command {
 	pf.BoolVar(&opts.pretty, "pretty", false, "Indent JSON output.")
 
 	root.AddCommand(
-		newIndexCmd(opts), newAskCmd(opts), newServeCmd(opts), newBotCmd(opts), newVersionCmd())
+		newIndexCmd(opts), newAskCmd(opts), newServeCmd(opts), newBotCmd(opts),
+		newFeedbackCmd(opts), newVersionCmd())
 	return root
 }
 

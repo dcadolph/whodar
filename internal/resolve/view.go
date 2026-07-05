@@ -45,6 +45,8 @@ type JSONAnswer struct {
 
 // JSONPerson is one ranked person.
 type JSONPerson struct {
+	// ID is the person's canonical identifier, the stable target for feedback.
+	ID string `json:"id"`
 	// Name is the person's display name.
 	Name string `json:"name"`
 	// Email is the person's work email.
@@ -99,6 +101,7 @@ func (a Answer) View(query string) JSONAnswer {
 	}
 	for _, m := range a.People {
 		jp := JSONPerson{
+			ID:         string(m.Person.ID),
 			Name:       m.Person.Name,
 			Email:      m.Person.Email,
 			Title:      m.Person.Title,

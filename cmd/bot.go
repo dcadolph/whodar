@@ -61,6 +61,7 @@ func newBotCmd(opts *options) *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("%w: run `whodar index` first: %w", ErrNoIndex, err)
 			}
+			applyFeedback(ix, opts, cmd.ErrOrStderr())
 
 			botClient := slack.New(botToken)
 			botUserID, err := botClient.AuthTest(cmd.Context())
