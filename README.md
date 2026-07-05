@@ -28,6 +28,9 @@ people, teams, and topics, and serves queries through swappable resolvers.
   and code ownership). Adding a source means implementing one small interface.
 - The model layer normalizes records into people, teams, orgs, topics, and
   documents, with weighted edges for who talks about what and who owns what.
+- Identity resolution keeps one human one node. Sources join by email, and an
+  alias file joins handle-only identifiers like a GitHub login or a Jira
+  account id to the same person.
 - The index lives on disk and combines full-text search with affinity scoring.
 - Resolvers answer a query. The keyword resolver needs no LLM and always works.
   An optional local LLM resolver adds semantic ranking and a written answer.

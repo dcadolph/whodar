@@ -58,6 +58,7 @@ func newIndexCmd(opts *options) *cobra.Command {
 		jiraJQL          string
 		maxIssues        int
 		merge            bool
+		aliasesFile      string
 		confluenceSpaces []string
 		confluenceCQL    string
 		maxPages         int
@@ -108,10 +109,18 @@ func newIndexCmd(opts *options) *cobra.Command {
 				if base, lerr := index.Load(opts.indexPath()); lerr == nil {
 					ix = base
 				}
+			}
+			if aliasesFile != "" {
+				if err := ix.LoadAliases(aliasesFile); err != nil {
+					return err
+				}
+			}
+			if merge {
 				ix.Add(recs)
 			} else {
 				ix.Build(recs)
 			}
+			ix.Canonicalize()
 
 			if embed {
 				if err := guardLLMHost(opts.pol, ollamaURL); err != nil {
@@ -152,6 +161,8 @@ func newIndexCmd(opts *options) *cobra.Command {
 	f.IntVar(&maxMessages, "max-messages", 5000, "Slack message cap per channel.")
 	f.StringVar(&changesFile, "changes-file", "", "Write the index diff as JSON to this path.")
 	f.BoolVar(&merge, "merge", false, "Merge into the existing index instead of replacing it.")
+	f.StringVar(&aliasesFile, "aliases", "",
+		"JSON file mapping a canonical id to its aliases, joining one person across sources.")
 	f.BoolVar(&embed, "embed", false, "Generate embeddings via Ollama for semantic search.")
 	f.StringVar(&embedModel, "embed-model", "", "Ollama embed model (default nomic-embed-text).")
 	f.StringVar(&ollamaURL, "ollama-url", "http://localhost:11434", "Ollama base URL for --embed.")

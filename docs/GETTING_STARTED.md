@@ -315,6 +315,26 @@ Each run prints what joined and left since the last index, for example
 "+3 people, -1 people, +1 channels". Add `--changes-file changes.json` to write
 the full diff as JSON for a script or a report.
 
+## Joining one person across sources
+
+People merge by email. When a source only knows a handle or an account id, such
+as a GitHub login without a public email or a CODEOWNERS `@handle`, the same
+human shows up as two entries. An alias file declares which identifiers belong
+to the same person:
+
+    {
+      "alice@corp.com": ["github:alice", "codeowners:alice"]
+    }
+
+Pass it once with `--aliases` and the index joins the entries, including ones
+indexed before the file existed:
+
+    whodar index --source github --github-org your-org --merge --aliases aliases.json
+
+The mapping is saved in the index, so later runs keep joining without the flag.
+Joined identifiers appear in answers under `identities`, and a person's email
+always wins as the display identifier. See `examples/aliases.json`.
+
 ## Troubleshooting
 
 | Message                                             | Cause                              | Fix                                          |

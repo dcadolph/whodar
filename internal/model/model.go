@@ -21,6 +21,9 @@ type Person struct {
 	OrgID ID
 	// ManagerID links the person to their manager, if known.
 	ManagerID ID
+	// Identities lists alternate identifiers merged into this person, such as
+	// a GitHub login joined to an email.
+	Identities []ID
 	// Topics maps a topic ID to this person's affinity weight for it.
 	Topics map[ID]float64
 }

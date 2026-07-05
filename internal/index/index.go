@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/dcadolph/whodar/internal/connector"
+	"github.com/dcadolph/whodar/internal/identity"
 	"github.com/dcadolph/whodar/internal/model"
 )
 
@@ -72,6 +73,9 @@ type Index struct {
 	personVecs map[model.ID][]float32
 	// channelVecs holds per-channel embedding vectors when present.
 	channelVecs map[model.ID][]float32
+	// resolver maps the identifiers a person accumulates across sources to one
+	// canonical identifier.
+	resolver *identity.Resolver
 }
 
 // New returns an empty index with initialized maps.
@@ -84,6 +88,7 @@ func New() *Index {
 		channelTexts:    make(map[model.ID]*channelText),
 		personVecs:      make(map[model.ID][]float32),
 		channelVecs:     make(map[model.ID][]float32),
+		resolver:        identity.NewResolver(),
 	}
 }
 
@@ -104,14 +109,37 @@ func (ix *Index) Build(records []connector.Record) {
 // name. It leaves embeddings unchanged; call Embed to refresh vectors after
 // adding.
 func (ix *Index) Add(records []connector.Record) {
+	r := ix.identityResolver()
 	for _, rec := range records {
 		switch rec.Kind {
 		case connector.KindChannel:
-			buildChannel(ix.Graph, ix.channelPostings, ix.channelTexts, rec)
+			buildChannel(ix.Graph, ix.channelPostings, ix.channelTexts, r, rec)
 		default:
-			buildPerson(ix.Graph, ix.postings, ix.texts, rec)
+			buildPerson(ix.Graph, ix.postings, ix.texts, r, rec)
 		}
 	}
+}
+
+// LoadAliases merges a JSON alias file into the index's identity resolver so
+// records indexed afterward key by their canonical identifier. Call
+// Canonicalize to also join people already in the graph.
+func (ix *Index) LoadAliases(path string) error {
+	return ix.identityResolver().LoadFile(path)
+}
+
+// Alias records that two identifiers belong to the same person. Records
+// indexed afterward key by the canonical identifier; call Canonicalize to
+// also join people already in the graph.
+func (ix *Index) Alias(a, b model.ID) {
+	ix.identityResolver().Union(a, b)
+}
+
+// identityResolver returns the index's resolver, initializing it on first use.
+func (ix *Index) identityResolver() *identity.Resolver {
+	if ix.resolver == nil {
+		ix.resolver = identity.NewResolver()
+	}
+	return ix.resolver
 }
 
 // buildPerson merges one person record into the graph and postings.
@@ -119,12 +147,17 @@ func buildPerson(
 	g *model.Graph,
 	postings map[string]map[model.ID]float64,
 	texts map[model.ID]*personText,
+	r *identity.Resolver,
 	rec connector.Record,
 ) {
-	pid := personID(rec)
-	if pid == "" {
+	raw := personID(rec)
+	if raw == "" {
 		return
 	}
+	if rec.PersonID != "" && rec.Email != "" {
+		r.Union(model.ID(rec.Email), model.ID(rec.PersonID))
+	}
+	pid := r.Canonical(raw)
 	w := rec.Weight
 	if w == 0 {
 		w = 1
@@ -134,7 +167,13 @@ func buildPerson(
 		p = &model.Person{ID: pid, Topics: make(map[model.ID]float64)}
 		g.People[pid] = p
 	}
+	if raw != pid && !slices.Contains(p.Identities, raw) {
+		p.Identities = append(p.Identities, raw)
+	}
 	fillIdentity(p, rec)
+	if p.ManagerID != "" {
+		p.ManagerID = r.Canonical(p.ManagerID)
+	}
 	linkOrg(g, p, rec)
 
 	pt := texts[pid]
@@ -179,6 +218,7 @@ func buildChannel(
 	g *model.Graph,
 	postings map[string]map[model.ID]float64,
 	texts map[model.ID]*channelText,
+	r *identity.Resolver,
 	rec connector.Record,
 ) {
 	cid := model.ID(slug(rec.Name))
@@ -194,7 +234,7 @@ func buildChannel(
 		ch.Topic = rec.Title
 	}
 	for _, m := range rec.Members {
-		mid := model.ID(strings.ToLower(m))
+		mid := r.Canonical(model.ID(strings.ToLower(m)))
 		if !slices.Contains(ch.Members, mid) {
 			ch.Members = append(ch.Members, mid)
 		}
@@ -414,6 +454,8 @@ type snapshot struct {
 	PersonVecs map[model.ID][]float32 `json:"person_vecs,omitempty"`
 	// ChannelVecs holds per-channel embedding vectors.
 	ChannelVecs map[model.ID][]float32 `json:"channel_vecs,omitempty"`
+	// Aliases maps each known alias identifier to its canonical form.
+	Aliases map[model.ID]model.ID `json:"aliases,omitempty"`
 }
 
 // Save writes the index to path as JSON, creating parent directories as needed.
@@ -441,6 +483,7 @@ func (ix *Index) Save(path string) (err error) {
 		ChannelTexts:    ix.channelTexts,
 		PersonVecs:      ix.personVecs,
 		ChannelVecs:     ix.channelVecs,
+		Aliases:         ix.identityResolver().Pairs(),
 	}
 	if err := enc.Encode(snap); err != nil {
 		return fmt.Errorf("index: encode: %w", err)
@@ -468,7 +511,9 @@ func Load(path string) (*Index, error) {
 		channelTexts:    snap.ChannelTexts,
 		personVecs:      snap.PersonVecs,
 		channelVecs:     snap.ChannelVecs,
+		resolver:        identity.NewResolver(),
 	}
+	ix.resolver.Restore(snap.Aliases)
 	if ix.Graph == nil {
 		ix.Graph = model.NewGraph()
 	}
@@ -516,9 +561,21 @@ func topicID(name string) model.ID {
 	return model.ID(slug(name))
 }
 
+// betterName reports whether name should replace current. A handle-like
+// placeholder ("@login", "jira:accountid") never replaces a real name.
+func betterName(current, name string) bool {
+	if name == "" {
+		return false
+	}
+	if current == "" {
+		return true
+	}
+	return !strings.HasPrefix(name, "@") && !strings.Contains(name, ":")
+}
+
 // fillIdentity copies non-empty identity fields from rec onto p.
 func fillIdentity(p *model.Person, rec connector.Record) {
-	if rec.Name != "" {
+	if betterName(p.Name, rec.Name) {
 		p.Name = rec.Name
 	}
 	if rec.Email != "" {

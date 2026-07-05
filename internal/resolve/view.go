@@ -23,6 +23,9 @@ type JSONPerson struct {
 	Title string `json:"title,omitempty"`
 	// Team is the person's team name.
 	Team string `json:"team,omitempty"`
+	// Identities lists alternate identifiers merged into this person, such as
+	// a GitHub login joined to an email.
+	Identities []string `json:"identities,omitempty"`
 	// Score is the relevance score.
 	Score float64 `json:"score"`
 	// Reasons explains why the person matched.
@@ -65,6 +68,9 @@ func (a Answer) View(query string) JSONAnswer {
 			Title:   m.Person.Title,
 			Score:   m.Score,
 			Reasons: m.Reasons,
+		}
+		for _, id := range m.Person.Identities {
+			jp.Identities = append(jp.Identities, string(id))
 		}
 		if m.Team != nil {
 			jp.Team = m.Team.Name
