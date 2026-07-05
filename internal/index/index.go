@@ -37,6 +37,19 @@ const (
 	weightText = 0.5
 )
 
+// Evidence strengths grade how convincing a matched field is when estimating
+// confidence: an explicit topic is proof, a passing mention is a hint.
+const (
+	// evidenceTopic is the strength of an explicit topic or channel-name hit.
+	evidenceTopic = 1.0
+	// evidenceTitle is the strength of a job-title hit.
+	evidenceTitle = 0.85
+	// evidenceTeam is the strength of a team-name hit.
+	evidenceTeam = 0.7
+	// evidenceMention is the strength of a free-text mention.
+	evidenceMention = 0.5
+)
+
 // personText holds the normalized field text for a person, used to explain why
 // the person matched a query.
 type personText struct {
@@ -313,11 +326,14 @@ func (ix *Index) Search(query string, limit int) []model.Match {
 		if p.TeamID != "" {
 			team = ix.Graph.Teams[p.TeamID]
 		}
+		reasons, evidence := ix.reasons(pid, matched[pid])
+		coverage := float64(len(matched[pid])) / float64(len(terms))
 		matches = append(matches, model.Match{
-			Person:  p,
-			Team:    team,
-			Score:   sc,
-			Reasons: ix.reasons(pid, matched[pid]),
+			Person:     p,
+			Team:       team,
+			Score:      sc,
+			Confidence: evidence * coverage,
+			Reasons:    reasons,
 		})
 	}
 	sort.Slice(matches, func(i, j int) bool {
@@ -348,10 +364,13 @@ func (ix *Index) SearchChannels(query string, limit int) []model.ChannelMatch {
 		if ch == nil {
 			continue
 		}
+		reasons, evidence := ix.channelReasons(cid, matched[cid])
+		coverage := float64(len(matched[cid])) / float64(len(terms))
 		matches = append(matches, model.ChannelMatch{
 			Channel:    ch,
 			Score:      sc,
-			Reasons:    ix.channelReasons(cid, matched[cid]),
+			Confidence: evidence * coverage,
+			Reasons:    reasons,
 			TopMembers: ix.topMembers(ch, personScores, 3),
 		})
 	}
@@ -416,45 +435,50 @@ func scoreByTerms(
 	return scores, matched
 }
 
-// reasons describes, for each matched term, which field of the person it hit.
-func (ix *Index) reasons(pid model.ID, terms map[string]bool) []string {
+// reasons describes, for each matched term, which field of the person it hit,
+// and returns the strongest evidence among those hits.
+func (ix *Index) reasons(pid model.ID, terms map[string]bool) ([]string, float64) {
 	pt := ix.texts[pid]
 	out := make([]string, 0, len(terms))
+	var evidence float64
 	for term := range terms {
-		field := "mention"
+		field, strength := "mention", evidenceMention
 		switch {
 		case pt != nil && containsToken(pt.Topics, term):
-			field = "topic"
+			field, strength = "topic", evidenceTopic
 		case pt != nil && strings.Contains(pt.Title, term):
-			field = "title"
+			field, strength = "title", evidenceTitle
 		case pt != nil && strings.Contains(pt.Team, term):
-			field = "team"
+			field, strength = "team", evidenceTeam
 		}
+		evidence = max(evidence, strength)
 		out = append(out, fmt.Sprintf("%s (%s)", term, field))
 	}
 	sort.Strings(out)
-	return out
+	return out, evidence
 }
 
 // channelReasons describes, for each matched term, which field of the channel
-// it hit.
-func (ix *Index) channelReasons(cid model.ID, terms map[string]bool) []string {
+// it hit, and returns the strongest evidence among those hits.
+func (ix *Index) channelReasons(cid model.ID, terms map[string]bool) ([]string, float64) {
 	ct := ix.channelTexts[cid]
 	out := make([]string, 0, len(terms))
+	var evidence float64
 	for term := range terms {
-		field := "mention"
+		field, strength := "mention", evidenceMention
 		switch {
 		case ct != nil && containsToken(ct.Topics, term):
-			field = "topic"
+			field, strength = "topic", evidenceTopic
 		case ct != nil && strings.Contains(ct.Topic, term):
-			field = "topic"
+			field, strength = "topic", evidenceTopic
 		case ct != nil && strings.Contains(ct.Name, term):
-			field = "name"
+			field, strength = "name", evidenceTopic
 		}
+		evidence = max(evidence, strength)
 		out = append(out, fmt.Sprintf("%s (%s)", term, field))
 	}
 	sort.Strings(out)
-	return out
+	return out, evidence
 }
 
 // snapshot is the serializable form of an index written to and read from disk.
