@@ -124,6 +124,16 @@ Runs the local web UI over the same engine.
 Queries are shareable links: `/?q=who+owns+billing` runs on load. Every
 result has feedback buttons.
 
+## whodar demo
+
+Explores whodar on a simulated company: all eight sources are built in
+process and served in the web UI, with no credentials and nothing fetched
+from the network. Sample data only; it is discarded when the demo stops.
+
+    whodar demo
+
+Takes the same flags as `serve`.
+
 ## whodar bot
 
 Runs the Slack bot. Mention it or send it a direct message; a trailing

@@ -18,7 +18,8 @@ Ask from the terminal and get people, channels, reasons, and confidence:
 </p>
 
 Or serve the local web UI, where every result carries a confidence badge and
-feedback buttons, and a query lives in the URL so answers are shareable:
+feedback buttons, a query lives in the URL so answers are shareable, and
+clicking a person shows everything whodar knows about them:
 
 <p align="center">
   <img src="docs/whodar-web.png" alt="whodar web UI" width="90%">
@@ -32,6 +33,13 @@ Or `go install github.com/dcadolph/whodar@latest`, or grab a prebuilt binary
 from the releases page.
 
 ## Quickstart
+
+No data yet? Explore a simulated company across all eight sources, no
+credentials needed:
+
+    whodar demo
+
+Then index something real:
 
     whodar index --source org-csv --file examples/people.csv
     whodar ask --pretty "who do I talk to about billing retries"

@@ -43,7 +43,16 @@ The examples below use `whodar`. From a source checkout without installing, use
 
 ## Try it in sixty seconds
 
-The repository ships a small example org chart. Index it, then ask a question:
+The fastest look is the demo: a simulated company indexed across all eight
+sources and served in the web UI, no credentials needed.
+
+    whodar demo
+
+It opens a browser on an answered question. Click a name for details, try
+"who owns terraform", vote on a result. Sample data only; it is discarded
+when the demo stops.
+
+For the command-line loop, the repository ships a small example org chart:
 
     whodar index --source org-csv --file examples/people.csv
     whodar ask --pretty "who do I talk to about billing retries"
@@ -408,6 +417,7 @@ turns decay off entirely.
 - `whodar index --source pagerduty` indexes PagerDuty services and on-call.
 - `whodar index --source git --repo-path DIR [--git-since-days N] [--max-commits N]`
   indexes local git history.
+- `whodar demo` explores a simulated company in the web UI, no credentials.
 - `whodar index ... --merge` adds the source to the existing index instead of replacing it.
 - `whodar ask [--mode keyword|semantic|llm] [--limit N] [--pretty] QUESTION`
   answers a question.
