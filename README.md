@@ -4,6 +4,14 @@
 
 # whodar
 
+<p align="center">
+  <a href="https://github.com/dcadolph/whodar/releases"><img src="https://img.shields.io/github/v/release/dcadolph/whodar" alt="Latest release"></a>
+  <a href="go.mod"><img src="https://img.shields.io/github/go-mod/go-version/dcadolph/whodar" alt="Go version"></a>
+  <a href="https://goreportcard.com/report/github.com/dcadolph/whodar"><img src="https://goreportcard.com/badge/github.com/dcadolph/whodar" alt="Go Report Card"></a>
+  <a href="https://pkg.go.dev/github.com/dcadolph/whodar"><img src="https://pkg.go.dev/badge/github.com/dcadolph/whodar.svg" alt="Go Reference"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/dcadolph/whodar" alt="License"></a>
+</p>
+
 whodar helps you find who to ask at work. Point it at the tools your org
 already uses and ask a question in plain words. It returns the people to talk
 to and the channels to ask in, with the reason and confidence behind each one.
