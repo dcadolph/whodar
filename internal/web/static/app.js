@@ -14,6 +14,10 @@ const button = form.querySelector("button");
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
+  await ask();
+});
+
+async function ask() {
   const q = qInput.value.trim();
   if (!q) return;
 
@@ -23,6 +27,7 @@ form.addEventListener("submit", async (event) => {
 
   try {
     const params = new URLSearchParams({ q, mode: modeSel.value });
+    history.replaceState(null, "", "?q=" + encodeURIComponent(q));
     const res = await fetch("/api/ask?" + params.toString());
     const data = await res.json();
     if (!res.ok) {
@@ -35,7 +40,14 @@ form.addEventListener("submit", async (event) => {
   } finally {
     button.disabled = false;
   }
-});
+}
+
+// A shared link carries the question in the URL; run it on load.
+const linkedQuery = new URLSearchParams(location.search).get("q");
+if (linkedQuery) {
+  qInput.value = linkedQuery;
+  ask();
+}
 
 function clearResults() {
   summaryEl.hidden = true;
