@@ -5,6 +5,7 @@
 # whodar
 
 <p align="center">
+  <a href="https://github.com/dcadolph/whodar/actions/workflows/ci.yml"><img src="https://github.com/dcadolph/whodar/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/dcadolph/whodar/releases"><img src="https://img.shields.io/github/v/release/dcadolph/whodar" alt="Latest release"></a>
   <a href="go.mod"><img src="https://img.shields.io/github/go-mod/go-version/dcadolph/whodar" alt="Go version"></a>
   <a href="https://goreportcard.com/report/github.com/dcadolph/whodar"><img src="https://goreportcard.com/badge/github.com/dcadolph/whodar" alt="Go Report Card"></a>
