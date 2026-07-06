@@ -20,6 +20,21 @@ gathers it into one index you can query.
 New here? See [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) for an
 end-to-end walkthrough: install, index a source, and ask.
 
+## See it
+
+Ask from the terminal and get people, channels, reasons, and confidence:
+
+<p align="center">
+  <img src="docs/whodar-cli.gif" alt="whodar in the terminal" width="90%">
+</p>
+
+Or serve the local web UI, where every result carries a confidence badge and
+feedback buttons, and a query lives in the URL so answers are shareable:
+
+<p align="center">
+  <img src="docs/whodar-web.png" alt="whodar web UI" width="90%">
+</p>
+
 ## How it works
 
 whodar pulls from pluggable connectors, normalizes everything into one graph of
