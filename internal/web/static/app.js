@@ -27,7 +27,8 @@ async function ask() {
 
   try {
     const params = new URLSearchParams({ q, mode: modeSel.value });
-    history.replaceState(null, "", "?q=" + encodeURIComponent(q));
+    setParam("person", "");
+    setParam("q", q);
     const res = await fetch("/api/ask?" + params.toString());
     const data = await res.json();
     if (!res.ok) {
@@ -42,11 +43,26 @@ async function ask() {
   }
 }
 
-// A shared link carries the question in the URL; run it on load.
-const linkedQuery = new URLSearchParams(location.search).get("q");
-if (linkedQuery) {
-  qInput.value = linkedQuery;
+// setParam updates one query parameter in the address bar without reloading.
+function setParam(key, val) {
+  const p = new URLSearchParams(location.search);
+  if (val) {
+    p.set(key, val);
+  } else {
+    p.delete(key);
+  }
+  const s = p.toString();
+  history.replaceState(null, "", s ? "?" + s : location.pathname);
+}
+
+// A shared link carries the question and person in the URL; run them on load.
+const linked = new URLSearchParams(location.search);
+if (linked.get("q")) {
+  qInput.value = linked.get("q");
   ask();
+}
+if (linked.get("person")) {
+  openProfile(linked.get("person"));
 }
 
 function clearResults() {
@@ -66,7 +82,7 @@ function render(data) {
   const people = data.people || [];
   const channels = data.channels || [];
 
-  for (const p of people) peopleEl.appendChild(personCard(p, data.query, people.length === 1));
+  for (const p of people) peopleEl.appendChild(personCard(p, data.query));
   for (const c of channels) channelsEl.appendChild(channelCard(c, data.query));
   peopleSection.hidden = people.length === 0;
   channelsSection.hidden = channels.length === 0;
@@ -120,12 +136,13 @@ function voteButtons(query, target) {
   return wrap;
 }
 
-function personCard(p, query, expand) {
+function personCard(p, query) {
   const card = el("div", "card");
   const name = el("div", "name");
   const toggle = el("button", "name-toggle", p.name || p.email || "unknown");
   toggle.type = "button";
-  toggle.title = "Show details";
+  toggle.title = "Show everything whodar knows";
+  toggle.addEventListener("click", () => openProfile(p.id || p.email));
   name.appendChild(toggle);
   const copyText = ((p.name || "") + (p.email ? " <" + p.email + ">" : "")).trim();
   if (copyText) name.appendChild(copyButton(copyText));
@@ -135,26 +152,48 @@ function personCard(p, query, expand) {
 
   const sub = [p.title, p.team].filter(Boolean).join(" · ");
   if (sub) card.appendChild(el("div", "sub", sub));
+  if (p.email) card.appendChild(el("div", "sub", p.email));
   chips(card, p.reasons);
-
-  const details = personDetails(p);
-  details.hidden = !expand;
-  card.appendChild(details);
-  toggle.addEventListener("click", () => {
-    details.hidden = !details.hidden;
-  });
-
   if (query && p.id) card.appendChild(voteButtons(query, { person: p.id }));
   return card;
 }
 
-function personDetails(p) {
-  const wrap = el("div", "details");
+async function openProfile(id) {
+  if (!id) return;
+  try {
+    const res = await fetch("/api/person?id=" + encodeURIComponent(id));
+    if (!res.ok) return;
+    showProfile(await res.json());
+  } catch (err) {
+    // A failed lookup just leaves the page as it is.
+  }
+}
+
+function showProfile(p) {
+  closeProfile();
+  const backdrop = el("div", "modal-backdrop");
+  backdrop.id = "profile-modal";
+  backdrop.addEventListener("click", (event) => {
+    if (event.target === backdrop) closeProfile();
+  });
+  const modal = el("div", "modal");
+
+  const name = el("div", "name", p.name || p.id);
+  const close = el("button", "modal-close", "close");
+  close.type = "button";
+  close.addEventListener("click", closeProfile);
+  name.appendChild(close);
+  modal.appendChild(name);
+
+  const sub = [p.title, p.team, p.org].filter(Boolean).join(" · ");
+  if (sub) modal.appendChild(el("div", "sub", sub));
+
+  const rows = el("div", "details");
   const row = (label, value) => {
     const r = el("div", "detail-row");
     r.appendChild(el("span", "detail-label", label));
     r.appendChild(value);
-    wrap.appendChild(r);
+    rows.appendChild(r);
   };
   if (p.email) {
     const v = el("span", "detail-value", p.email);
@@ -168,13 +207,34 @@ function personDetails(p) {
   if (p.identities && p.identities.length) {
     row("Also known as", el("span", "detail-value", p.identities.join(", ")));
   }
+  if (p.manager && (p.manager.name || p.manager.email)) {
+    row("Manager", el("span", "detail-value", p.manager.name || p.manager.email));
+  }
+  if (p.channels && p.channels.length) {
+    row("Active in", el("span", "detail-value", p.channels.map((c) => "#" + c).join(", ")));
+  }
   if (p.topics && p.topics.length) {
     const v = el("span", "detail-value detail-chips");
     for (const topic of p.topics) v.appendChild(el("span", "chip", topic));
     row("Knows about", v);
   }
-  return wrap;
+  modal.appendChild(rows);
+  backdrop.appendChild(modal);
+  document.body.appendChild(backdrop);
+  setParam("person", p.id);
 }
+
+function closeProfile() {
+  const open = document.getElementById("profile-modal");
+  if (open) {
+    open.remove();
+    setParam("person", "");
+  }
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeProfile();
+});
 
 function channelCard(c, query) {
   const card = el("div", "card");

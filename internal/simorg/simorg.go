@@ -4,6 +4,7 @@
 package simorg
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -15,6 +16,14 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
+
+	"github.com/dcadolph/whodar/internal/confluence"
+	"github.com/dcadolph/whodar/internal/connector"
+	"github.com/dcadolph/whodar/internal/github"
+	"github.com/dcadolph/whodar/internal/index"
+	"github.com/dcadolph/whodar/internal/jira"
+	"github.com/dcadolph/whodar/internal/pagerduty"
+	"github.com/dcadolph/whodar/internal/slack"
 )
 
 // The simulated cast. Jane, Bob, Carol, Dan, Eve, Frank, Grace, and Heidi are
@@ -295,6 +304,88 @@ func BuildGitRepo(dir string) error {
 		}
 	}
 	return nil
+}
+
+// BuildIndex assembles the simulated company into a merged, canonicalized
+// index under dir: it writes the org chart, CODEOWNERS, and alias fixtures,
+// creates the git repository, serves each tool's wire format from in-process
+// HTTP servers, and ingests all eight sources through the real connectors.
+func BuildIndex(dir string) (*index.Index, error) {
+	ctx := context.Background()
+	write := func(name, content string) (string, error) {
+		p := filepath.Join(dir, name)
+		return p, os.WriteFile(p, []byte(content), 0o600)
+	}
+	csvPath, err := write("org.csv", OrgCSV())
+	if err != nil {
+		return nil, fmt.Errorf("simorg: %w", err)
+	}
+	ownersPath, err := write("CODEOWNERS", CodeOwners())
+	if err != nil {
+		return nil, fmt.Errorf("simorg: %w", err)
+	}
+	aliasPath, err := write("aliases.json", Aliases())
+	if err != nil {
+		return nil, fmt.Errorf("simorg: %w", err)
+	}
+	repoDir := filepath.Join(dir, "repo")
+	if err := BuildGitRepo(repoDir); err != nil {
+		return nil, err
+	}
+
+	slackSrv := SlackServer()
+	defer slackSrv.Close()
+	githubSrv := GitHubServer()
+	defer githubSrv.Close()
+	jiraSrv := JiraServer()
+	defer jiraSrv.Close()
+	confluenceSrv := ConfluenceServer()
+	defer confluenceSrv.Close()
+	pagerdutySrv := PagerDutyServer()
+	defer pagerdutySrv.Close()
+
+	sources := []struct {
+		Name   string
+		Source connector.Source
+	}{
+		{"org-csv", connector.NewOrgCSV(csvPath)},
+		{"codeowners", connector.NewCodeOwners(ownersPath)},
+		{"slack", connector.NewSlackWithClient(
+			slack.New("xoxb-demo", slack.WithBaseURL(slackSrv.URL)), connector.SlackOptions{})},
+		{"github", connector.NewGitHubWithClient(
+			github.New("ghp-demo", github.WithBaseURL(githubSrv.URL)),
+			connector.GitHubOptions{
+				Repos: []string{"corp/billing-service", "corp/webapp"}, ResolveEmails: true,
+			})},
+		{"jira", connector.NewJiraWithClient(
+			jira.New(jiraSrv.URL, "demo@corp.com", "token"), connector.JiraOptions{})},
+		{"confluence", connector.NewConfluenceWithClient(
+			confluence.New(confluenceSrv.URL, "demo@corp.com", "token"),
+			connector.ConfluenceOptions{})},
+		{"pagerduty", connector.NewPagerDutyWithClient(
+			pagerduty.New("token", pagerduty.WithBaseURL(pagerdutySrv.URL)),
+			connector.PagerDutyOptions{})},
+		{"git", connector.NewGitHistory(connector.GitOptions{
+			Paths: []string{repoDir}, SinceDays: 900,
+		})},
+	}
+
+	ix := index.New()
+	if err := ix.LoadAliases(aliasPath); err != nil {
+		return nil, err
+	}
+	for _, s := range sources {
+		recs, err := s.Source.Fetch(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("simorg: %s: %w", s.Name, err)
+		}
+		if len(recs) == 0 {
+			return nil, fmt.Errorf("simorg: %s returned no records", s.Name)
+		}
+		ix.Add(recs)
+	}
+	ix.Canonicalize()
+	return ix, nil
 }
 
 // slackUser builds one users.list member.

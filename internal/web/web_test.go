@@ -138,3 +138,41 @@ func TestFeedbackAPIDisabled(t *testing.T) {
 		t.Errorf("status = %d, want 404 when feedback is disabled", rec.Code)
 	}
 }
+
+// TestPersonAPI verifies the person endpoint returns a profile and a 404 for
+// unknown identifiers.
+func TestPersonAPI(t *testing.T) {
+	t.Parallel()
+	ask := func(_ context.Context, _, _ string, _ int) (resolve.Answer, error) {
+		return resolve.Answer{}, nil
+	}
+	person := func(id string) (resolve.JSONProfile, bool) {
+		if id != "jane@x.com" {
+			return resolve.JSONProfile{}, false
+		}
+		return resolve.JSONProfile{ID: id, Name: "Jane Roe", Channels: []string{"payments"}}, true
+	}
+	h, err := Handler(Config{Ask: ask, Person: person, Version: "test"})
+	if err != nil {
+		t.Fatalf("Handler: %v", err)
+	}
+
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/person?id=jane%40x.com", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d: %s", rec.Code, rec.Body.String())
+	}
+	var got resolve.JSONProfile
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got.Name != "Jane Roe" || len(got.Channels) != 1 {
+		t.Errorf("profile = %+v", got)
+	}
+
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/person?id=ghost", nil))
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("unknown person status = %d, want 404", rec.Code)
+	}
+}

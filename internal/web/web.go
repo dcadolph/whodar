@@ -29,12 +29,18 @@ type AskFunc func(ctx context.Context, query, mode string, limit int) (resolve.A
 // FeedbackFunc records a user's vote on one result.
 type FeedbackFunc func(feedback.Entry) error
 
+// PersonFunc returns the full profile for a person identifier, or false when
+// the person is unknown.
+type PersonFunc func(id string) (resolve.JSONProfile, bool)
+
 // Config configures the web handler.
 type Config struct {
 	// Ask resolves queries; required.
 	Ask AskFunc
 	// Feedback records votes on results; nil disables the feedback API.
 	Feedback FeedbackFunc
+	// Person returns full person profiles; nil disables the person API.
+	Person PersonFunc
 	// Version is shown in the page footer.
 	Version string
 }
@@ -59,6 +65,9 @@ func Handler(cfg Config) (http.Handler, error) {
 	mux.HandleFunc("/api/ask", askHandler(cfg.Ask))
 	if cfg.Feedback != nil {
 		mux.HandleFunc("/api/feedback", feedbackHandler(cfg.Feedback))
+	}
+	if cfg.Person != nil {
+		mux.HandleFunc("/api/person", personHandler(cfg.Person))
 	}
 	mux.HandleFunc("/", indexHandler(tmpl, cfg.Version))
 	return mux, nil
@@ -102,6 +111,25 @@ func askHandler(ask AskFunc) http.HandlerFunc {
 			return
 		}
 		_ = json.NewEncoder(w).Encode(ans.View(query))
+	}
+}
+
+// personHandler returns the full profile for the person named by the id query
+// parameter.
+func personHandler(person PersonFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		id := strings.TrimSpace(r.URL.Query().Get("id"))
+		if id == "" {
+			writeError(w, http.StatusBadRequest, "missing id")
+			return
+		}
+		profile, ok := person(id)
+		if !ok {
+			writeError(w, http.StatusNotFound, "unknown person")
+			return
+		}
+		_ = json.NewEncoder(w).Encode(profile)
 	}
 }
 

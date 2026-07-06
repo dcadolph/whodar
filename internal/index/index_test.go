@@ -198,3 +198,41 @@ func TestAddMerges(t *testing.T) {
 		t.Errorf("bob added by merge: %v", got)
 	}
 }
+
+// TestProfile verifies the full-person lookup resolves aliases and gathers
+// org placement and channel membership.
+func TestProfile(t *testing.T) {
+	t.Parallel()
+	ix := New()
+	ix.Alias("alice@corp.com", "github:alice")
+	ix.Build([]connector.Record{{
+		Kind: connector.KindPerson, Email: "alice@corp.com", Name: "Alice Smith",
+		Title: "Engineer", Team: "Payments", Org: "Corp", Manager: "boss@corp.com",
+		Topics: []string{"billing"}, Source: "org-csv",
+	}, {
+		Kind: connector.KindPerson, Email: "boss@corp.com", Name: "Boss", Source: "org-csv",
+	}, {
+		Kind: connector.KindChannel, Name: "payments", Title: "billing questions",
+		Members: []string{"alice@corp.com"}, Source: "slack",
+	}})
+
+	got, ok := ix.Profile("github:alice")
+	if !ok {
+		t.Fatal("Profile(github:alice) not found; alias should resolve")
+	}
+	if got.Person.Name != "Alice Smith" || got.Team == nil || got.Team.Name != "Payments" {
+		t.Errorf("profile person/team = %+v / %+v", got.Person, got.Team)
+	}
+	if got.Org == nil || got.Org.Name != "Corp" {
+		t.Errorf("profile org = %+v", got.Org)
+	}
+	if got.Manager == nil || got.Manager.Name != "Boss" {
+		t.Errorf("profile manager = %+v", got.Manager)
+	}
+	if len(got.Channels) != 1 || got.Channels[0].Name != "payments" {
+		t.Errorf("profile channels = %+v", got.Channels)
+	}
+	if _, ok := ix.Profile("nobody@corp.com"); ok {
+		t.Error("Profile(nobody) = ok, want false")
+	}
+}

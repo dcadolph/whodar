@@ -4,6 +4,7 @@ import (
 	"math"
 	"sort"
 
+	"github.com/dcadolph/whodar/internal/index"
 	"github.com/dcadolph/whodar/internal/model"
 )
 
@@ -121,6 +122,57 @@ type JSONMember struct {
 	Name string `json:"name"`
 	// Email is the member's work email.
 	Email string `json:"email,omitempty"`
+}
+
+// JSONProfile is the full picture of one person, for the profile view.
+type JSONProfile struct {
+	// ID is the person's canonical identifier.
+	ID string `json:"id"`
+	// Name is the person's display name.
+	Name string `json:"name"`
+	// Email is the person's work email.
+	Email string `json:"email,omitempty"`
+	// Title is the person's job title.
+	Title string `json:"title,omitempty"`
+	// Team is the person's team name.
+	Team string `json:"team,omitempty"`
+	// Org is the person's organization name.
+	Org string `json:"org,omitempty"`
+	// Manager is the person's manager, if known.
+	Manager *JSONMember `json:"manager,omitempty"`
+	// Identities lists alternate identifiers merged into this person.
+	Identities []string `json:"identities,omitempty"`
+	// Channels lists the channels the person is active in.
+	Channels []string `json:"channels,omitempty"`
+	// Topics are the person's expertise areas, strongest first.
+	Topics []string `json:"topics,omitempty"`
+}
+
+// ProfileView renders a profile for the web and CLI.
+func ProfileView(p index.Profile) JSONProfile {
+	out := JSONProfile{
+		ID:     string(p.Person.ID),
+		Name:   p.Person.Name,
+		Email:  p.Person.Email,
+		Title:  p.Person.Title,
+		Topics: topTopics(p.Person.Topics, 32),
+	}
+	for _, id := range p.Person.Identities {
+		out.Identities = append(out.Identities, string(id))
+	}
+	if p.Team != nil {
+		out.Team = p.Team.Name
+	}
+	if p.Org != nil {
+		out.Org = p.Org.Name
+	}
+	if p.Manager != nil {
+		out.Manager = &JSONMember{Name: p.Manager.Name, Email: p.Manager.Email}
+	}
+	for _, ch := range p.Channels {
+		out.Channels = append(out.Channels, ch.Name)
+	}
+	return out
 }
 
 // View renders the answer as a flat JSONAnswer for the given query.

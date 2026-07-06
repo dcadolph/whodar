@@ -1,99 +1,22 @@
 package simorg
 
 import (
-	"context"
-	"os"
-	"path/filepath"
 	"slices"
 	"testing"
 
-	"github.com/dcadolph/whodar/internal/confluence"
-	"github.com/dcadolph/whodar/internal/connector"
 	"github.com/dcadolph/whodar/internal/feedback"
-	"github.com/dcadolph/whodar/internal/github"
 	"github.com/dcadolph/whodar/internal/index"
-	"github.com/dcadolph/whodar/internal/jira"
 	"github.com/dcadolph/whodar/internal/model"
-	"github.com/dcadolph/whodar/internal/pagerduty"
-	"github.com/dcadolph/whodar/internal/slack"
 )
 
 // buildFullIndex ingests every source against the simulated org and returns
 // the merged, canonicalized index.
 func buildFullIndex(t *testing.T) *index.Index {
 	t.Helper()
-	ctx := context.Background()
-	dir := t.TempDir()
-
-	write := func(name, content string) string {
-		t.Helper()
-		path := filepath.Join(dir, name)
-		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-			t.Fatalf("write %s: %v", name, err)
-		}
-		return path
+	ix, err := BuildIndex(t.TempDir())
+	if err != nil {
+		t.Fatalf("BuildIndex: %v", err)
 	}
-	csvPath := write("org.csv", OrgCSV())
-	ownersPath := write("CODEOWNERS", CodeOwners())
-	aliasPath := write("aliases.json", Aliases())
-
-	repoDir := filepath.Join(dir, "repo")
-	if err := BuildGitRepo(repoDir); err != nil {
-		t.Fatalf("git repo: %v", err)
-	}
-
-	slackSrv := SlackServer()
-	t.Cleanup(slackSrv.Close)
-	githubSrv := GitHubServer()
-	t.Cleanup(githubSrv.Close)
-	jiraSrv := JiraServer()
-	t.Cleanup(jiraSrv.Close)
-	confluenceSrv := ConfluenceServer()
-	t.Cleanup(confluenceSrv.Close)
-	pagerdutySrv := PagerDutyServer()
-	t.Cleanup(pagerdutySrv.Close)
-
-	fetches := []struct {
-		Name   string
-		Source connector.Source
-	}{
-		{"org-csv", connector.NewOrgCSV(csvPath)},
-		{"codeowners", connector.NewCodeOwners(ownersPath)},
-		{"slack", connector.NewSlackWithClient(
-			slack.New("xoxb-sim", slack.WithBaseURL(slackSrv.URL)), connector.SlackOptions{})},
-		{"github", connector.NewGitHubWithClient(
-			github.New("ghp-sim", github.WithBaseURL(githubSrv.URL)),
-			connector.GitHubOptions{
-				Repos: []string{"corp/billing-service", "corp/webapp"}, ResolveEmails: true,
-			})},
-		{"jira", connector.NewJiraWithClient(
-			jira.New(jiraSrv.URL, "sim@corp.com", "token"), connector.JiraOptions{})},
-		{"confluence", connector.NewConfluenceWithClient(
-			confluence.New(confluenceSrv.URL, "sim@corp.com", "token"),
-			connector.ConfluenceOptions{})},
-		{"pagerduty", connector.NewPagerDutyWithClient(
-			pagerduty.New("token", pagerduty.WithBaseURL(pagerdutySrv.URL)),
-			connector.PagerDutyOptions{})},
-		{"git", connector.NewGitHistory(connector.GitOptions{
-			Paths: []string{repoDir}, SinceDays: 900,
-		})},
-	}
-
-	ix := index.New()
-	if err := ix.LoadAliases(aliasPath); err != nil {
-		t.Fatalf("aliases: %v", err)
-	}
-	for _, f := range fetches {
-		recs, err := f.Source.Fetch(ctx)
-		if err != nil {
-			t.Fatalf("%s fetch: %v", f.Name, err)
-		}
-		if len(recs) == 0 {
-			t.Fatalf("%s fetch returned no records", f.Name)
-		}
-		ix.Add(recs)
-	}
-	ix.Canonicalize()
 	return ix
 }
 
