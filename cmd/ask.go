@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -13,6 +14,14 @@ import (
 	"github.com/dcadolph/whodar/internal/resolve"
 )
 
+// Cloud provider credentials come only from the environment, never flags.
+const (
+	// anthropicKeyEnv holds the Claude API key.
+	anthropicKeyEnv = "WHODAR_ANTHROPIC_KEY"
+	// openaiKeyEnv holds the OpenAI-compatible API key.
+	openaiKeyEnv = "WHODAR_OPENAI_KEY"
+)
+
 // newAskCmd builds the ask command, which answers a question from the index.
 func newAskCmd(opts *options) *cobra.Command {
 	var (
@@ -21,6 +30,8 @@ func newAskCmd(opts *options) *cobra.Command {
 		model      string
 		embedModel string
 		ollamaURL  string
+		provider   string
+		openaiURL  string
 	)
 	cmd := &cobra.Command{
 		Use:   "ask [question]",
@@ -43,7 +54,7 @@ Examples:
 				return fmt.Errorf("%w: run `whodar index` first: %w", ErrNoIndex, err)
 			}
 			applyFeedback(ix, opts, cmd.ErrOrStderr())
-			res, err := pickResolver(ix, opts, mode, model, embedModel, ollamaURL)
+			res, err := pickResolver(ix, opts, mode, model, embedModel, ollamaURL, provider, openaiURL)
 			if err != nil {
 				return err
 			}
@@ -61,31 +72,97 @@ Examples:
 	f.StringVar(&model, "model", "", "Ollama chat model for --mode llm (default llama3.1).")
 	f.StringVar(&embedModel, "embed-model", "", "Ollama embed model for semantic/llm (default nomic-embed-text).")
 	f.StringVar(&ollamaURL, "ollama-url", "http://localhost:11434", "Ollama base URL.")
+	f.StringVar(&provider, "provider", "ollama",
+		"LLM provider: ollama, anthropic, or openai. Cloud providers need --policy redacted or open.")
+	f.StringVar(&openaiURL, "openai-url", "",
+		"OpenAI-compatible base URL, e.g. a local LM Studio or vLLM server.")
 	return cmd
 }
 
-// pickResolver builds the resolver for the chosen mode. Semantic and LLM modes
-// target a local Ollama server; a non-local server is gated by the egress
-// policy. LLM mode also uses the embedder for retrieval when the index has
-// vectors.
-func pickResolver(ix *index.Index, opts *options, mode, model, embedModel, ollamaURL string) (resolve.Resolver, error) {
+// pickResolver builds the resolver for the chosen mode. Semantic mode and the
+// default ollama provider target a local server; anything non-local is gated
+// by the egress policy. Cloud providers additionally run redacted under the
+// redacted policy, so no names or emails leave the machine.
+func pickResolver(ix *index.Index, opts *options, mode, model, embedModel, ollamaURL string, provider, openaiURL string) (resolve.Resolver, error) {
 	switch mode {
 	case "", "keyword":
 		return resolve.NewKeyword(ix), nil
 	case "semantic":
+		if provider != "" && provider != "ollama" {
+			return nil, fmt.Errorf("%w: semantic mode needs local embeddings; use --provider ollama", ErrBadArgs)
+		}
 		if err := guardLLMHost(opts.pol, ollamaURL); err != nil {
 			return nil, err
 		}
 		return resolve.NewSemantic(ix, newOllama(model, embedModel, ollamaURL)), nil
 	case "llm":
-		if err := guardLLMHost(opts.pol, ollamaURL); err != nil {
-			return nil, err
+		switch provider {
+		case "", "ollama":
+			if err := guardLLMHost(opts.pol, ollamaURL); err != nil {
+				return nil, err
+			}
+			client := newOllama(model, embedModel, ollamaURL)
+			return resolve.NewLLM(ix, client, client), nil
+		case "anthropic", "openai":
+			chat, err := cloudChatter(opts.pol, provider, model, openaiURL)
+			if err != nil {
+				return nil, err
+			}
+			if opts.pol.Mode() == policy.Redacted {
+				return resolve.NewRedactedLLM(ix, chat, nil), nil
+			}
+			return resolve.NewLLM(ix, chat, nil), nil
+		default:
+			return nil, fmt.Errorf("%w: provider %q (want ollama, anthropic, or openai)", ErrBadArgs, provider)
 		}
-		client := newOllama(model, embedModel, ollamaURL)
-		return resolve.NewLLM(ix, client, client), nil
 	default:
 		return nil, fmt.Errorf("%w: mode %q (want keyword, semantic, or llm)", ErrBadArgs, mode)
 	}
+}
+
+// cloudChatter builds a chat client for the anthropic or openai provider,
+// gated by the egress policy. Strict denies anything non-local; redacted and
+// open permit, with redaction applied by the resolver under redacted. A local
+// --openai-url, such as LM Studio, counts as local and needs no opt-in. Keys
+// come only from the environment.
+func cloudChatter(pol policy.Policy, provider, model, openaiURL string) (resolve.Chatter, error) {
+	if provider == "anthropic" {
+		if err := pol.AllowEgress("api.anthropic.com", 0); err != nil {
+			return nil, cloudDenied(provider, err)
+		}
+		key := os.Getenv(anthropicKeyEnv)
+		if key == "" {
+			return nil, fmt.Errorf("%w: set %s", ErrBadArgs, anthropicKeyEnv)
+		}
+		return llm.NewAnthropic(key, llm.WithAnthropicModel(model)), nil
+	}
+
+	key := os.Getenv(openaiKeyEnv)
+	var clientOpts []llm.OpenAIOption
+	if model != "" {
+		clientOpts = append(clientOpts, llm.WithOpenAIModel(model))
+	}
+	if openaiURL != "" {
+		if err := guardLLMHost(pol, openaiURL); err != nil {
+			return nil, err
+		}
+		clientOpts = append(clientOpts, llm.WithOpenAIBaseURL(openaiURL))
+	} else {
+		if err := pol.AllowEgress("api.openai.com", 0); err != nil {
+			return nil, cloudDenied(provider, err)
+		}
+		if key == "" {
+			return nil, fmt.Errorf("%w: set %s (or point --openai-url at a local server)", ErrBadArgs, openaiKeyEnv)
+		}
+	}
+	return llm.NewOpenAI(key, clientOpts...), nil
+}
+
+// cloudDenied explains a policy denial with the way to opt in.
+func cloudDenied(provider string, err error) error {
+	return fmt.Errorf(
+		"cloud provider %s: %w (use --policy redacted to send anonymized candidates, or --policy open)",
+		provider, err)
 }
 
 // newOllama builds an Ollama client for the chat and embed models.

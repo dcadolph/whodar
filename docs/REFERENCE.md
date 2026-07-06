@@ -79,14 +79,22 @@ Answers a question from the index.
 | --------------- | --------- | --------------------------------------------------- |
 | `--mode`        | `keyword` | Resolver: `keyword`, `semantic`, or `llm`.          |
 | `--limit`       | `5`       | Maximum results per section.                        |
-| `--model`       |           | Ollama chat model for llm mode (default `llama3.1`). |
+| `--provider`    | `ollama`  | LLM provider: `ollama`, `anthropic`, or `openai`.   |
+| `--model`       |           | Chat model for llm mode (defaults per provider).    |
 | `--embed-model` |           | Ollama embed model for semantic and llm modes.      |
 | `--ollama-url`  | localhost | Ollama base URL.                                    |
+| `--openai-url`  |           | OpenAI-compatible base URL, e.g. LM Studio or vLLM. |
 
 Modes: `keyword` needs no model and always works. `semantic` matches on
 meaning using embeddings built with `index --embed`. `llm` retrieves
-candidates, then a local Ollama model re-ranks them and writes a short
-recommendation; it cannot invent people. Each result carries a `confidence`
+candidates, then a model re-ranks them and writes a short recommendation; it
+cannot invent people. The default provider is a local Ollama server. The
+`anthropic` (Claude) and `openai` providers are cloud models gated by the
+egress policy: strict refuses them, `--policy redacted` sends candidates as
+anonymized numbered roles with no names or emails and writes the summary
+locally, and `--policy open` sends candidates as-is. The `openai` provider
+also speaks to any compatible server via `--openai-url`; a local one, such as
+LM Studio, needs no policy opt-in. Each result carries a `confidence`
 from zero to one: query coverage scaled by evidence strength, where an
 explicit topic is proof, a title slightly less, a passing mention half.
 
@@ -169,6 +177,8 @@ never logged or stored.
 | `WHODAR_CONFLUENCE_EMAIL`     | confluence source  | Account email; falls back to Jira's.      |
 | `WHODAR_CONFLUENCE_TOKEN`     | confluence source  | API token; falls back to Jira's.          |
 | `WHODAR_PAGERDUTY_TOKEN`      | pagerduty source   | Read-only API token.                      |
+| `WHODAR_ANTHROPIC_KEY`        | llm anthropic provider | Claude API key.                       |
+| `WHODAR_OPENAI_KEY`           | llm openai provider    | OpenAI-compatible API key.            |
 | `WHODAR_POLICY_FILE`          | all commands       | Org policy file path (default `/etc/whodar/policy.json`). |
 
 ## Identity aliases
@@ -192,8 +202,11 @@ on-call) describe the present and never decay.
 ## Policy
 
 The egress policy decides what may leave the machine. `strict` (default)
-permits nothing external beyond a local Ollama; a non-local `--ollama-url`
-counts as egress and is refused. An organization can pin the policy with a
+permits nothing external beyond a local model server; non-local `--ollama-url`
+and `--openai-url` values and the cloud providers count as egress and are
+refused. `redacted` permits cloud providers but strips personal identifiers:
+candidates leave as numbered roles, the model returns numbers, and the summary
+is written locally. `open` sends candidates as-is. An organization can pin the policy with a
 locked file at `WHODAR_POLICY_FILE` or `/etc/whodar/policy.json` that user
 flags cannot override, and can deny private-channel ingest the same way. See
 `examples/policy.json`.

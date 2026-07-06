@@ -178,6 +178,29 @@ Ollama runs on your machine, so LLM mode is allowed under the default strict
 policy. Pointing `--ollama-url` at a non-local host counts as leaving the
 machine and is refused unless the policy permits it.
 
+## Cloud models (Claude, OpenAI, and compatible servers)
+
+By default nothing leaves the machine. If you explicitly opt in, llm mode can
+use a cloud model instead of Ollama:
+
+    export WHODAR_ANTHROPIC_KEY=...
+    whodar ask --mode llm --provider anthropic --policy redacted "who owns billing"
+
+    export WHODAR_OPENAI_KEY=...
+    whodar ask --mode llm --provider openai --policy redacted "who owns billing"
+
+The policy decides what the model sees. Under `--policy redacted`, candidates
+leave as anonymized numbered roles: title, team, and matched topics, but no
+names, no emails, no message text. The model returns numbers, whodar maps them
+back, and the summary is written locally. Under `--policy open`, candidates go
+as-is. Under the default strict policy, cloud providers are refused, and a
+locked org policy can pin that permanently.
+
+The `openai` provider speaks the common chat-completions format, so
+`--openai-url` also points it at local servers like LM Studio or vLLM; a local
+URL needs no policy opt-in at all. Keys are read only from the environment and
+are never logged or stored.
+
 ## Semantic search (embeddings)
 
 Keyword search matches words. Semantic search matches meaning, so "who handles

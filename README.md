@@ -66,8 +66,10 @@ every source, flag, and credential.
 
 Indexed work data is sensitive, so whodar enforces where it can go. The
 default policy is strict: nothing leaves the machine, and every external call
-passes one policy checkpoint. An organization can pin the policy with a
-locked config that user flags cannot override.
+passes one policy checkpoint. Cloud models (Claude, OpenAI, or any compatible
+server) exist behind explicit opt-in, and the redacted policy sends them only
+anonymized numbered candidates, never names or emails. An organization can
+pin the policy with a locked config that user flags cannot override.
 
 ## Docs
 

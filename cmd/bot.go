@@ -45,6 +45,8 @@ func newBotCmd(opts *options) *cobra.Command {
 		mode       string
 		model      string
 		embedModel string
+		provider   string
+		openaiURL  string
 		ollamaURL  string
 		addr       string
 		limit      int
@@ -79,7 +81,7 @@ Transports and their credentials:
 				if reqMode == "" {
 					reqMode = mode
 				}
-				res, err := pickResolver(ix, opts, reqMode, model, embedModel, ollamaURL)
+				res, err := pickResolver(ix, opts, reqMode, model, embedModel, ollamaURL, provider, openaiURL)
 				if err != nil {
 					return resolve.Answer{}, err
 				}
@@ -104,6 +106,10 @@ Transports and their credentials:
 	f.StringVar(&model, "model", "", "Ollama chat model for llm mode.")
 	f.StringVar(&embedModel, "embed-model", "", "Ollama embed model for semantic/llm mode.")
 	f.StringVar(&ollamaURL, "ollama-url", "http://localhost:11434", "Ollama base URL.")
+	f.StringVar(&provider, "provider", "ollama",
+		"LLM provider: ollama, anthropic, or openai. Cloud providers need --policy redacted or open.")
+	f.StringVar(&openaiURL, "openai-url", "",
+		"OpenAI-compatible base URL, e.g. a local LM Studio or vLLM server.")
 	f.StringVar(&addr, "addr", "127.0.0.1:8766", "Address for the events transport HTTP server.")
 	f.IntVar(&limit, "limit", 5, "Maximum results per section.")
 	return cmd

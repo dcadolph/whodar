@@ -28,12 +28,16 @@ type webConfig struct {
 	addr string
 	// mode is the default resolver mode.
 	mode string
-	// model is the Ollama chat model for llm mode.
+	// model is the chat model for llm mode.
 	model string
 	// embedModel is the Ollama embed model.
 	embedModel string
 	// ollamaURL is the Ollama base URL.
 	ollamaURL string
+	// provider is the llm-mode provider: ollama, anthropic, or openai.
+	provider string
+	// openaiURL is an OpenAI-compatible base URL for the openai provider.
+	openaiURL string
 }
 
 // newServeCmd builds the serve command, which runs the web UI on localhost and
@@ -67,6 +71,10 @@ func addWebFlags(cmd *cobra.Command, cfg *webConfig, defaultAddr string) {
 	f.StringVar(&cfg.model, "model", "", "Ollama chat model for llm mode.")
 	f.StringVar(&cfg.embedModel, "embed-model", "", "Ollama embed model for semantic/llm mode.")
 	f.StringVar(&cfg.ollamaURL, "ollama-url", "http://localhost:11434", "Ollama base URL.")
+	f.StringVar(&cfg.provider, "provider", "ollama",
+		"LLM provider: ollama, anthropic, or openai. Cloud providers need --policy redacted or open.")
+	f.StringVar(&cfg.openaiURL, "openai-url", "",
+		"OpenAI-compatible base URL, e.g. a local LM Studio or vLLM server.")
 }
 
 // serveWeb runs the web UI over ix until interrupted. A nil store disables
@@ -76,7 +84,7 @@ func serveWeb(cmd *cobra.Command, opts *options, ix *index.Index, store *feedbac
 		if reqMode == "" {
 			reqMode = cfg.mode
 		}
-		res, err := pickResolver(ix, opts, reqMode, cfg.model, cfg.embedModel, cfg.ollamaURL)
+		res, err := pickResolver(ix, opts, reqMode, cfg.model, cfg.embedModel, cfg.ollamaURL, cfg.provider, cfg.openaiURL)
 		if err != nil {
 			return resolve.Answer{}, err
 		}

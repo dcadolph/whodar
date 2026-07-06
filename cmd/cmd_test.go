@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/dcadolph/whodar/internal/index"
+	"github.com/dcadolph/whodar/internal/policy"
 	"github.com/dcadolph/whodar/internal/resolve"
 )
 
@@ -59,4 +61,37 @@ func runCmd(t *testing.T, args ...string) (stdout, stderr []byte, err error) {
 	root.SetArgs(args)
 	err = root.Execute()
 	return out.Bytes(), errBuf.Bytes(), err
+}
+
+// TestPickResolverCloudPolicy verifies cloud providers are gated by policy:
+// strict denies, redacted permits with the redacting resolver, and keys are
+// required.
+func TestPickResolverCloudPolicy(t *testing.T) {
+	ix := index.New()
+	strict := &options{pol: policy.New(policy.Strict, false)}
+	if _, err := pickResolver(ix, strict, "llm", "", "", "http://localhost:11434", "anthropic", ""); err == nil {
+		t.Error("strict policy allowed a cloud provider")
+	}
+
+	t.Setenv(anthropicKeyEnv, "")
+	redacted := &options{pol: policy.New(policy.Redacted, false)}
+	if _, err := pickResolver(ix, redacted, "llm", "", "", "http://localhost:11434", "anthropic", ""); err == nil {
+		t.Error("missing key did not error")
+	}
+
+	t.Setenv(anthropicKeyEnv, "sk-test")
+	res, err := pickResolver(ix, redacted, "llm", "", "", "http://localhost:11434", "anthropic", "")
+	if err != nil {
+		t.Fatalf("redacted anthropic: %v", err)
+	}
+	if res == nil {
+		t.Fatal("nil resolver")
+	}
+
+	if _, err := pickResolver(ix, redacted, "semantic", "", "", "http://localhost:11434", "anthropic", ""); err == nil {
+		t.Error("semantic mode accepted a cloud provider")
+	}
+	if _, err := pickResolver(ix, redacted, "llm", "", "", "http://localhost:11434", "carrier-pigeon", ""); err == nil {
+		t.Error("unknown provider accepted")
+	}
 }

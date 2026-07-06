@@ -87,9 +87,22 @@ email, or channel that is not in the candidate list. Reply only as JSON of the f
 "channels":["<channel name from candidates, best first>"]}.
 If no candidate is relevant, return empty arrays and say so in the summary.`
 
+// redactedSystem is the system prompt for the redacted path: candidates are
+// numbered and carry no personal identifiers, and the model replies with
+// candidate numbers only.
+const redactedSystem = `You help an employee find who to talk to and which channel to ask in.
+You are given a question and a numbered list of candidate roles and channels retrieved from
+an internal index. Candidates are anonymized: rank them only by their role, team, and topics.
+Reply only as JSON of the form:
+{"people":["<candidate number, best first>"],"channels":["<channel number, best first>"]}.
+If no candidate is relevant, return empty arrays.`
+
 // LLM is a resolver that retrieves candidates with the keyword index, then asks
-// a local model to rank them and summarize. It stays grounded: model output is
-// matched back to retrieved candidates and anything invented is dropped.
+// a model to rank them and summarize. It stays grounded: model output is
+// matched back to retrieved candidates and anything invented is dropped. In
+// redacted mode, built for cloud models under the redacted policy, candidates
+// leave the machine as numbered roles with no names or emails, the model
+// returns numbers, and the summary is written locally.
 type LLM struct {
 	// ix retrieves candidates.
 	ix *index.Index
@@ -98,6 +111,8 @@ type LLM struct {
 	// embedder retrieves candidates semantically when set and the index has
 	// embeddings; nil falls back to keyword retrieval.
 	embedder Embedder
+	// redact strips personal identifiers from everything sent to the model.
+	redact bool
 }
 
 // NewLLM returns an LLM resolver. The embedder may be nil, in which case
@@ -107,6 +122,16 @@ func NewLLM(ix *index.Index, chat Chatter, embedder Embedder) *LLM {
 		panic("resolve: NewLLM requires a non-nil index and chat client")
 	}
 	return &LLM{ix: ix, chat: chat, embedder: embedder}
+}
+
+// NewRedactedLLM returns an LLM resolver that never sends names, emails, or
+// message text to the model: candidates go out as numbered roles, and the
+// written summary is composed locally. Use it with cloud providers under the
+// redacted policy.
+func NewRedactedLLM(ix *index.Index, chat Chatter, embedder Embedder) *LLM {
+	l := NewLLM(ix, chat, embedder)
+	l.redact = true
+	return l
 }
 
 // llmResult is the JSON the model is asked to return.
@@ -129,24 +154,36 @@ func (l *LLM) Resolve(ctx context.Context, query string, limit int) (Answer, err
 		return Answer{}, nil
 	}
 
-	raw, err := l.chat.Chat(ctx, llmSystem, buildPrompt(query, people, channels))
+	system, prompt := llmSystem, buildPrompt(query, people, channels)
+	if l.redact {
+		system, prompt = redactedSystem, buildRedactedPrompt(query, people, channels)
+	}
+	raw, err := l.chat.Chat(ctx, system, prompt)
 	if err != nil {
 		return Answer{}, fmt.Errorf("llm resolve: %w", err)
 	}
 
 	var out llmResult
 	if jsonErr := json.Unmarshal([]byte(raw), &out); jsonErr != nil {
-		return Answer{
+		ans := Answer{
 			People:   capPeople(people, limit),
 			Channels: capChannels(channels, limit),
 			Summary:  strings.TrimSpace(raw),
-		}, nil
+		}
+		if l.redact {
+			ans.Summary = localSummary(ans.People, ans.Channels)
+		}
+		return ans, nil
 	}
-	return Answer{
+	ans := Answer{
 		People:   capPeople(reorderPeople(people, out.People), limit),
 		Channels: capChannels(reorderChannels(channels, out.Channels), limit),
 		Summary:  strings.TrimSpace(out.Summary),
-	}, nil
+	}
+	if l.redact {
+		ans.Summary = localSummary(ans.People, ans.Channels)
+	}
+	return ans, nil
 }
 
 // retrieve gets candidate people and channels, semantically when an embedder is
@@ -204,12 +241,65 @@ func buildPrompt(query string, people []model.Match, channels []model.ChannelMat
 	return b.String()
 }
 
-// reorderPeople ranks candidates by the model's order, matching on email or
-// name, then appends any candidates the model omitted. Unknown entries from the
-// model are ignored, keeping the result grounded.
+// buildRedactedPrompt renders the question and candidates without personal
+// identifiers: each person is a numbered role with title, team, and matched
+// topics; channels keep their name and topic but not their members.
+func buildRedactedPrompt(query string, people []model.Match, channels []model.ChannelMatch) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Question: %s\n\nCandidate people:\n", query)
+	if len(people) == 0 {
+		b.WriteString("(none)\n")
+	}
+	for i, m := range people {
+		team := ""
+		if m.Team != nil {
+			team = m.Team.Name
+		}
+		fmt.Fprintf(&b, "%d. %s; team %s; matched %s\n",
+			i+1, m.Person.Title, team, strings.Join(m.Reasons, ", "))
+	}
+	b.WriteString("\nCandidate channels:\n")
+	if len(channels) == 0 {
+		b.WriteString("(none)\n")
+	}
+	for i, c := range channels {
+		fmt.Fprintf(&b, "%d. #%s - topic: %s\n", i+1, c.Channel.Name, c.Channel.Topic)
+	}
+	return b.String()
+}
+
+// localSummary writes a one-line recommendation from the top-ranked results,
+// so redacted mode never needs the model to see or produce a name.
+func localSummary(people []model.Match, channels []model.ChannelMatch) string {
+	var parts []string
+	if len(people) > 0 {
+		p := people[0].Person
+		who := p.Name
+		if who == "" {
+			who = p.Email
+		}
+		if p.Title != "" {
+			who += " (" + p.Title + ")"
+		}
+		parts = append(parts, "Talk to "+who)
+	}
+	if len(channels) > 0 {
+		parts = append(parts, "ask in #"+channels[0].Channel.Name)
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return strings.Join(parts, "; ") + "."
+}
+
+// reorderPeople ranks candidates by the model's order, matching on email,
+// name, or one-based candidate number, then appends any candidates the model
+// omitted. Unknown entries from the model are ignored, keeping the result
+// grounded.
 func reorderPeople(cands []model.Match, order []string) []model.Match {
-	byKey := make(map[string]model.Match, len(cands)*2)
-	for _, m := range cands {
+	byKey := make(map[string]model.Match, len(cands)*3)
+	for i, m := range cands {
+		byKey[fmt.Sprintf("%d", i+1)] = m
 		if m.Person.Email != "" {
 			byKey[strings.ToLower(m.Person.Email)] = m
 		}
@@ -235,10 +325,12 @@ func reorderPeople(cands []model.Match, order []string) []model.Match {
 }
 
 // reorderChannels ranks channel candidates by the model's order, matching on
-// name, then appends any the model omitted. Unknown names are ignored.
+// name or one-based candidate number, then appends any the model omitted.
+// Unknown names are ignored.
 func reorderChannels(cands []model.ChannelMatch, order []string) []model.ChannelMatch {
-	byName := make(map[string]model.ChannelMatch, len(cands))
-	for _, c := range cands {
+	byName := make(map[string]model.ChannelMatch, len(cands)*2)
+	for i, c := range cands {
+		byName[fmt.Sprintf("%d", i+1)] = c
 		byName[strings.ToLower(c.Channel.Name)] = c
 	}
 	out := make([]model.ChannelMatch, 0, len(cands))
