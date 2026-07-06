@@ -66,7 +66,7 @@ function render(data) {
   const people = data.people || [];
   const channels = data.channels || [];
 
-  for (const p of people) peopleEl.appendChild(personCard(p, data.query));
+  for (const p of people) peopleEl.appendChild(personCard(p, data.query, people.length === 1));
   for (const c of channels) channelsEl.appendChild(channelCard(c, data.query));
   peopleSection.hidden = people.length === 0;
   channelsSection.hidden = channels.length === 0;
@@ -120,16 +120,13 @@ function voteButtons(query, target) {
   return wrap;
 }
 
-function personCard(p, query) {
+function personCard(p, query, expand) {
   const card = el("div", "card");
   const name = el("div", "name");
-  if (p.email) {
-    const link = el("a", null, p.name || p.email);
-    link.href = "mailto:" + p.email;
-    name.appendChild(link);
-  } else {
-    name.appendChild(document.createTextNode(p.name || "unknown"));
-  }
+  const toggle = el("button", "name-toggle", p.name || p.email || "unknown");
+  toggle.type = "button";
+  toggle.title = "Show details";
+  name.appendChild(toggle);
   const copyText = ((p.name || "") + (p.email ? " <" + p.email + ">" : "")).trim();
   if (copyText) name.appendChild(copyButton(copyText));
   const badge = confidenceBadge(p.confidence);
@@ -139,8 +136,44 @@ function personCard(p, query) {
   const sub = [p.title, p.team].filter(Boolean).join(" · ");
   if (sub) card.appendChild(el("div", "sub", sub));
   chips(card, p.reasons);
+
+  const details = personDetails(p);
+  details.hidden = !expand;
+  card.appendChild(details);
+  toggle.addEventListener("click", () => {
+    details.hidden = !details.hidden;
+  });
+
   if (query && p.id) card.appendChild(voteButtons(query, { person: p.id }));
   return card;
+}
+
+function personDetails(p) {
+  const wrap = el("div", "details");
+  const row = (label, value) => {
+    const r = el("div", "detail-row");
+    r.appendChild(el("span", "detail-label", label));
+    r.appendChild(value);
+    wrap.appendChild(r);
+  };
+  if (p.email) {
+    const v = el("span", "detail-value", p.email);
+    v.appendChild(copyButton(p.email));
+    const mail = el("a", "detail-action", "email");
+    mail.href = "mailto:" + p.email;
+    v.appendChild(mail);
+    row("Email", v);
+  }
+  if (p.id && p.id !== p.email) row("Id", el("span", "detail-value", p.id));
+  if (p.identities && p.identities.length) {
+    row("Also known as", el("span", "detail-value", p.identities.join(", ")));
+  }
+  if (p.topics && p.topics.length) {
+    const v = el("span", "detail-value detail-chips");
+    for (const topic of p.topics) v.appendChild(el("span", "chip", topic));
+    row("Knows about", v);
+  }
+  return wrap;
 }
 
 function channelCard(c, query) {
@@ -158,13 +191,9 @@ function channelCard(c, query) {
     sub.appendChild(document.createTextNode("Active: "));
     members.forEach((m, i) => {
       if (i) sub.appendChild(document.createTextNode(", "));
-      if (m.email) {
-        const link = el("a", null, m.name || m.email);
-        link.href = "mailto:" + m.email;
-        sub.appendChild(link);
-      } else {
-        sub.appendChild(document.createTextNode(m.name || ""));
-      }
+      const span = el("span", "member", m.name || m.email || "");
+      if (m.email) span.title = m.email;
+      sub.appendChild(span);
     });
     card.appendChild(sub);
   }

@@ -1,6 +1,11 @@
 package resolve
 
-import "math"
+import (
+	"math"
+	"sort"
+
+	"github.com/dcadolph/whodar/internal/model"
+)
 
 // Confidence labels partition the zero-to-one confidence range for display.
 const (
@@ -28,6 +33,30 @@ func ConfidenceLabel(c float64) string {
 // roundConfidence trims a confidence to two decimals for stable JSON output.
 func roundConfidence(c float64) float64 {
 	return math.Round(c*100) / 100
+}
+
+// topTopics returns up to n of a person's topic names, strongest first, ties
+// broken alphabetically. Topic identifiers are readable slugs, so they double
+// as display names.
+func topTopics(topics map[model.ID]float64, n int) []string {
+	if len(topics) == 0 {
+		return nil
+	}
+	names := make([]string, 0, len(topics))
+	for id := range topics {
+		names = append(names, string(id))
+	}
+	sort.Slice(names, func(i, j int) bool {
+		wi, wj := topics[model.ID(names[i])], topics[model.ID(names[j])]
+		if wi != wj {
+			return wi > wj
+		}
+		return names[i] < names[j]
+	})
+	if len(names) > n {
+		names = names[:n]
+	}
+	return names
 }
 
 // JSONAnswer is a flat, JSON-friendly view of an Answer, shared by the CLI and
@@ -58,6 +87,8 @@ type JSONPerson struct {
 	// Identities lists alternate identifiers merged into this person, such as
 	// a GitHub login joined to an email.
 	Identities []string `json:"identities,omitempty"`
+	// Topics are the person's strongest expertise areas, strongest first.
+	Topics []string `json:"topics,omitempty"`
 	// Score is the relevance score.
 	Score float64 `json:"score"`
 	// Confidence estimates how trustworthy the match is, from zero to one.
@@ -105,6 +136,7 @@ func (a Answer) View(query string) JSONAnswer {
 			Name:       m.Person.Name,
 			Email:      m.Person.Email,
 			Title:      m.Person.Title,
+			Topics:     topTopics(m.Person.Topics, 8),
 			Score:      m.Score,
 			Confidence: roundConfidence(m.Confidence),
 			Reasons:    m.Reasons,
