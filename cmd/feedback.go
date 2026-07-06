@@ -24,7 +24,14 @@ func newFeedbackCmd(opts *options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "feedback [question]",
 		Short: "Confirm or correct an answer",
-		Args:  cobra.MinimumNArgs(1),
+		Long: `Record that a result was right or wrong for a question. Future rankings for
+that question and its close variants move accordingly, capped so votes tune
+answers without burying the evidence. Votes survive re-indexing.
+
+Examples:
+  whodar feedback "billing retries" --person alice@corp.com --helpful
+  whodar feedback "billing retries" --channel payments --not-helpful`,
+		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if helpful == notHelpful {
 				return fmt.Errorf("%w: pass exactly one of --helpful or --not-helpful", ErrBadArgs)

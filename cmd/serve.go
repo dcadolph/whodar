@@ -34,6 +34,9 @@ func newServeCmd(opts *options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "serve",
 		Short: "Serve the whodar web UI on localhost",
+		Long: `Serve the local web UI over the same engine as ask. Binds to localhost by
+default, so nothing leaves the machine. Queries are shareable links
+(/?q=who+owns+billing runs on load) and every result has feedback buttons.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ix, err := index.Load(opts.indexPath())
 			if err != nil {

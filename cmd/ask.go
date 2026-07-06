@@ -25,7 +25,18 @@ func newAskCmd(opts *options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "ask [question]",
 		Short: "Ask who to talk to about something",
-		Args:  cobra.MinimumNArgs(1),
+		Long: `Answer a question from the index: the people to talk to and the channels to
+ask in, each with reasons and a confidence from zero to one.
+
+Modes:
+  keyword   no model, deterministic, always works (default)
+  semantic  match on meaning; needs an index built with --embed
+  llm       a local Ollama model re-ranks and writes a recommendation
+
+Examples:
+  whodar ask "who do I talk to about billing retries"
+  whodar ask --mode llm "where do I ask about kafka"`,
+		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ix, err := index.Load(opts.indexPath())
 			if err != nil {

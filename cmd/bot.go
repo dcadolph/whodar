@@ -52,6 +52,12 @@ func newBotCmd(opts *options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "bot",
 		Short: "Run the Slack bot",
+		Long: `Run the Slack bot. Mention it in a channel or send it a direct message; a
+trailing --llm or --keyword in a message overrides the mode for that answer.
+
+Transports and their credentials:
+  socket  no public URL needed     WHODAR_SLACK_TOKEN + WHODAR_SLACK_APP_TOKEN
+  events  serves HTTP for Slack    WHODAR_SLACK_TOKEN + WHODAR_SLACK_SIGNING_SECRET`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			botToken := os.Getenv(slackTokenEnv)
 			if botToken == "" {

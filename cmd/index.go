@@ -71,6 +71,24 @@ func newIndexCmd(opts *options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "index",
 		Short: "Build the index from a source",
+		Long: `Build or extend the index from one source per run. Combine sources with --merge;
+people join across sources by email, or by an alias file (--aliases) when a
+source only knows a handle. Dated activity decays per --half-life-days.
+
+Sources and their credentials:
+  org-csv     --file people.csv                          none
+  codeowners  --file CODEOWNERS|repo-root                none
+  git         --repo-path DIR (repeatable)               none
+  slack       [--include-private]                        WHODAR_SLACK_TOKEN
+  github      --repo o/r | --github-org ORG              WHODAR_GITHUB_TOKEN
+  jira        --jira-project KEY | --jira-jql JQL        WHODAR_JIRA_URL/EMAIL/TOKEN
+  confluence  --confluence-space KEY | --confluence-cql  WHODAR_CONFLUENCE_* (or Jira's)
+  pagerduty   (no scope flags)                           WHODAR_PAGERDUTY_TOKEN
+
+Start with the org chart, then merge everything else onto it:
+  whodar index --source org-csv --file people.csv
+  whodar index --source slack --merge
+  whodar index --source git --repo-path ~/src/billing --merge`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			var (
 				recs []connector.Record
