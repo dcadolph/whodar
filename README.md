@@ -57,16 +57,14 @@ every source, flag, and credential.
 
 ## How it works
 
-- Eight pluggable sources feed one graph of people, teams, topics, and
-  channels. Adding a source is one small interface.
-- One human stays one node: sources join by email, and an alias file joins
-  handle-only identifiers like a GitHub login.
-- Recent activity counts more, every answer carries a confidence, and results
-  explain which words hit where.
-- Answers learn: confirm or correct a result and future rankings move,
-  without burying the evidence.
-- Three query modes: keyword (no model, always works), semantic, and a local
-  LLM through Ollama. The CLI, web UI, and Slack bot share one engine.
+| Piece     | What it does                                                                                                    |
+| --------- | --------------------------------------------------------------------------------------------------------------- |
+| Sources   | Eight pluggable connectors feed one graph of people, teams, topics, and channels. Adding a source is one small interface. |
+| Identity  | One human stays one node: sources join by email, and an alias file joins handle-only identifiers like a GitHub login. |
+| Ranking   | Recent activity counts more, every answer carries a confidence, and results explain which words hit where.       |
+| Feedback  | Confirm or correct a result and future rankings move, without burying the evidence.                              |
+| Modes     | Keyword needs no model and always works; semantic and LLM answers run on local Ollama, or on Claude and OpenAI behind explicit opt-in. |
+| Frontends | The CLI, web UI, and Slack bot share one engine.                                                                  |
 
 ## Data governance
 
