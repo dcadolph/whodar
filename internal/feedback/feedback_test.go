@@ -88,3 +88,47 @@ func TestAddRejectsBadEntry(t *testing.T) {
 		t.Errorf("add error = %v, want ErrBadEntry", err)
 	}
 }
+
+func TestListAndClear(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "feedback.json")
+	s, err := Load(path)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	when := time.Date(2026, 7, 5, 12, 0, 0, 0, time.UTC)
+	entries := []Entry{
+		{Query: "billing retries", Person: "alice@corp.com", Vote: Helpful,
+			Comment: "she fixed it last week", Time: when},
+		{Query: "billing retries", Person: "bob@corp.com", Vote: NotHelpful, Time: when},
+		{Query: "kafka", Channel: "data-platform", Vote: Helpful, Time: when},
+	}
+	for _, e := range entries {
+		if err := s.Add(e); err != nil {
+			t.Fatalf("add: %v", err)
+		}
+	}
+
+	if got := s.List(Filter{Query: "Billing Retries"}); len(got) != 2 {
+		t.Errorf("list by query = %d entries, want 2", len(got))
+	}
+	if got := s.List(Filter{Person: "alice@corp.com"}); len(got) != 1 || got[0].Comment == "" {
+		t.Errorf("list by person = %+v, want alice's commented vote", got)
+	}
+
+	removed, err := s.Clear(Filter{Person: "alice@corp.com"})
+	if err != nil || removed != 1 {
+		t.Fatalf("clear = %d, %v; want 1 removed", removed, err)
+	}
+	reloaded, err := Load(path)
+	if err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	if got := reloaded.List(Filter{}); len(got) != 2 {
+		t.Errorf("after clear = %d entries, want 2 persisted", len(got))
+	}
+	removed, err = s.Clear(Filter{})
+	if err != nil || removed != 2 {
+		t.Errorf("clear all = %d, %v; want 2 removed", removed, err)
+	}
+}

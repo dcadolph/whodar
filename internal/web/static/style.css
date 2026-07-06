@@ -360,3 +360,18 @@ footer {
   color: var(--fg);
   border-color: var(--accent);
 }
+
+.vote-note {
+  flex: 1;
+  min-width: 120px;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg);
+  font-size: 12px;
+}
+
+.vote-note::placeholder {
+  color: var(--muted);
+}

@@ -38,6 +38,8 @@ type webConfig struct {
 	provider string
 	// openaiURL is an OpenAI-compatible base URL for the openai provider.
 	openaiURL string
+	// fbStrength is how hard votes move ranking.
+	fbStrength string
 }
 
 // newServeCmd builds the serve command, which runs the web UI on localhost and
@@ -75,11 +77,16 @@ func addWebFlags(cmd *cobra.Command, cfg *webConfig, defaultAddr string) {
 		"LLM provider: ollama, anthropic, or openai. Cloud providers need --policy redacted or open.")
 	f.StringVar(&cfg.openaiURL, "openai-url", "",
 		"OpenAI-compatible base URL, e.g. a local LM Studio or vLLM server.")
+	f.StringVar(&cfg.fbStrength, "feedback", "normal",
+		"How hard votes move ranking: off, low, normal, or high.")
 }
 
 // serveWeb runs the web UI over ix until interrupted. A nil store disables
 // the feedback API.
 func serveWeb(cmd *cobra.Command, opts *options, ix *index.Index, store *feedback.Store, cfg webConfig) error {
+	if err := applyFeedbackStrength(ix, cfg.fbStrength); err != nil {
+		return err
+	}
 	ask := func(ctx context.Context, query, reqMode string, limit int) (resolve.Answer, error) {
 		if reqMode == "" {
 			reqMode = cfg.mode

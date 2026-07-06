@@ -116,6 +116,10 @@ function confidenceBadge(c) {
 
 function voteButtons(query, target) {
   const wrap = el("div", "votes");
+  const note = document.createElement("input");
+  note.className = "vote-note";
+  note.type = "text";
+  note.placeholder = "why? (optional)";
   for (const [label, vote] of [["helpful", "helpful"], ["wrong", "not-helpful"]]) {
     const button = el("button", "vote", label);
     button.type = "button";
@@ -124,7 +128,7 @@ function voteButtons(query, target) {
         const res = await fetch("/api/feedback", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query, vote, ...target }),
+          body: JSON.stringify({ query, vote, comment: note.value.trim(), ...target }),
         });
         wrap.replaceChildren(el("span", "voted", res.ok ? "thanks" : "failed"));
       } catch (err) {
@@ -133,6 +137,7 @@ function voteButtons(query, target) {
     });
     wrap.appendChild(button);
   }
+  wrap.appendChild(note);
   return wrap;
 }
 

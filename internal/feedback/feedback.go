@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -30,6 +31,8 @@ type Entry struct {
 	Channel string `json:"channel,omitempty"`
 	// Vote is Helpful or NotHelpful.
 	Vote int `json:"vote"`
+	// Comment is an optional note explaining the vote.
+	Comment string `json:"comment,omitempty"`
 	// Time is when the vote was cast.
 	Time time.Time `json:"time"`
 }
@@ -85,6 +88,65 @@ func (s *Store) All() []Entry {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return append([]Entry(nil), s.entries...)
+}
+
+// Filter selects the votes to list or clear. Zero fields match everything;
+// set fields must all match.
+type Filter struct {
+	// Query matches entries for this exact question, case-insensitively.
+	Query string
+	// Person matches votes on this person identifier.
+	Person string
+	// Channel matches votes on this channel name.
+	Channel string
+}
+
+// matches reports whether e satisfies every set field of f.
+func (f Filter) matches(e Entry) bool {
+	if f.Query != "" && !strings.EqualFold(f.Query, e.Query) {
+		return false
+	}
+	if f.Person != "" && !strings.EqualFold(f.Person, e.Person) {
+		return false
+	}
+	if f.Channel != "" && !strings.EqualFold(f.Channel, e.Channel) {
+		return false
+	}
+	return true
+}
+
+// List returns the votes matching f, oldest first.
+func (s *Store) List(f Filter) []Entry {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []Entry
+	for _, e := range s.entries {
+		if f.matches(e) {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// Clear removes the votes matching f, persists the store, and returns how
+// many were removed.
+func (s *Store) Clear(f Filter) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	kept := s.entries[:0]
+	removed := 0
+	for _, e := range s.entries {
+		if f.matches(e) {
+			removed++
+			continue
+		}
+		kept = append(kept, e)
+	}
+	s.entries = kept
+	if removed == 0 {
+		return 0, nil
+	}
+	return removed, s.save()
 }
 
 // save writes the entries to the store's path. Callers hold the lock.

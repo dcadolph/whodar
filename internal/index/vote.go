@@ -8,13 +8,13 @@ import (
 	"github.com/dcadolph/whodar/internal/model"
 )
 
-// Feedback application bounds. A few votes adjust ranking; they never bury
-// the underlying evidence.
+// Feedback application defaults. A few votes adjust ranking; they never bury
+// the underlying evidence. Both are tunable via SetFeedbackStrength.
 const (
-	// maxFeedbackNet clamps the net votes applied to one result per query.
-	maxFeedbackNet = 3
-	// feedbackStep is the per-vote score multiplier.
-	feedbackStep = 1.25
+	// defaultFeedbackNet clamps the net votes applied to one result per query.
+	defaultFeedbackNet = 3
+	// defaultFeedbackStep is the per-vote score multiplier.
+	defaultFeedbackStep = 1.25
 )
 
 // fbRule is one preprocessed vote: the stemmed query terms it applies to, the
@@ -28,6 +28,14 @@ type fbRule struct {
 	vote int
 	// channel marks a channel vote.
 	channel bool
+}
+
+// SetFeedbackStrength tunes how hard votes move ranking: step is the per-vote
+// score multiplier and maxNet clamps the net votes applied to one result. A
+// step at or below one, or a maxNet at or below zero, turns feedback off.
+func (ix *Index) SetFeedbackStrength(step float64, maxNet int) {
+	ix.fbStep = step
+	ix.fbMax = maxNet
 }
 
 // SetFeedback gives the index user votes to apply during ranking. Later calls
@@ -63,6 +71,10 @@ func (ix *Index) SetFeedback(entries []feedback.Entry) {
 // clamped to maxFeedbackNet in either direction. A vote applies when every
 // term of its recorded query appears in the current one.
 func (ix *Index) feedbackNets(queryTerms []string, channel bool) map[model.ID]int {
+	step, maxNet := ix.feedbackStrength()
+	if step <= 1 || maxNet <= 0 {
+		return nil
+	}
 	loaded := ix.fbRules.Load()
 	if loaded == nil || len(*loaded) == 0 {
 		return nil
@@ -88,14 +100,28 @@ func (ix *Index) feedbackNets(queryTerms []string, channel bool) map[model.ID]in
 		}
 	}
 	for id, n := range nets {
-		nets[id] = min(max(n, -maxFeedbackNet), maxFeedbackNet)
+		nets[id] = min(max(n, -maxNet), maxNet)
 	}
 	return nets
 }
 
+// feedbackStrength returns the configured step and clamp, defaulting when
+// unset.
+func (ix *Index) feedbackStrength() (float64, int) {
+	step, maxNet := ix.fbStep, ix.fbMax
+	if step == 0 {
+		step = defaultFeedbackStep
+	}
+	if maxNet == 0 {
+		maxNet = defaultFeedbackNet
+	}
+	return step, maxNet
+}
+
 // feedbackFactor converts a net vote count into a score multiplier.
-func feedbackFactor(net int) float64 {
-	return math.Pow(feedbackStep, float64(net))
+func (ix *Index) feedbackFactor(net int) float64 {
+	step, _ := ix.feedbackStrength()
+	return math.Pow(step, float64(net))
 }
 
 // feedbackReason describes an applied net vote for the reasons list, or

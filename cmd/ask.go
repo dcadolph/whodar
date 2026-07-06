@@ -32,6 +32,7 @@ func newAskCmd(opts *options) *cobra.Command {
 		ollamaURL  string
 		provider   string
 		openaiURL  string
+		fbStrength string
 	)
 	cmd := &cobra.Command{
 		Use:   "ask [question]",
@@ -54,6 +55,9 @@ Examples:
 				return fmt.Errorf("%w: run `whodar index` first: %w", ErrNoIndex, err)
 			}
 			applyFeedback(ix, opts, cmd.ErrOrStderr())
+			if err := applyFeedbackStrength(ix, fbStrength); err != nil {
+				return err
+			}
 			res, err := pickResolver(ix, opts, mode, model, embedModel, ollamaURL, provider, openaiURL)
 			if err != nil {
 				return err
@@ -76,6 +80,8 @@ Examples:
 		"LLM provider: ollama, anthropic, or openai. Cloud providers need --policy redacted or open.")
 	f.StringVar(&openaiURL, "openai-url", "",
 		"OpenAI-compatible base URL, e.g. a local LM Studio or vLLM server.")
+	f.StringVar(&fbStrength, "feedback", "normal",
+		"How hard votes move ranking: off, low, normal, or high.")
 	return cmd
 }
 

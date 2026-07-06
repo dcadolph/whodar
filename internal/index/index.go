@@ -102,6 +102,10 @@ type Index struct {
 	// fbRules are preprocessed user votes applied during ranking, held
 	// atomically so a running server can apply new votes mid-flight.
 	fbRules atomic.Pointer[[]fbRule]
+	// fbStep is the per-vote score multiplier; zero means the default.
+	fbStep float64
+	// fbMax clamps net votes per result; zero means the default, negative off.
+	fbMax int
 }
 
 // New returns an empty index with initialized maps.
@@ -333,7 +337,7 @@ func (ix *Index) Search(query string, limit int) []model.Match {
 		}
 		reasons, evidence := ix.reasons(pid, matched[pid])
 		if net := nets[pid]; net != 0 {
-			sc *= feedbackFactor(net)
+			sc *= ix.feedbackFactor(net)
 			reasons = append(reasons, feedbackReason(net))
 		}
 		coverage := float64(len(matched[pid])) / float64(len(terms))
@@ -376,7 +380,7 @@ func (ix *Index) SearchChannels(query string, limit int) []model.ChannelMatch {
 		}
 		reasons, evidence := ix.channelReasons(cid, matched[cid])
 		if net := nets[cid]; net != 0 {
-			sc *= feedbackFactor(net)
+			sc *= ix.feedbackFactor(net)
 			reasons = append(reasons, feedbackReason(net))
 		}
 		coverage := float64(len(matched[cid])) / float64(len(terms))

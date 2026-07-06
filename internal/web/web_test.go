@@ -107,13 +107,14 @@ func TestFeedbackAPI(t *testing.T) {
 		t.Fatalf("Handler: %v", err)
 	}
 
-	body := `{"query":"billing retries","person":"jane@x.com","vote":"helpful"}`
+	body := `{"query":"billing retries","person":"jane@x.com","vote":"helpful","comment":"she owns it"}`
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/feedback", strings.NewReader(body)))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200: %s", rec.Code, rec.Body.String())
 	}
-	if got.Query != "billing retries" || got.Person != "jane@x.com" || got.Vote != feedback.Helpful {
+	if got.Query != "billing retries" || got.Person != "jane@x.com" ||
+		got.Vote != feedback.Helpful || got.Comment != "she owns it" {
 		t.Errorf("recorded entry = %+v", got)
 	}
 

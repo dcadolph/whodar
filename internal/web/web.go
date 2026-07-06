@@ -160,6 +160,8 @@ func feedbackHandler(record FeedbackFunc) http.HandlerFunc {
 			Channel string `json:"channel"`
 			// Vote is "helpful" or "not-helpful".
 			Vote string `json:"vote"`
+			// Comment is an optional note explaining the vote.
+			Comment string `json:"comment"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid JSON")
@@ -169,6 +171,7 @@ func feedbackHandler(record FeedbackFunc) http.HandlerFunc {
 			Query:   strings.TrimSpace(body.Query),
 			Person:  strings.TrimSpace(body.Person),
 			Channel: strings.TrimSpace(body.Channel),
+			Comment: strings.TrimSpace(body.Comment),
 			Time:    time.Now(),
 		}
 		switch body.Vote {

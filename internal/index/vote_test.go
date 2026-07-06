@@ -85,7 +85,7 @@ func TestFeedbackStemsAndClamps(t *testing.T) {
 			gotBob = m.Score
 		}
 	}
-	want := baseBob * feedbackFactor(maxFeedbackNet)
+	want := baseBob * ix.feedbackFactor(defaultFeedbackNet)
 	if gotBob < want*0.999 || gotBob > want*1.001 {
 		t.Errorf("bob score = %.4f, want clamped to %.4f", gotBob, want)
 	}
@@ -100,7 +100,7 @@ func TestFeedbackBoostsChannels(t *testing.T) {
 		{Query: "kafka", Channel: "kafka", Vote: feedback.Helpful},
 	})
 	got := ix.SearchChannels("kafka", 1)[0]
-	want := base * feedbackFactor(1)
+	want := base * ix.feedbackFactor(1)
 	if got.Score < want*0.999 || got.Score > want*1.001 {
 		t.Errorf("channel score = %.4f, want %.4f", got.Score, want)
 	}

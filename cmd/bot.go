@@ -47,6 +47,7 @@ func newBotCmd(opts *options) *cobra.Command {
 		embedModel string
 		provider   string
 		openaiURL  string
+		fbStrength string
 		ollamaURL  string
 		addr       string
 		limit      int
@@ -70,6 +71,9 @@ Transports and their credentials:
 				return fmt.Errorf("%w: run `whodar index` first: %w", ErrNoIndex, err)
 			}
 			applyFeedback(ix, opts, cmd.ErrOrStderr())
+			if err := applyFeedbackStrength(ix, fbStrength); err != nil {
+				return err
+			}
 
 			botClient := slack.New(botToken)
 			botUserID, err := botClient.AuthTest(cmd.Context())
@@ -110,6 +114,8 @@ Transports and their credentials:
 		"LLM provider: ollama, anthropic, or openai. Cloud providers need --policy redacted or open.")
 	f.StringVar(&openaiURL, "openai-url", "",
 		"OpenAI-compatible base URL, e.g. a local LM Studio or vLLM server.")
+	f.StringVar(&fbStrength, "feedback", "normal",
+		"How hard votes move ranking: off, low, normal, or high.")
 	f.StringVar(&addr, "addr", "127.0.0.1:8766", "Address for the events transport HTTP server.")
 	f.IntVar(&limit, "limit", 5, "Maximum results per section.")
 	return cmd

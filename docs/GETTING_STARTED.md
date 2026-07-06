@@ -149,8 +149,14 @@ least-bad answer never dresses up as a sure one.
 When an answer is right, say so; when it is wrong, say that too. Votes adjust
 future rankings for that question and its close variants:
 
-    whodar feedback "billing retries" --person alice@corp.com --helpful
-    whodar feedback "billing retries" --channel payments --not-helpful
+    whodar feedback record "billing retries" --person alice@corp.com --helpful
+    whodar feedback record "billing retries" --channel payments --not-helpful --comment "bot answers there now"
+
+Review or undo what has been taught, and tune how hard votes move ranking:
+
+    whodar feedback list --pretty
+    whodar feedback clear --person alice@corp.com
+    whodar ask --feedback high "billing retries"
 
 The web UI has the same buttons on every result. Votes live in
 `feedback.json` next to the index, separate on purpose: re-indexing rebuilds
@@ -445,8 +451,9 @@ turns decay off entirely.
 - `whodar ask [--mode keyword|semantic|llm] [--limit N] [--pretty] QUESTION`
   answers a question.
 - `whodar index ... --embed` adds embeddings for semantic and llm retrieval.
-- `whodar feedback QUESTION (--person ID | --channel NAME) (--helpful | --not-helpful)`
-  records a vote on an answer.
+- `whodar feedback record QUESTION (--person ID | --channel NAME) (--helpful | --not-helpful) [--comment TEXT]`
+  records a vote; `whodar feedback list` and `whodar feedback clear` review and
+  undo votes.
 - `whodar serve [--addr HOST:PORT] [--mode keyword|llm]` runs the web UI.
 - `whodar bot [--transport socket|events] [--mode keyword|llm] [--addr HOST:PORT]`
   runs the Slack bot.

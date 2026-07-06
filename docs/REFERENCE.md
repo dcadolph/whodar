@@ -84,6 +84,7 @@ Answers a question from the index.
 | `--embed-model` |           | Ollama embed model for semantic and llm modes.      |
 | `--ollama-url`  | localhost | Ollama base URL.                                    |
 | `--openai-url`  |           | OpenAI-compatible base URL, e.g. LM Studio or vLLM. |
+| `--feedback`    | `normal`  | How hard votes move ranking: `off`, `low`, `normal`, `high`. |
 
 Modes: `keyword` needs no model and always works. `semantic` matches on
 meaning using embeddings built with `index --embed`. `llm` retrieves
@@ -100,20 +101,28 @@ explicit topic is proof, a title slightly less, a passing mention half.
 
 ## whodar feedback
 
-Records a vote on an answer so future rankings improve.
+Records, reviews, and clears votes on answers.
 
-    whodar feedback QUESTION (--person ID | --channel NAME) (--helpful | --not-helpful)
+    whodar feedback record QUESTION (--person ID | --channel NAME) (--helpful | --not-helpful) [--comment TEXT]
+    whodar feedback list [--query Q | --person ID | --channel NAME]
+    whodar feedback clear (--query Q | --person ID | --channel NAME | --all)
 
-| Flag            | What it does                             |
-| --------------- | ---------------------------------------- |
-| `--person`      | Person identifier from the answer.       |
-| `--channel`     | Channel name from the answer.            |
-| `--helpful`     | The result answered the question.        |
-| `--not-helpful` | The result was wrong for the question.   |
+| Flag            | Applies to    | What it does                              |
+| --------------- | ------------- | ----------------------------------------- |
+| `--person`      | all           | Person identifier from the answer.        |
+| `--channel`     | all           | Channel name from the answer.             |
+| `--query`       | list, clear   | Match votes for this exact question.      |
+| `--helpful`     | record        | The result answered the question.         |
+| `--not-helpful` | record        | The result was wrong for the question.    |
+| `--comment`     | record        | Optional note explaining the vote.        |
+| `--all`         | clear         | Clear every recorded vote.                |
 
-Each net vote multiplies the result's score by 1.25 for that question and its
-close variants, clamped at three votes either way. Votes live in
-`feedback.json` under the data directory and survive re-indexing.
+By default each net vote multiplies the result's score by 1.25 for that
+question and its close variants, clamped at three votes either way. Tune it
+with `--feedback off|low|normal|high` on `ask`, `serve`, and `bot`: low is a
+gentle 1.1x capped at two votes, high is 1.5x capped at four, off ignores
+votes entirely. Votes live in `feedback.json` under the data directory and
+survive re-indexing.
 
 ## whodar serve
 
