@@ -28,7 +28,7 @@ feedback buttons, a query lives in the URL so answers are shareable, and
 clicking a person shows everything whodar knows about them:
 
 <p align="center">
-  <img src="docs/whodar-web.png" alt="whodar web UI" width="90%">
+  <img src="docs/whodar-web.gif" alt="whodar web UI" width="90%">
 </p>
 
 ## Install
