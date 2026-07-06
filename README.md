@@ -10,10 +10,10 @@
   <a href="LICENSE"><img src="https://img.shields.io/github/license/dcadolph/whodar" alt="License"></a>
 </p>
 
-whodar helps you find who to ask at work. Point it at the tools your org
-already uses and ask a question in plain words. It returns the people to talk
-to and the channels to ask in, with the reason and confidence behind each one.
-It runs locally by default, with or without an LLM.
+Someone at your company already knows the answer. whodar tells you who.
+Point it at the tools your org already uses, ask in plain words, and get the
+people to talk to and the channels to ask in, each with the reason and
+confidence behind it. Local by default, with or without an LLM.
 
 ## See it
 
