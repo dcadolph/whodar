@@ -6,6 +6,7 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io/fs"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/dcadolph/whodar/internal/feedback"
+	"github.com/dcadolph/whodar/internal/llm"
 	"github.com/dcadolph/whodar/internal/resolve"
 )
 
@@ -107,6 +109,13 @@ func askHandler(ask AskFunc) http.HandlerFunc {
 
 		ans, err := ask(r.Context(), query, r.URL.Query().Get("mode"), limit)
 		if err != nil {
+			if errors.Is(err, llm.ErrModel) {
+				writeError(w, http.StatusBadGateway,
+					"The local model is not reachable. LLM and semantic modes need Ollama "+
+						"running on this machine: install it from ollama.com, run "+
+						"`ollama pull llama3.1`, and ask again. Keyword mode always works.")
+				return
+			}
 			writeError(w, http.StatusBadGateway, err.Error())
 			return
 		}

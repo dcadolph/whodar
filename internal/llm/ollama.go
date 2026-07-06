@@ -23,7 +23,7 @@ const defaultModel = "llama3.1"
 // ErrEmptyResponse indicates the model returned no content.
 var ErrEmptyResponse = errors.New("llm: empty response")
 
-// ErrModel indicates the Ollama server reported an error.
+// ErrModel indicates the Ollama server is unreachable or reported an error.
 var ErrModel = errors.New("llm: model error")
 
 // Doer performs an HTTP request. *http.Client satisfies it; tests inject a stub.
@@ -138,7 +138,7 @@ func (o *Ollama) Chat(ctx context.Context, system, user string) (string, error) 
 
 	resp, err := o.http.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("llm: request to %s: %w", o.baseURL, err)
+		return "", fmt.Errorf("llm: %w: request to %s: %w", ErrModel, o.baseURL, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 

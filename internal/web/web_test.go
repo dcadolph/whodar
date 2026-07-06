@@ -3,12 +3,14 @@ package web
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/dcadolph/whodar/internal/feedback"
+	"github.com/dcadolph/whodar/internal/llm"
 	"github.com/dcadolph/whodar/internal/model"
 	"github.com/dcadolph/whodar/internal/resolve"
 )
@@ -174,5 +176,26 @@ func TestPersonAPI(t *testing.T) {
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/person?id=ghost", nil))
 	if rec.Code != http.StatusNotFound {
 		t.Errorf("unknown person status = %d, want 404", rec.Code)
+	}
+}
+
+// TestAskAPIModelDown verifies an unreachable model maps to guidance instead
+// of a raw dial error.
+func TestAskAPIModelDown(t *testing.T) {
+	t.Parallel()
+	ask := func(_ context.Context, _, _ string, _ int) (resolve.Answer, error) {
+		return resolve.Answer{}, fmt.Errorf("llm resolve: %w: connection refused", llm.ErrModel)
+	}
+	h, err := Handler(Config{Ask: ask, Version: "test"})
+	if err != nil {
+		t.Fatalf("Handler: %v", err)
+	}
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/ask?q=x&mode=llm", nil))
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("status = %d, want 502", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "ollama.com") {
+		t.Errorf("body = %s, want Ollama guidance", rec.Body.String())
 	}
 }

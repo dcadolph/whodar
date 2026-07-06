@@ -43,7 +43,7 @@ func (o *Ollama) Embed(ctx context.Context, text string) ([]float32, error) {
 
 	resp, err := o.http.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("llm: embed request to %s: %w", o.baseURL, err)
+		return nil, fmt.Errorf("llm: %w: embed request to %s: %w", ErrModel, o.baseURL, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
