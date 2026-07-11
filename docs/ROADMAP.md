@@ -23,3 +23,13 @@ sources by email or an alias file, so one person stays one entry across them.
 ## Experience
 
 - Result deep links: open a channel or a profile directly from an answer.
+
+## Personal digest
+
+A second way to ask: "what did I miss that matters to me." Instead of a topic
+query returning people, the digest scans the channels the running user can see,
+scores each message for personal relevance, and returns a ranked, actionable
+roll-up on demand, on a schedule, or live. It reuses the Slack client, the
+messaging client, the LLM layer, and the policy egress rules, and adds only a
+per-message relevance path beside the existing pipeline. See DIGEST.md for the
+full plan.
