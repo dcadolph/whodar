@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
 	"time"
 
 	"github.com/coder/websocket"
@@ -74,6 +75,10 @@ const (
 	steadyPeriod   = 30 * time.Second
 )
 
+// maxConcurrentAnswers caps how many answers run at once, so a burst of
+// mentions cannot spawn unbounded resolver work.
+const maxConcurrentAnswers = 8
+
 // SocketRunner runs a Slack Socket Mode session: it opens a WebSocket with the
 // app-level token, reads event frames, acknowledges them, and dispatches
 // questions to the Engine. It reconnects with backoff until the context is
@@ -93,6 +98,9 @@ type SocketRunner struct {
 	dial Dialer
 	// log receives connection notices.
 	log io.Writer
+	// answerSlots bounds concurrent answers to maxConcurrentAnswers. Each
+	// answer goroutine acquires a slot itself so the read loop never blocks.
+	answerSlots chan struct{}
 }
 
 // SocketOption configures a SocketRunner.
@@ -133,6 +141,7 @@ func NewSocketRunner(app *slack.Client, engine *Engine, replier Replier, botUser
 	s := &SocketRunner{
 		app: app, engine: engine, replier: replier, botUserID: botUserID,
 		dial: dialWebSocket, log: io.Discard,
+		answerSlots: make(chan struct{}, maxConcurrentAnswers),
 	}
 	for _, o := range opts {
 		o(s)
@@ -191,9 +200,14 @@ func sleepCtx(ctx context.Context, d time.Duration) bool {
 	}
 }
 
-// session reads and dispatches frames until the connection ends.
+// session reads and dispatches frames until the connection ends. Answers run on
+// their own goroutines so a slow one, up to handleTimeout, cannot stall the read
+// loop from acking and reading the next envelope. Outstanding answers are
+// drained before the session returns.
 func (s *SocketRunner) session(ctx context.Context, conn wsConn) error {
 	defer func() { _ = conn.Close() }()
+	var answers sync.WaitGroup
+	defer answers.Wait()
 	for {
 		data, err := conn.Read(ctx)
 		if err != nil {
@@ -214,19 +228,40 @@ func (s *SocketRunner) session(ctx context.Context, conn wsConn) error {
 			}
 			switch {
 			case env.Type == "events_api":
-				routeEvent(ctx, s.engine, s.replier, s.botUserID, env.Payload.Event, s.log)
+				ev := env.Payload.Event
+				s.dispatch(ctx, &answers, func() {
+					routeEvent(ctx, s.engine, s.replier, s.botUserID, ev, s.log)
+				})
 			case env.Type == "slash_commands" && s.respond != nil:
 				cmd := slashCommand{
 					Text:        env.Payload.Text,
 					UserID:      env.Payload.UserID,
 					ResponseURL: env.Payload.ResponseURL,
 				}
-				// A goroutine keeps a slow model from blocking the read
-				// loop; the answer arrives through the response URL.
-				go routeSlash(ctx, s.engine, s.respond, cmd, s.log)
+				s.dispatch(ctx, &answers, func() {
+					routeSlash(ctx, s.engine, s.respond, cmd, s.log)
+				})
 			}
 		}
 	}
+}
+
+// dispatch runs fn on its own goroutine after acquiring an answer slot, so the
+// read loop never blocks: a slot fills only inside the goroutine. It abandons
+// the work if ctx ends before a slot frees. The WaitGroup lets the session
+// drain in-flight answers before it returns.
+func (s *SocketRunner) dispatch(ctx context.Context, wg *sync.WaitGroup, fn func()) {
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		select {
+		case s.answerSlots <- struct{}{}:
+		case <-ctx.Done():
+			return
+		}
+		defer func() { <-s.answerSlots }()
+		fn()
+	}()
 }
 
 // ack acknowledges a frame so Slack does not redeliver it.
