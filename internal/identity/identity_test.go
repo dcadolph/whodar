@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -59,6 +60,60 @@ func TestCanonical(t *testing.T) {
 				t.Errorf("Canonical(%q) = %q, want %q", test.Ask, got, test.WantID)
 			}
 		})
+	}
+}
+
+// TestCanonicalConcurrent resolves the same aliased, uncompressed union-find
+// chains from many goroutines at once. Canonical path-compresses by writing the
+// shared parent map, so an unguarded resolver trips the race detector (or Go's
+// fatal "concurrent map read and map write") the way the serving process does
+// when GET /api/person and POST /api/feedback overlap. Run under -race.
+func TestCanonicalConcurrent(t *testing.T) {
+	t.Parallel()
+	const chains = 2000
+	r := NewResolver()
+	deep := make([]model.ID, chains)
+	for i := range chains {
+		// Build a two-hop chain d -> c -> a so find(d) must compress on the
+		// first read. Suffixes a < b < c < d keep the root deterministic.
+		a := model.ID(fmt.Sprintf("chain-%06d-a", i))
+		b := model.ID(fmt.Sprintf("chain-%06d-b", i))
+		c := model.ID(fmt.Sprintf("chain-%06d-c", i))
+		d := model.ID(fmt.Sprintf("chain-%06d-d", i))
+		r.Union(a, b)
+		r.Union(c, d)
+		r.Union(b, d)
+		deep[i] = d
+	}
+
+	const workers = 16
+	var start sync.WaitGroup
+	start.Add(1)
+	var done sync.WaitGroup
+	for w := range workers {
+		done.Add(1)
+		go func(seed int) {
+			defer done.Done()
+			start.Wait()
+			for pass := 0; pass < 4; pass++ {
+				for i := range deep {
+					if got := r.Canonical(deep[(i+seed)%len(deep)]); got == "" {
+						t.Errorf("Canonical returned empty id")
+						return
+					}
+				}
+			}
+		}(w)
+	}
+	start.Done()
+	done.Wait()
+
+	// Every chain still resolves to its root after the concurrent churn.
+	for i := range chains {
+		want := model.ID(fmt.Sprintf("chain-%06d-a", i))
+		if got := r.Canonical(deep[i]); got != want {
+			t.Fatalf("Canonical(%q) = %q, want %q", deep[i], got, want)
+		}
 	}
 }
 
