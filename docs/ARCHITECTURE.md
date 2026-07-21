@@ -15,9 +15,9 @@ calls a resolver and presents the answer.
 
 ## Layers
 
-Connectors implement one method, Fetch, returning normalized records. Org-CSV,
-Slack, and CODEOWNERS exist today. Each new source is one connector and changes
-nothing else.
+Connectors implement one method, Fetch, returning normalized records. Eight
+exist today: org-CSV, Slack, GitHub, Jira, Confluence, PagerDuty, git history,
+and CODEOWNERS. Each new source is one connector and changes nothing else.
 
 The model is the normalized graph: people, teams, orgs, topics, and channels,
 with weighted edges. People merge across sources by email, so one human is one
@@ -32,8 +32,10 @@ no model. The semantic resolver ranks by embedding similarity. The LLM resolver
 retrieves candidates, ranks and summarizes with a local model, and stays grounded
 in the real candidates.
 
-Policy governs data egress. The default is strict: nothing leaves the machine. An
-organization can pin the policy from a file so user flags cannot loosen it.
+Policy governs model egress. The default is strict: answers never leave the
+machine. Redacted admits only known providers and only anonymized numbered
+candidates. An organization can pin the policy from a locked system file that
+user flags and environment variables cannot loosen.
 
 Frontends are thin and share the engine: a CLI, a localhost web UI, and a Slack
 bot over Socket Mode or the Events API.
@@ -42,5 +44,5 @@ bot over Socket Mode or the Events API.
 
 Implement the connector Source interface, returning records for people or
 channels, and add a case to the index command. The index, resolvers, web UI, and
-bot then work with the new data without change. This is how GitHub, Jira, and
-other sources will be added.
+bot then work with the new data without change. Every source after the first
+was added this way.

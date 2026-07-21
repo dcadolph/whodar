@@ -81,7 +81,7 @@ A row needs at least a name or an email. Topics are split on semicolons by
 default. A minimal file looks like this:
 
     name,email,title,team,topics
-    Jane Roe,jane@corp.com,Staff Engineer,Billing,retries;idempotency
+    Angela Malone,angela@corp.com,Staff Engineer,Payments,billing;retries
 
 Index it:
 
@@ -110,7 +110,9 @@ are about, and who is active on each topic.
     whodar index --source slack
 
 By default this reads public channels and the last 180 days of history, capped
-at 5000 messages per channel. Tune it:
+at 5000 messages per channel. A bot can only read the history of channels it
+has joined, so invite it (`/invite @whodar`) to the channels that matter;
+unreadable channels are skipped with a warning, not fatal. Tune the depth:
 
     whodar index --source slack --since-days 90 --max-messages 2000
 
@@ -184,7 +186,7 @@ Ollama runs on your machine, so LLM mode is allowed under the default strict
 policy. Pointing `--ollama-url` at a non-local host counts as leaving the
 machine and is refused unless the policy permits it.
 
-## Cloud models (Claude, OpenAI, and compatible servers)
+## Cloud models (Claude, Gemini, OpenAI, and compatible servers)
 
 By default nothing leaves the machine. If you explicitly opt in, llm mode can
 use a cloud model instead of Ollama:
@@ -192,22 +194,29 @@ use a cloud model instead of Ollama:
     export WHODAR_ANTHROPIC_KEY=...
     whodar ask --mode llm --provider anthropic --policy redacted "who owns billing"
 
+    export WHODAR_GEMINI_KEY=...
+    whodar ask --mode llm --provider gemini --policy redacted "who owns billing"
+
     export WHODAR_OPENAI_KEY=...
     whodar ask --mode llm --provider openai --policy redacted "who owns billing"
 
-The policy decides what the model sees. Under `--policy redacted`, candidates
-leave as anonymized numbered roles: title, team, and matched topics, but no
-names, no emails, no message text. The model returns numbers, whodar maps them
-back, and the summary is written locally. Under `--policy open`, candidates go
-as-is. Under the default strict policy, cloud providers are refused, and a
-locked org policy can pin that permanently.
+The policy decides what the model sees. Under `--policy redacted`, the
+question goes out as you typed it, people leave as anonymized numbered roles
+(title, team, and matched query terms), and channels leave as numbered
+matched terms, with no names, no emails, no channel names, and no message
+text. The question is the one part you control: if you type a person's name
+into it, that name goes to the model. The model returns numbers, whodar maps
+them back, and the summary is written locally. Redacted egress is limited to
+the known provider hosts, so a remote `--openai-url` needs `--policy open`.
+Under `--policy open`, candidates go as-is. Under the default strict policy,
+cloud providers are refused, and a locked org policy can pin that permanently.
 
 The `openai` provider speaks the common chat-completions format, so
 `--openai-url` also points it at local servers like LM Studio or vLLM; a local
 URL needs no policy opt-in at all. Keys are read only from the environment and
 are never logged or stored.
 
-## Semantic search (embeddings)
+## Semantic search (Meaning mode in the web UI)
 
 Keyword search matches words. Semantic search matches meaning, so "who handles
 failed payments" can find the person tagged with "billing retries" even with no
@@ -237,9 +246,69 @@ Prefer a search box to the terminal:
 
     whodar serve
 
-Open http://127.0.0.1:8765, type a question, and pick keyword or llm mode. The
-server binds to localhost only, so it is not reachable from the network. Stop it
-with Ctrl-C; it shuts down cleanly. Change the address with `--addr`.
+Open http://127.0.0.1:8765, type a question, and pick Keyword, Meaning, or
+AI. Picking AI reveals a provider choice (local Ollama, Claude, ChatGPT, or
+Gemini) with live readiness hints saying what each needs. The sidebar also
+browses everything indexed: people, channels, teams, and topics, each
+filterable, and clicking a topic asks about it.
+
+### Serving with AI enabled
+
+An amber dot on a provider means it needs something; its tooltip says what.
+The recipes:
+
+Ollama (private, everything stays on this machine, allowed under the default
+strict policy):
+
+    # install from ollama.com, then:
+    ollama pull llama3.1
+    whodar serve
+
+Claude, ChatGPT, or Gemini (cloud): export the provider's key and start the
+server with a policy that permits cloud egress, since the default strict
+policy keeps everything local:
+
+    export WHODAR_ANTHROPIC_KEY=...   # or WHODAR_OPENAI_KEY / WHODAR_GEMINI_KEY
+    whodar serve --policy redacted
+
+Redacted sends the model only your question and anonymized numbered
+candidates; `--policy open` sends full candidate detail. Keys are read only
+from the environment and are never typed into the browser. The provider
+choice applies per question, and keyword mode keeps working no matter what.
+The same flags work on `whodar demo` if you want to try cloud AI against the
+sample company first.
+
+### Meaning mode
+
+Meaning mode matches by meaning instead of exact words, so "failed payments"
+can find the person tagged "billing retries". It needs the index built once
+with `--embed`; see the Semantic search section below for the two commands. The
+server binds to localhost only, so it is not reachable from the network. Stop
+it with Ctrl-C; it shuts down cleanly. Change the address with `--addr`;
+binding beyond localhost requires `WHODAR_SERVE_TOKEN`, and every request
+must then carry the token. See docs/DEPLOY.md for the token flow.
+
+## Claude Code and other agents (MCP)
+
+Let an agent ask whodar mid-conversation. The MCP server speaks stdio, so
+registration is one line:
+
+    claude mcp add whodar -- whodar mcp
+
+For Claude Desktop, add this under `mcpServers` in
+`claude_desktop_config.json`:
+
+    {"whodar": {"command": "whodar", "args": ["mcp"]}}
+
+The agent gets three tools: `whodar_ask` (ranked people and channels with
+reasons and confidence, keyword or semantic), `whodar_person` (a full
+profile), and `whodar_directory` (browse people, channels, teams, or
+topics). There is no llm mode over MCP on purpose: the calling agent is
+already a model, so it reads the ranked candidates itself.
+
+One thing to be clear-eyed about: answers flow to whichever agent you wire
+this into, and on to that agent's model. Registering the server is the
+opt-in.
 
 ## Slack bot
 
@@ -252,6 +321,19 @@ message uses the model for that answer, and `--keyword` forces the fast path.
 In addition to the read scopes from the Slack section, add the bot scopes
 `chat:write`, `app_mentions:read`, `im:history`, and `im:read`. Under Event
 Subscriptions, subscribe the bot to `app_mention` and `message.im`.
+
+### The /whodar slash command
+
+Ask from anywhere without mentioning the bot:
+
+    /whodar who owns billing retries
+
+In the app config, open Slash Commands and create `/whodar`. Over Socket
+Mode it just works; the request URL field can hold any placeholder. Over the
+Events API, point the request URL at `https://your-host/slack/commands`; the
+same signing secret verifies it. The answer arrives through Slack's response
+URL, visible in the channel, and the `--llm`/`--keyword` hints work in the
+command text too.
 
 ### Socket Mode (no public URL)
 
@@ -341,18 +423,22 @@ skipped. `--git-since-days` bounds the window (default 365) and
 
 ## Where your data lives
 
-The index is written to `~/.whodar/index.json` by default. Override the location
-with `--data-dir`. This file holds the indexed text, so treat it like the source
-data. It is never uploaded.
+The index is written to `~/.whodar/index.json` by default, readable only by
+your user. Override the location with `--data-dir`. This file holds the
+indexed text, so treat it like the source data. It is never uploaded.
 
 ## Organization policy
 
-Data egress is enforced, not advisory. The default policy is strict: nothing
-leaves the machine, and only the keyword resolver and a local model are allowed.
+The policy governs model egress and is enforced, not advisory. The default is
+strict: answers are computed locally, and only the keyword resolver and a
+local model are allowed. Indexing is separate from the policy: it talks only
+to the sources you name, with your tokens, when you run it.
 
-An organization can pin behavior with a policy file. Point whodar at it with the
-`WHODAR_POLICY_FILE` environment variable, or place it at `/etc/whodar/policy.json`.
-See `examples/policy.json`:
+An organization pins behavior with a policy file at `/etc/whodar/policy.json`.
+When that file sets `locked`, it wins over both the `--policy` flag and the
+`WHODAR_POLICY_FILE` environment variable, so a user cannot point whodar at a
+looser file. `WHODAR_POLICY_FILE` remains useful on unmanaged machines and in
+tests. See `examples/policy.json`:
 
     {
       "mode": "strict",
@@ -360,10 +446,11 @@ See `examples/policy.json`:
       "private_channels": "deny"
     }
 
-When `locked` is true, user flags cannot loosen the policy. With the file above,
-`--policy open` is ignored and `--include-private` is refused. This is how a
-cautious organization keeps a managed install locked down while an individual
-running their own copy stays free to opt in.
+With the file above, `--policy open` is ignored and `--include-private` is
+refused. The lock constrains the installed binary for regular users; it is
+not a security boundary against an administrator. This is how a cautious
+organization keeps a managed install locked down while an individual running
+their own copy stays free to opt in.
 
 ## Updating the index
 

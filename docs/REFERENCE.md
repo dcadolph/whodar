@@ -90,12 +90,14 @@ Modes: `keyword` needs no model and always works. `semantic` matches on
 meaning using embeddings built with `index --embed`. `llm` retrieves
 candidates, then a model re-ranks them and writes a short recommendation; it
 cannot invent people. The default provider is a local Ollama server. The
-`anthropic` (Claude) and `openai` providers are cloud models gated by the
-egress policy: strict refuses them, `--policy redacted` sends candidates as
-anonymized numbered roles with no names or emails and writes the summary
-locally, and `--policy open` sends candidates as-is. The `openai` provider
+`anthropic` (Claude), `openai`, and `gemini` providers are cloud models gated
+by the egress policy: strict refuses them, `--policy redacted` sends the question and
+anonymized numbered candidates (people as title, team, and matched terms;
+channels as matched terms only) and writes the summary locally, and
+`--policy open` sends candidates as-is. The `openai` provider
 also speaks to any compatible server via `--openai-url`; a local one, such as
-LM Studio, needs no policy opt-in. Each result carries a `confidence`
+LM Studio, needs no policy opt-in, while a remote one needs `--policy open`.
+Each result carries a `confidence`
 from zero to one: query coverage scaled by evidence strength, where an
 explicit topic is proof, a title slightly less, a passing mention half.
 
@@ -151,10 +153,25 @@ from the network. Sample data only; it is discarded when the demo stops.
 
 Takes the same flags as `serve`.
 
+## whodar mcp
+
+Serves the index to MCP clients over stdio, so agents such as Claude Code
+and Claude Desktop can ask who knows what mid-conversation. Tools:
+`whodar_ask`, `whodar_person`, `whodar_directory`.
+
+    whodar mcp [--embed-model name] [--ollama-url url]
+
+Register with `claude mcp add whodar -- whodar mcp`, or a `mcpServers`
+entry in Claude Desktop's config. Semantic mode works when the index was
+built with `--embed` and local Ollama is running; keyword needs nothing.
+
 ## whodar bot
 
-Runs the Slack bot. Mention it or send it a direct message; a trailing
-`--llm` or `--keyword` in a message overrides the mode for that answer.
+Runs the Slack bot. Mention it, send it a direct message, or use the
+`/whodar` slash command; a trailing `--llm` or `--keyword` in the text
+overrides the mode for that answer. Each user gets ten questions a minute,
+Slack redeliveries are never answered twice, and a dropped connection
+reconnects with backoff.
 
     whodar bot [--transport socket|events]
 
@@ -188,18 +205,40 @@ never logged or stored.
 | `WHODAR_PAGERDUTY_TOKEN`      | pagerduty source   | Read-only API token.                      |
 | `WHODAR_ANTHROPIC_KEY`        | llm anthropic provider | Claude API key.                       |
 | `WHODAR_OPENAI_KEY`           | llm openai provider    | OpenAI-compatible API key.            |
-| `WHODAR_POLICY_FILE`          | all commands       | Org policy file path (default `/etc/whodar/policy.json`). |
+| `WHODAR_GEMINI_KEY`           | llm gemini provider    | Gemini API key.                       |
+| `WHODAR_SERVE_TOKEN`          | serve, demo        | Bearer token; required to bind beyond localhost. |
+| `WHODAR_POLICY_FILE`          | all commands       | Extra policy file; a locked `/etc/whodar/policy.json` overrides it. |
 
 ## Identity aliases
 
-An alias file joins identifiers that belong to the same person when no email
-can. The file maps a canonical identifier to its aliases:
+Handles that clearly belong to one person join automatically: a handle-only
+identifier such as `codeowners:carol-lee` or `github:carollee` merges with the
+one person whose name or email local-part flattens to the same string, so
+Carol Lee, carol-lee, and carol.lee@example.com stay one entry. A handle matching
+nobody, or matching more than one person, stays separate.
 
-    {"alice@corp.com": ["github:alice", "codeowners:alice"]}
+An alias file joins the rest, when neither email nor name can. The file maps
+a canonical identifier to its aliases:
+
+    {"angela.malone@example.com": ["github:angela-malone", "codeowners:angela-malone"]}
 
 Pass it once with `index --aliases`; the mapping persists in the index and
 joins entries indexed before the file existed. Joined identifiers appear in
 answers under `identities`. See `examples/aliases.json`.
+
+## Ranking
+
+Keyword scores weight rarer query terms higher, then cap and saturate each
+term's accumulated weight, so repeating a word in chat all day cannot outrank
+the person with the explicit topic, title, or ownership signal. People with
+far more indexed text than average are further discounted for verbosity.
+Recency decay and feedback votes then scale the result.
+
+A term that matches nothing falls back to fuzzy matching: the closest indexed
+term within one edit (four-letter terms and up) or two edits (seven and up)
+scores instead, at a penalty per edit so an exact match always outranks a
+corrected one. Corrected terms say so in the reasons, e.g. `terrafrom
+(topic, fuzzy)`.
 
 ## Recency
 
@@ -210,15 +249,23 @@ on-call) describe the present and never decay.
 
 ## Policy
 
-The egress policy decides what may leave the machine. `strict` (default)
-permits nothing external beyond a local model server; non-local `--ollama-url`
-and `--openai-url` values and the cloud providers count as egress and are
-refused. `redacted` permits cloud providers but strips personal identifiers:
-candidates leave as numbered roles, the model returns numbers, and the summary
-is written locally. `open` sends candidates as-is. An organization can pin the policy with a
-locked file at `WHODAR_POLICY_FILE` or `/etc/whodar/policy.json` that user
-flags cannot override, and can deny private-channel ingest the same way. See
-`examples/policy.json`.
+The egress policy decides what whodar may send to a model. `strict` (default)
+permits nothing beyond a local model server; non-local `--ollama-url` and
+`--openai-url` values and the cloud providers count as egress and are refused.
+`redacted` permits only the known provider hosts (`api.anthropic.com`,
+`api.openai.com`) and strips identifiers: the question goes out as typed,
+people leave as numbered roles (title, team, matched terms), channels leave as
+numbered matched terms with no names or topics, the model returns numbers, and
+the summary is written locally. `open` sends full candidate detail to any
+host. The policy does not gate indexing, which talks only to the sources you
+name with your tokens when you run `whodar index`, or the bot posting answers
+back to your Slack workspace.
+
+An organization can pin the policy with a locked file. A locked
+`/etc/whodar/policy.json` always wins: `WHODAR_POLICY_FILE` and `--policy` are
+then ignored. The lock constrains the installed binary for regular users; it
+is not a security boundary against an administrator. Private-channel ingest
+can be denied the same way. See `examples/policy.json`.
 
 ## Files
 

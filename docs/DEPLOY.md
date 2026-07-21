@@ -9,11 +9,22 @@ Build the image:
 
     docker build -t whodar .
 
-The image serves the web UI by default. Mount a data directory that holds a
-prebuilt index, or run the index command against the same volume first:
+The image serves the web UI by default. Serving beyond localhost requires
+WHODAR_SERVE_TOKEN: the server refuses to start without it, and every request
+must carry the token as an Authorization bearer header or a token query
+parameter, which sets a session cookie for the browser. Generate a long random
+value, for example `openssl rand -hex 24`.
+
+Mount a data directory that holds a prebuilt index, or run the index command
+against the same volume first:
 
     docker run --rm -p 8765:8765 -v whodar-data:/data \
+      -e WHODAR_SERVE_TOKEN=change-me \
       whodar serve --addr 0.0.0.0:8765 --data-dir /data
+
+Then open http://host:8765/?token=change-me once; the session cookie carries
+the rest. The token gates access, not transport: put TLS in front of the
+container for anything beyond a trusted network.
 
 For the Slack bot, run the bot subcommand instead and pass the tokens as
 environment variables.

@@ -1,5 +1,8 @@
 # Build whodar and run it from a minimal image. The web UI and the Slack bot
-# both run from this image; the default command serves the web UI.
+# both run from this image; the default command serves the web UI. The serve
+# bind is 0.0.0.0 so the published port works, which means the container
+# refuses to start until WHODAR_SERVE_TOKEN is set; every request must then
+# carry that token.
 FROM golang:1.26 AS build
 WORKDIR /src
 COPY go.mod go.sum ./

@@ -4,6 +4,8 @@
 
 # whodar
 
+<p align="center"><em>Know who knows.</em></p>
+
 <p align="center">
   <a href="https://github.com/dcadolph/whodar/actions/workflows/ci.yml"><img src="https://github.com/dcadolph/whodar/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/dcadolph/whodar/releases"><img src="https://img.shields.io/github/v/release/dcadolph/whodar" alt="Latest release"></a>
@@ -24,8 +26,9 @@ Ask from the terminal and get people, channels, reasons, and confidence:
 </p>
 
 Or serve the local web UI, where every result carries a confidence badge and
-feedback buttons, a query lives in the URL so answers are shareable, and
-clicking a person shows everything whodar knows about them:
+feedback buttons, a query lives in the URL so answers are shareable, clicking
+a person shows everything whodar knows about them, and a sidebar browses the
+whole graph: people, channels, teams, and topics:
 
 <p align="center">
   <img src="docs/whodar-web.gif" alt="whodar web UI" width="90%">
@@ -61,19 +64,24 @@ every source, flag, and credential.
 | --------- | --------------------------------------------------------------------------------------------------------------- |
 | Sources   | Eight pluggable connectors feed one graph of people, teams, topics, and channels. Adding a source is one small interface. |
 | Identity  | One human stays one node: sources join by email, and an alias file joins handle-only identifiers like a GitHub login. |
-| Ranking   | Recent activity counts more, every answer carries a confidence, and results explain which words hit where.       |
+| Ranking   | Owners beat chatterboxes: repetition saturates while explicit signals stay strong. Recency counts, every answer carries a confidence, and results explain which words hit where. |
 | Feedback  | Confirm or correct a result and future rankings move, without burying the evidence.                              |
-| Modes     | Keyword needs no model and always works; semantic and LLM answers run on local Ollama, or on Claude and OpenAI behind explicit opt-in. |
-| Frontends | The CLI, web UI, and Slack bot share one engine.                                                                  |
+| Modes     | Keyword needs no model and always works; semantic and LLM answers run on local Ollama, or on Claude, Gemini, and OpenAI behind explicit opt-in. |
+| Frontends | The CLI, web UI, Slack bot, and an MCP server for agents like Claude Code all share one engine.                   |
 
 ## Data governance
 
-Indexed work data is sensitive, so whodar enforces where it can go. The
-default policy is strict: nothing leaves the machine, and every external call
-passes one policy checkpoint. Cloud models (Claude, OpenAI, or any compatible
-server) exist behind explicit opt-in, and the redacted policy sends them only
-anonymized numbered candidates, never names or emails. An organization can
-pin the policy with a locked config that user flags cannot override.
+Indexed work data is sensitive, so whodar controls what a model can see. The
+default policy is strict: answers are computed locally and nothing is sent to
+any model beyond this machine. The redacted policy admits only the known
+cloud providers (Claude, Gemini, OpenAI) and sends them your question plus numbered
+candidates, meaning title, team, and matched query terms, never names,
+emails, channel names, or message text. The open policy sends full candidate
+detail anywhere you point it. Indexing talks only to the sources you name,
+with your own tokens, and the index on disk is readable only by your user.
+Serving the web UI beyond localhost requires a bearer token on every request.
+An organization can pin the policy with a locked file that user flags and
+environment variables cannot override.
 
 ## Docs
 
