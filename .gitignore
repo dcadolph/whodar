@@ -21,3 +21,6 @@ coverage.*
 /index/
 .whodar/
 *.bleve
+
+# Cloudflare wrangler local state, written during pages deploy.
+.wrangler/
