@@ -95,3 +95,60 @@ func TestSlackFetch(t *testing.T) {
 		t.Errorf("channel time = %v, want the latest user message time %v", channel.Time, want)
 	}
 }
+
+// TestSlackFetchSkipsUnreadableChannels verifies one unreadable channel, such
+// as a public channel the bot never joined, does not abort the run: the
+// readable channel still indexes and the skip is logged.
+func TestSlackFetchSkipsUnreadableChannels(t *testing.T) {
+	t.Parallel()
+	const (
+		usersJSON = `{"ok":true,"members":[
+			{"id":"U1","profile":{"real_name":"Jane Roe","email":"jane@x.com"}}]}`
+		channelsJSON = `{"ok":true,"channels":[
+			{"id":"C1","name":"locked-room"},
+			{"id":"C2","name":"billing","topic":{"value":"retries"}}]}`
+		historyJSON = `{"ok":true,"has_more":false,"messages":[
+			{"type":"message","user":"U1","text":"retries fixed","ts":"1.0"}]}`
+	)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/users.list", func(w http.ResponseWriter, _ *http.Request) {
+		io.WriteString(w, usersJSON)
+	})
+	mux.HandleFunc("/conversations.list", func(w http.ResponseWriter, _ *http.Request) {
+		io.WriteString(w, channelsJSON)
+	})
+	mux.HandleFunc("/conversations.history", func(w http.ResponseWriter, r *http.Request) {
+		if r.FormValue("channel") == "C1" {
+			io.WriteString(w, `{"ok":false,"error":"not_in_channel"}`)
+			return
+		}
+		io.WriteString(w, historyJSON)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	var log strings.Builder
+	client := slack.New("xoxb-test", slack.WithBaseURL(srv.URL))
+	recs, err := NewSlackWithClient(client, SlackOptions{Log: &log}).Fetch(context.Background())
+	if err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+
+	var names []string
+	for _, r := range recs {
+		if r.Kind == KindChannel {
+			names = append(names, r.Name)
+		}
+	}
+	if !slices.Contains(names, "billing") || slices.Contains(names, "locked-room") {
+		t.Errorf("channels = %v, want billing indexed and locked-room skipped", names)
+	}
+	got := log.String()
+	if !strings.Contains(got, "skipping #locked-room") || !strings.Contains(got, "not_in_channel") {
+		t.Errorf("log missing skip line:\n%s", got)
+	}
+	if !strings.Contains(got, "skipped 1 unreadable channels") {
+		t.Errorf("log missing skip summary:\n%s", got)
+	}
+}

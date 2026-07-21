@@ -1,8 +1,14 @@
 package slack
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
 	"net/url"
+	"strings"
+	"time"
 )
 
 // okResp decodes a response that carries only the standard envelope.
@@ -36,6 +42,37 @@ func (c *Client) AuthTest(ctx context.Context) (string, error) {
 		return "", err
 	}
 	return resp.UserID, nil
+}
+
+// responseURLPrefix is the only host slash-command response URLs may name,
+// so a forged payload cannot point the bot's POST anywhere else.
+const responseURLPrefix = "https://hooks.slack.com/"
+
+// Respond posts text to a slash-command response URL. The URL is minted by
+// Slack per invocation and needs no token.
+func Respond(ctx context.Context, responseURL, text string) error {
+	if !strings.HasPrefix(responseURL, responseURLPrefix) {
+		return fmt.Errorf("slack: respond: unexpected response url host")
+	}
+	body, err := json.Marshal(map[string]string{"response_type": "in_channel", "text": text})
+	if err != nil {
+		return fmt.Errorf("slack: respond: encode: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, responseURL, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("slack: respond: new request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("slack: respond: %w", err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("slack: respond: status %d", resp.StatusCode)
+	}
+	return nil
 }
 
 // connectionsOpenResp decodes apps.connections.open.

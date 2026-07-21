@@ -2,6 +2,7 @@ package connector
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -105,12 +106,21 @@ func (s *Slack) Fetch(ctx context.Context) ([]Record, error) {
 	fmt.Fprintf(s.opts.Log, "slack: %d users, %d channels\n", len(users), len(channels))
 
 	oldest := slackOldest(s.opts.SinceDays)
+	skipped := 0
 	for i, ch := range channels {
 		if s.opts.MaxChannels > 0 && i >= s.opts.MaxChannels {
 			fmt.Fprintf(s.opts.Log, "slack: stopping at %d channels (cap)\n", s.opts.MaxChannels)
 			break
 		}
 		msgs, err := s.client.History(ctx, ch.ID, oldest, s.opts.MaxMessages)
+		if errors.Is(err, slack.ErrAPI) {
+			// A channel the token cannot read, commonly not_in_channel on a
+			// public channel the bot was never invited to, must not cost the
+			// whole run.
+			skipped++
+			fmt.Fprintf(s.opts.Log, "slack: skipping #%s: %v\n", ch.Name, err)
+			continue
+		}
 		if err != nil {
 			return nil, fmt.Errorf("slack history for %s: %w", ch.Name, err)
 		}
@@ -128,6 +138,10 @@ func (s *Slack) Fetch(ctx context.Context) ([]Record, error) {
 			})
 		}
 		fmt.Fprintf(s.opts.Log, "slack: indexed #%s (%d messages)\n", ch.Name, len(msgs))
+	}
+	if skipped > 0 {
+		fmt.Fprintf(s.opts.Log,
+			"slack: skipped %d unreadable channels; invite the bot to the ones that matter\n", skipped)
 	}
 	return records, nil
 }

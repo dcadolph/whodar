@@ -56,6 +56,9 @@ func WithHTTPClient(d Doer) Option {
 	}
 }
 
+// apiTimeout bounds one HTTP exchange so a hung server cannot stall a run.
+const apiTimeout = 60 * time.Second
+
 // New returns a Client for the site, authenticating with an email and API
 // token. It panics if any argument is empty.
 func New(siteURL, email, token string, opts ...Option) *Client {
@@ -65,7 +68,7 @@ func New(siteURL, email, token string, opts ...Option) *Client {
 	c := &Client{
 		baseURL:    strings.TrimRight(siteURL, "/"),
 		auth:       "Basic " + base64.StdEncoding.EncodeToString([]byte(email+":"+token)),
-		http:       http.DefaultClient,
+		http:       &http.Client{Timeout: apiTimeout},
 		maxRetries: 3,
 	}
 	for _, o := range opts {

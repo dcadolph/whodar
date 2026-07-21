@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // defaultBaseURL is the local Ollama server address.
@@ -74,9 +75,16 @@ func WithEmbedModel(name string) Option {
 	}
 }
 
+// chatTimeout bounds one exchange with the model server. Local generation on
+// modest hardware is slow, so the bound is generous.
+const chatTimeout = 300 * time.Second
+
 // New returns an Ollama client for model, defaulting the model when empty.
 func New(model string, opts ...Option) *Ollama {
-	o := &Ollama{baseURL: defaultBaseURL, model: model, embedModel: defaultEmbedModel, http: http.DefaultClient}
+	o := &Ollama{
+		baseURL: defaultBaseURL, model: model, embedModel: defaultEmbedModel,
+		http: &http.Client{Timeout: chatTimeout},
+	}
 	if o.model == "" {
 		o.model = defaultModel
 	}

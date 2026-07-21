@@ -36,11 +36,10 @@ func (i Issue) LabelNames() []string { return labelNames(i.Labels) }
 // AssigneeLogins returns the assignees' logins.
 func (i Issue) AssigneeLogins() []string { return accountLogins(i.Assignees) }
 
-// Issues returns up to 100 recently updated issues of any state. The result
+// Issues returns a repository's issues of any state, most recently updated
+// first, following pagination up to maxPages pages of 100. The result
 // includes pull requests, which the caller can filter with IsPullRequest.
 func (c *Client) Issues(ctx context.Context, owner, repo string) ([]Issue, error) {
-	var out []Issue
 	q := url.Values{"state": {"all"}, "per_page": {"100"}, "sort": {"updated"}, "direction": {"desc"}}
-	err := c.get(ctx, "/repos/"+owner+"/"+repo+"/issues", q, &out)
-	return out, err
+	return getAll[Issue](ctx, c, "/repos/"+owner+"/"+repo+"/issues", q)
 }

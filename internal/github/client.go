@@ -68,13 +68,16 @@ func WithBaseURL(u string) Option {
 	}
 }
 
+// apiTimeout bounds one HTTP exchange so a hung server cannot stall a run.
+const apiTimeout = 60 * time.Second
+
 // New returns a Client for token. It panics on an empty token; callers validate
 // token presence before constructing the client.
 func New(token string, opts ...Option) *Client {
 	if token == "" {
 		panic("github: New requires a non-empty token")
 	}
-	c := &Client{token: token, baseURL: defaultBaseURL, http: http.DefaultClient, maxRetries: 3}
+	c := &Client{token: token, baseURL: defaultBaseURL, http: &http.Client{Timeout: apiTimeout}, maxRetries: 3}
 	for _, o := range opts {
 		o(c)
 	}
@@ -176,26 +179,25 @@ func (c *Client) Repo(ctx context.Context, owner, repo string) (Repo, error) {
 	return r, err
 }
 
-// Contributors returns up to 100 contributors, most commits first.
+// Contributors returns a repository's contributors, most commits first,
+// following pagination up to maxPages pages of 100.
 func (c *Client) Contributors(ctx context.Context, owner, repo string) ([]Contributor, error) {
-	var out []Contributor
-	err := c.get(ctx, "/repos/"+owner+"/"+repo+"/contributors", url.Values{"per_page": {"100"}}, &out)
-	return out, err
+	q := url.Values{"per_page": {"100"}}
+	return getAll[Contributor](ctx, c, "/repos/"+owner+"/"+repo+"/contributors", q)
 }
 
-// PullRequests returns up to 100 recently updated pull requests of any state.
+// PullRequests returns a repository's pull requests of any state, most
+// recently updated first, following pagination up to maxPages pages of 100.
 func (c *Client) PullRequests(ctx context.Context, owner, repo string) ([]PullRequest, error) {
-	var out []PullRequest
 	q := url.Values{"state": {"all"}, "per_page": {"100"}, "sort": {"updated"}, "direction": {"desc"}}
-	err := c.get(ctx, "/repos/"+owner+"/"+repo+"/pulls", q, &out)
-	return out, err
+	return getAll[PullRequest](ctx, c, "/repos/"+owner+"/"+repo+"/pulls", q)
 }
 
-// OrgRepos returns up to 100 recently updated repositories in an org.
+// OrgRepos returns an org's repositories, most recently updated first,
+// following pagination up to maxPages pages of 100.
 func (c *Client) OrgRepos(ctx context.Context, org string) ([]Repo, error) {
-	var out []Repo
-	err := c.get(ctx, "/orgs/"+org+"/repos", url.Values{"per_page": {"100"}, "sort": {"updated"}}, &out)
-	return out, err
+	q := url.Values{"per_page": {"100"}, "sort": {"updated"}}
+	return getAll[Repo](ctx, c, "/orgs/"+org+"/repos", q)
 }
 
 // Account returns a user's public profile.
@@ -223,35 +225,76 @@ func (c *Client) FileContents(ctx context.Context, owner, repo, path string) ([]
 	return base64.StdEncoding.DecodeString(strings.ReplaceAll(resp.Content, "\n", ""))
 }
 
-// get performs a GET request and decodes the JSON body into out. It retries on a
-// secondary rate limit that sends Retry-After, and returns ErrRateLimited or
-// ErrNotFound for those conditions.
+// maxPages caps how many pages one listing walks so a pathological
+// repository cannot consume the whole rate budget.
+const maxPages = 10
+
+// get performs a GET request and decodes the JSON body into out.
 func (c *Client) get(ctx context.Context, path string, query url.Values, out any) error {
 	endpoint := c.baseURL + path
 	if len(query) > 0 {
 		endpoint += "?" + query.Encode()
 	}
+	_, err := c.getURL(ctx, endpoint, path, out)
+	return err
+}
 
+// getAll fetches every page of a list endpoint by following the Link header,
+// up to maxPages. Pagination stays on the API host so the bearer token
+// cannot be sent anywhere else.
+func getAll[T any](ctx context.Context, c *Client, path string, query url.Values) ([]T, error) {
+	base, err := url.Parse(c.baseURL)
+	if err != nil {
+		return nil, fmt.Errorf("github: base url: %w", err)
+	}
+	endpoint := c.baseURL + path
+	if len(query) > 0 {
+		endpoint += "?" + query.Encode()
+	}
+	var all []T
+	for page := 0; endpoint != "" && page < maxPages; page++ {
+		var batch []T
+		next, err := c.getURL(ctx, endpoint, path, &batch)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, batch...)
+		if next != "" {
+			u, err := url.Parse(next)
+			if err != nil || u.Host != base.Host {
+				break
+			}
+		}
+		endpoint = next
+	}
+	return all, nil
+}
+
+// getURL performs one GET against a full endpoint URL, decodes the JSON body
+// into out, and returns the Link header's rel="next" URL when present. It
+// retries on a secondary rate limit that sends Retry-After, and returns
+// ErrRateLimited or ErrNotFound for those conditions. path labels errors.
+func (c *Client) getURL(ctx context.Context, endpoint, path string, out any) (string, error) {
 	for attempt := 0; ; attempt++ {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 		if err != nil {
-			return fmt.Errorf("github: new request: %w", err)
+			return "", fmt.Errorf("github: new request: %w", err)
 		}
 		req.Header.Set("Authorization", "Bearer "+c.token)
 		req.Header.Set("Accept", "application/vnd.github+json")
 
 		resp, err := c.http.Do(req)
 		if err != nil {
-			return fmt.Errorf("github %s: %w", path, err)
+			return "", fmt.Errorf("github %s: %w", path, err)
 		}
 
 		if wait, ok := retryAfter(resp); ok {
 			_ = resp.Body.Close()
 			if attempt >= c.maxRetries {
-				return fmt.Errorf("github %s: %w", path, ErrRateLimited)
+				return "", fmt.Errorf("github %s: %w", path, ErrRateLimited)
 			}
 			if err := sleep(ctx, wait); err != nil {
-				return err
+				return "", err
 			}
 			continue
 		}
@@ -259,21 +302,38 @@ func (c *Client) get(ctx context.Context, path string, query url.Values, out any
 		body, err := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
 		if err != nil {
-			return fmt.Errorf("github %s: read body: %w", path, err)
+			return "", fmt.Errorf("github %s: read body: %w", path, err)
 		}
 		switch {
 		case resp.StatusCode == http.StatusNotFound:
-			return fmt.Errorf("github %s: %w", path, ErrNotFound)
+			return "", fmt.Errorf("github %s: %w", path, ErrNotFound)
 		case resp.StatusCode == http.StatusForbidden && resp.Header.Get("X-RateLimit-Remaining") == "0":
-			return fmt.Errorf("github %s: %w (resets at %s)", path, ErrRateLimited, resetTime(resp))
+			return "", fmt.Errorf("github %s: %w (resets at %s)", path, ErrRateLimited, resetTime(resp))
 		case resp.StatusCode != http.StatusOK:
-			return fmt.Errorf("github %s: %w %d", path, ErrStatus, resp.StatusCode)
+			return "", fmt.Errorf("github %s: %w %d", path, ErrStatus, resp.StatusCode)
 		}
 		if err := json.Unmarshal(body, out); err != nil {
-			return fmt.Errorf("github %s: decode: %w", path, err)
+			return "", fmt.Errorf("github %s: decode: %w", path, err)
 		}
-		return nil
+		return nextLink(resp.Header.Get("Link")), nil
 	}
+}
+
+// nextLink extracts the rel="next" URL from a Link header, or empty.
+func nextLink(header string) string {
+	for _, part := range strings.Split(header, ",") {
+		segs := strings.Split(part, ";")
+		if len(segs) < 2 {
+			continue
+		}
+		target := strings.Trim(strings.TrimSpace(segs[0]), "<>")
+		for _, param := range segs[1:] {
+			if strings.TrimSpace(param) == `rel="next"` {
+				return target
+			}
+		}
+	}
+	return ""
 }
 
 // retryAfter reports a secondary rate-limit wait when the response carries a

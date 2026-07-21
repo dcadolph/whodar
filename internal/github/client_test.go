@@ -60,6 +60,60 @@ func TestContributorsAndPulls(t *testing.T) {
 	}
 }
 
+// TestPagination verifies list endpoints follow the Link header across pages.
+func TestPagination(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewUnstartedServer(nil)
+	base := "http://" + srv.Listener.Addr().String()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/o/r/contributors", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("page") == "2" {
+			io.WriteString(w, `[{"login":"carl","contributions":1}]`)
+			return
+		}
+		w.Header().Set("Link", "<"+base+"/repos/o/r/contributors?page=2>; rel=\"next\"")
+		io.WriteString(w, `[{"login":"jane","contributions":50},{"login":"bob","contributions":3}]`)
+	})
+	srv.Config.Handler = mux
+	srv.Start()
+	t.Cleanup(srv.Close)
+
+	cons, err := New("ghp-test", WithBaseURL(base)).Contributors(context.Background(), "o", "r")
+	if err != nil {
+		t.Fatalf("Contributors: %v", err)
+	}
+	if len(cons) != 3 || cons[2].Login != "carl" {
+		t.Errorf("contributors = %+v, want all three across two pages", cons)
+	}
+}
+
+// TestPaginationStaysOnHost verifies a next link naming a foreign host is not
+// followed, so the bearer token stays on the API host.
+func TestPaginationStaysOnHost(t *testing.T) {
+	t.Parallel()
+	evil := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		t.Error("foreign host was contacted")
+	}))
+	t.Cleanup(evil.Close)
+
+	srv := httptest.NewUnstartedServer(nil)
+	evilNext := evil.URL + "/steal"
+	srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Link", "<"+evilNext+`>; rel="next"`)
+		io.WriteString(w, `[{"login":"jane","contributions":1}]`)
+	})
+	srv.Start()
+	t.Cleanup(srv.Close)
+
+	cons, err := New("ghp-test", WithBaseURL(srv.URL)).Contributors(context.Background(), "o", "r")
+	if err != nil {
+		t.Fatalf("Contributors: %v", err)
+	}
+	if len(cons) != 1 {
+		t.Errorf("contributors = %+v, want only the first page", cons)
+	}
+}
+
 // TestFileContents verifies base64 file contents decode.
 func TestFileContents(t *testing.T) {
 	t.Parallel()

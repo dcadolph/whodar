@@ -64,13 +64,16 @@ func WithBaseURL(u string) Option {
 	}
 }
 
+// apiTimeout bounds one HTTP exchange so a hung server cannot stall a run.
+const apiTimeout = 60 * time.Second
+
 // New returns a Client for token. It panics on an empty token; callers validate
 // token presence before constructing the client.
 func New(token string, opts ...Option) *Client {
 	if token == "" {
 		panic("pagerduty: New requires a non-empty token")
 	}
-	c := &Client{token: token, baseURL: defaultBaseURL, http: http.DefaultClient, maxRetries: 3}
+	c := &Client{token: token, baseURL: defaultBaseURL, http: &http.Client{Timeout: apiTimeout}, maxRetries: 3}
 	for _, o := range opts {
 		o(c)
 	}
