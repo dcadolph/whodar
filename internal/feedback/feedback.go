@@ -60,29 +60,24 @@ type Store struct {
 
 // Load reads a store from path. A missing file yields an empty store.
 func Load(path string) (*Store, error) {
-	s := &Store{path: path}
-	raw, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return s, nil
-	}
+	entries, err := readEntries(path)
 	if err != nil {
-		return nil, fmt.Errorf("feedback: read %s: %w", path, err)
+		return nil, err
 	}
-	if err := json.Unmarshal(raw, &s.entries); err != nil {
-		return nil, fmt.Errorf("feedback: parse %s: %w", path, err)
-	}
-	return s, nil
+	return &Store{path: path, entries: entries}, nil
 }
 
-// Add records a vote and persists the store.
+// Add records a vote and persists it, merging with any votes another process
+// wrote since this store last read the file.
 func (s *Store) Add(e Entry) error {
 	if !e.Valid() {
 		return fmt.Errorf("feedback: %w", ErrBadEntry)
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.entries = append(s.entries, e)
-	return s.save()
+	return s.mutate(func(cur []Entry) []Entry {
+		return append(cur, e)
+	})
 }
 
 // All returns a copy of the recorded votes.
@@ -131,35 +126,76 @@ func (s *Store) List(f Filter) []Entry {
 }
 
 // Clear removes the votes matching f, persists the store, and returns how
-// many were removed.
+// many were removed. It filters the file's current contents so a concurrent
+// process's writes are not clobbered.
 func (s *Store) Clear(f Filter) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	kept := s.entries[:0]
 	removed := 0
-	for _, e := range s.entries {
-		if f.matches(e) {
-			removed++
-			continue
+	err := s.mutate(func(cur []Entry) []Entry {
+		kept := make([]Entry, 0, len(cur))
+		for _, e := range cur {
+			if f.matches(e) {
+				removed++
+				continue
+			}
+			kept = append(kept, e)
 		}
-		kept = append(kept, e)
+		return kept
+	})
+	if err != nil {
+		return 0, err
 	}
-	s.entries = kept
-	if removed == 0 {
-		return 0, nil
-	}
-	return removed, s.save()
+	return removed, nil
 }
 
-// save writes the entries to the store's path atomically. Callers hold the
-// lock.
-func (s *Store) save() error {
-	raw, err := json.Marshal(s.entries)
+// mutate applies fn to the file's current contents under a cross-process lock,
+// persists the result atomically, and only then swaps the in-memory entries, so
+// a failed write never leaves memory ahead of disk and a concurrent process's
+// votes are not lost. Callers hold s.mu.
+func (s *Store) mutate(fn func([]Entry) []Entry) error {
+	unlock, err := lockFile(s.path + lockSuffix)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+
+	cur, err := readEntries(s.path)
+	if err != nil {
+		return err
+	}
+	next := fn(cur)
+	if err := saveEntries(s.path, next); err != nil {
+		return err
+	}
+	s.entries = next
+	return nil
+}
+
+// readEntries reads the votes at path. A missing file yields no entries.
+func readEntries(path string) ([]Entry, error) {
+	raw, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("feedback: read %s: %w", path, err)
+	}
+	var entries []Entry
+	if err := json.Unmarshal(raw, &entries); err != nil {
+		return nil, fmt.Errorf("feedback: parse %s: %w", path, err)
+	}
+	return entries, nil
+}
+
+// saveEntries writes entries to path atomically.
+func saveEntries(path string, entries []Entry) error {
+	raw, err := json.Marshal(entries)
 	if err != nil {
 		return fmt.Errorf("feedback: encode: %w", err)
 	}
-	if err := util.WriteFileAtomic(s.path, raw, 0o600); err != nil {
-		return fmt.Errorf("feedback: write %s: %w", s.path, err)
+	if err := util.WriteFileAtomic(path, raw, 0o600); err != nil {
+		return fmt.Errorf("feedback: write %s: %w", path, err)
 	}
 	return nil
 }

@@ -78,6 +78,42 @@ func TestEntryValid(t *testing.T) {
 	}
 }
 
+// TestAddMergesConcurrentWrite verifies a store re-reads the file before
+// appending, so a vote another process wrote is not clobbered.
+func TestAddMergesConcurrentWrite(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "feedback.json")
+	when := time.Date(2026, 7, 5, 12, 0, 0, 0, time.UTC)
+
+	// Two stores stand in for two processes sharing one file.
+	procA, err := Load(path)
+	if err != nil {
+		t.Fatalf("load A: %v", err)
+	}
+	procB, err := Load(path)
+	if err != nil {
+		t.Fatalf("load B: %v", err)
+	}
+
+	a := Entry{Query: "q", Person: "alice@corp.com", Vote: Helpful, Time: when}
+	if err := procA.Add(a); err != nil {
+		t.Fatalf("A add: %v", err)
+	}
+	// procB still holds an empty in-memory view; its Add must not drop A's vote.
+	b := Entry{Query: "q", Person: "bob@corp.com", Vote: NotHelpful, Time: when}
+	if err := procB.Add(b); err != nil {
+		t.Fatalf("B add: %v", err)
+	}
+
+	reloaded, err := Load(path)
+	if err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	if diff := cmp.Diff([]Entry{a, b}, reloaded.All()); diff != "" {
+		t.Errorf("persisted entries mismatch (-want +got):\n%s", diff)
+	}
+}
+
 func TestAddRejectsBadEntry(t *testing.T) {
 	t.Parallel()
 	s, err := Load(filepath.Join(t.TempDir(), "feedback.json"))
