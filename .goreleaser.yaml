@@ -29,8 +29,30 @@ archives:
 checksum:
   name_template: checksums.txt
 
+dockers_v2:
+  - images:
+      - "ghcr.io/dcadolph/whodar"
+    tags:
+      - "{{ .Version }}"
+      - "latest"
+    platforms:
+      - "linux/amd64"
+      - "linux/arm64"
+    dockerfile: Dockerfile.release
+    labels:
+      org.opencontainers.image.title: "{{ .ProjectName }}"
+      org.opencontainers.image.version: "{{ .Version }}"
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.source: "https://github.com/dcadolph/whodar"
+      org.opencontainers.image.licenses: "AGPL-3.0-or-later"
+
 homebrew_casks:
   - name: whodar
+    # The built-in CI token cannot push to the separate homebrew-whodar tap
+    # repo, so the cask is generated but not uploaded. To auto-publish it on
+    # every release, add a token with write access to the tap and flip this to
+    # false.
+    skip_upload: "true"
     repository:
       owner: dcadolph
       name: homebrew-whodar
@@ -45,4 +67,7 @@ homebrew_casks:
           end
 
 release:
-  draft: false
+  # The GitHub release and its generated notes are created by
+  # `gh release create --generate-notes` before this runs, so keep that release
+  # and only attach the build artifacts to it.
+  mode: keep-existing

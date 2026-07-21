@@ -1,0 +1,11 @@
+# Release image assembled by GoReleaser from the prebuilt binary. The runtime
+# mirrors the from-source Dockerfile: the web UI and the Slack bot both run from
+# this image, and the default command serves the web UI. The serve bind is
+# 0.0.0.0 so the published port works, which means the container refuses to
+# start until WHODAR_SERVE_TOKEN is set; every request must then carry it.
+FROM gcr.io/distroless/static-debian12
+COPY whodar /whodar
+USER nonroot:nonroot
+EXPOSE 8765
+ENTRYPOINT ["/whodar"]
+CMD ["serve", "--addr", "0.0.0.0:8765"]
