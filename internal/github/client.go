@@ -7,23 +7,19 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/dcadolph/whodar/internal/httputil"
 )
 
 // defaultBaseURL is the GitHub REST API root.
 const defaultBaseURL = "https://api.github.com"
-
-// Doer performs an HTTP request. *http.Client satisfies it; tests inject a stub.
-type Doer interface {
-	// Do performs the request and returns the response.
-	Do(req *http.Request) (*http.Response, error)
-}
 
 // Client calls the GitHub REST API.
 type Client struct {
@@ -32,7 +28,7 @@ type Client struct {
 	// baseURL is the API root, overridable for tests.
 	baseURL string
 	// http performs requests.
-	http Doer
+	http httputil.Doer
 	// maxRetries bounds retries on a secondary rate limit.
 	maxRetries int
 }
@@ -41,7 +37,7 @@ type Client struct {
 type Option func(*Client)
 
 // WithHTTPClient sets the HTTP doer.
-func WithHTTPClient(d Doer) Option {
+func WithHTTPClient(d httputil.Doer) Option {
 	return func(c *Client) {
 		if d != nil {
 			c.http = d
@@ -165,7 +161,7 @@ type Account struct {
 // Repo returns a repository's metadata.
 func (c *Client) Repo(ctx context.Context, owner, repo string) (Repo, error) {
 	var r Repo
-	err := c.get(ctx, "/repos/"+owner+"/"+repo, nil, &r)
+	err := c.get(ctx, repoPath(owner, repo), nil, &r)
 	return r, err
 }
 
@@ -173,27 +169,27 @@ func (c *Client) Repo(ctx context.Context, owner, repo string) (Repo, error) {
 // following pagination up to maxPages pages of 100.
 func (c *Client) Contributors(ctx context.Context, owner, repo string) ([]Contributor, error) {
 	q := url.Values{"per_page": {"100"}}
-	return getAll[Contributor](ctx, c, "/repos/"+owner+"/"+repo+"/contributors", q)
+	return getAll[Contributor](ctx, c, repoPath(owner, repo, "contributors"), q)
 }
 
 // PullRequests returns a repository's pull requests of any state, most
 // recently updated first, following pagination up to maxPages pages of 100.
 func (c *Client) PullRequests(ctx context.Context, owner, repo string) ([]PullRequest, error) {
 	q := url.Values{"state": {"all"}, "per_page": {"100"}, "sort": {"updated"}, "direction": {"desc"}}
-	return getAll[PullRequest](ctx, c, "/repos/"+owner+"/"+repo+"/pulls", q)
+	return getAll[PullRequest](ctx, c, repoPath(owner, repo, "pulls"), q)
 }
 
 // OrgRepos returns an org's repositories, most recently updated first,
 // following pagination up to maxPages pages of 100.
 func (c *Client) OrgRepos(ctx context.Context, org string) ([]Repo, error) {
 	q := url.Values{"per_page": {"100"}, "sort": {"updated"}}
-	return getAll[Repo](ctx, c, "/orgs/"+org+"/repos", q)
+	return getAll[Repo](ctx, c, "/orgs/"+url.PathEscape(org)+"/repos", q)
 }
 
 // Account returns a user's public profile.
 func (c *Client) Account(ctx context.Context, login string) (Account, error) {
 	var a Account
-	err := c.get(ctx, "/users/"+login, nil, &a)
+	err := c.get(ctx, "/users/"+url.PathEscape(login), nil, &a)
 	return a, err
 }
 
@@ -206,13 +202,31 @@ func (c *Client) FileContents(ctx context.Context, owner, repo, path string) ([]
 		// Encoding is the content encoding, normally base64.
 		Encoding string `json:"encoding"`
 	}
-	if err := c.get(ctx, "/repos/"+owner+"/"+repo+"/contents/"+path, nil, &resp); err != nil {
+	endpoint := repoPath(owner, repo, "contents") + "/" + escapeSegments(path)
+	if err := c.get(ctx, endpoint, nil, &resp); err != nil {
 		return nil, err
 	}
 	if resp.Encoding != "base64" {
 		return []byte(resp.Content), nil
 	}
 	return base64.StdEncoding.DecodeString(strings.ReplaceAll(resp.Content, "\n", ""))
+}
+
+// repoPath builds "/repos/{owner}/{repo}[/rest...]" with every segment escaped
+// so a name carrying a slash or reserved character cannot alter the path.
+func repoPath(owner, repo string, rest ...string) string {
+	segs := append([]string{"repos", owner, repo}, rest...)
+	return "/" + escapeSegments(strings.Join(segs, "/"))
+}
+
+// escapeSegments escapes each slash-separated segment of p and rejoins them,
+// preserving the slashes so nested content paths still address the right file.
+func escapeSegments(p string) string {
+	segs := strings.Split(p, "/")
+	for i, s := range segs {
+		segs[i] = url.PathEscape(s)
+	}
+	return strings.Join(segs, "/")
 }
 
 // maxPages caps how many pages one listing walks so a pathological
@@ -271,48 +285,45 @@ func getAll[T any](ctx context.Context, c *Client, path string, query url.Values
 // retries on a secondary rate limit that sends Retry-After, and returns
 // ErrRateLimited or ErrNotFound for those conditions. path labels errors.
 func (c *Client) getURL(ctx context.Context, endpoint, path string, out any) (string, error) {
-	for attempt := 0; ; attempt++ {
+	resp, body, err := httputil.Do(ctx, c.http, c.maxRetries, githubRetryable, func() (*http.Request, error) {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 		if err != nil {
-			return "", fmt.Errorf("github: new request: %w", err)
+			return nil, fmt.Errorf("new request: %w", err)
 		}
 		req.Header.Set("Authorization", "Bearer "+c.token)
 		req.Header.Set("Accept", "application/vnd.github+json")
-
-		resp, err := c.http.Do(req)
-		if err != nil {
-			return "", fmt.Errorf("github %s: %w", path, err)
-		}
-
-		if wait, ok := retryAfter(resp); ok {
-			_ = resp.Body.Close()
-			if attempt >= c.maxRetries {
-				return "", fmt.Errorf("github %s: %w", path, ErrRateLimited)
-			}
-			if err := sleep(ctx, wait); err != nil {
-				return "", err
-			}
-			continue
-		}
-
-		body, err := io.ReadAll(resp.Body)
-		_ = resp.Body.Close()
-		if err != nil {
-			return "", fmt.Errorf("github %s: read body: %w", path, err)
-		}
-		switch {
-		case resp.StatusCode == http.StatusNotFound:
-			return "", fmt.Errorf("github %s: %w", path, ErrNotFound)
-		case resp.StatusCode == http.StatusForbidden && resp.Header.Get("X-RateLimit-Remaining") == "0":
-			return "", fmt.Errorf("github %s: %w (resets at %s)", path, ErrRateLimited, resetTime(resp))
-		case resp.StatusCode != http.StatusOK:
-			return "", fmt.Errorf("github %s: %w %d", path, ErrStatus, resp.StatusCode)
-		}
-		if err := json.Unmarshal(body, out); err != nil {
-			return "", fmt.Errorf("github %s: decode: %w", path, err)
-		}
-		return nextLink(resp.Header.Get("Link")), nil
+		return req, nil
+	})
+	if errors.Is(err, httputil.ErrRateLimited) {
+		return "", fmt.Errorf("github %s: %w", path, ErrRateLimited)
 	}
+	if err != nil {
+		return "", fmt.Errorf("github %s: %w", path, err)
+	}
+	switch {
+	case resp.StatusCode == http.StatusNotFound:
+		return "", fmt.Errorf("github %s: %w", path, ErrNotFound)
+	case (resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusTooManyRequests) &&
+		resp.Header.Get("X-RateLimit-Remaining") == "0":
+		return "", fmt.Errorf("github %s: %w (resets at %s)", path, ErrRateLimited, resetTime(resp))
+	case resp.StatusCode != http.StatusOK:
+		return "", fmt.Errorf("github %s: %w %d", path, ErrStatus, resp.StatusCode)
+	}
+	if err := json.Unmarshal(body, out); err != nil {
+		return "", fmt.Errorf("github %s: decode: %w", path, err)
+	}
+	return nextLink(resp.Header.Get("Link")), nil
+}
+
+// githubRetryable reports a retryable secondary rate limit: a 403 or 429 that
+// carries a Retry-After header. A primary limit sends no Retry-After and is left
+// to getURL to map to ErrRateLimited.
+func githubRetryable(resp *http.Response) bool {
+	if resp.StatusCode != http.StatusForbidden && resp.StatusCode != http.StatusTooManyRequests {
+		return false
+	}
+	_, ok := httputil.RetryAfter(resp)
+	return ok
 }
 
 // nextLink extracts the rel="next" URL from a Link header, or empty.
@@ -332,22 +343,6 @@ func nextLink(header string) string {
 	return ""
 }
 
-// retryAfter reports a secondary rate-limit wait when the response carries a
-// Retry-After header.
-func retryAfter(resp *http.Response) (time.Duration, bool) {
-	if resp.StatusCode != http.StatusForbidden && resp.StatusCode != http.StatusTooManyRequests {
-		return 0, false
-	}
-	v := resp.Header.Get("Retry-After")
-	if v == "" {
-		return 0, false
-	}
-	if secs, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && secs >= 0 {
-		return time.Duration(secs) * time.Second, true
-	}
-	return 0, false
-}
-
 // resetTime formats the X-RateLimit-Reset header as a time, or "unknown".
 func resetTime(resp *http.Response) string {
 	v := resp.Header.Get("X-RateLimit-Reset")
@@ -355,19 +350,4 @@ func resetTime(resp *http.Response) string {
 		return time.Unix(secs, 0).UTC().Format(time.RFC3339)
 	}
 	return "unknown"
-}
-
-// sleep waits for d or until ctx is canceled.
-func sleep(ctx context.Context, d time.Duration) error {
-	if d <= 0 {
-		return nil
-	}
-	t := time.NewTimer(d)
-	defer t.Stop()
-	select {
-	case <-t.C:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
 }

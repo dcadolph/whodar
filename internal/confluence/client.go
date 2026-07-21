@@ -9,28 +9,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/dcadolph/whodar/internal/httputil"
 )
 
 // searchPath is the Confluence Cloud content search endpoint.
 const searchPath = "/wiki/rest/api/content/search"
-
-// ErrStatus indicates an unexpected HTTP status.
-var ErrStatus = errors.New("confluence: unexpected status")
-
-// ErrRateLimited indicates the API rate limit was exhausted.
-var ErrRateLimited = errors.New("confluence: rate limited")
-
-// Doer performs an HTTP request. *http.Client satisfies it; tests inject a stub.
-type Doer interface {
-	// Do performs the request and returns the response.
-	Do(req *http.Request) (*http.Response, error)
-}
 
 // Client calls the Confluence Cloud REST API.
 type Client struct {
@@ -39,7 +28,7 @@ type Client struct {
 	// auth is the Basic authorization header value.
 	auth string
 	// http performs requests.
-	http Doer
+	http httputil.Doer
 	// maxRetries bounds retries on HTTP 429.
 	maxRetries int
 }
@@ -48,7 +37,7 @@ type Client struct {
 type Option func(*Client)
 
 // WithHTTPClient sets the HTTP doer.
-func WithHTTPClient(d Doer) Option {
+func WithHTTPClient(d httputil.Doer) Option {
 	return func(c *Client) {
 		if d != nil {
 			c.http = d
@@ -112,10 +101,12 @@ type Page struct {
 			Results []label `json:"results"`
 		} `json:"labels"`
 	} `json:"metadata"`
-	// History holds the page creator.
+	// History holds the page creator and creation time.
 	History struct {
 		// CreatedBy is the page's creator.
 		CreatedBy *User `json:"createdBy"`
+		// CreatedAt is when the page was created.
+		CreatedAt time.Time `json:"createdDate"`
 	} `json:"history"`
 	// Version holds the last editor and edit time.
 	Version struct {
@@ -196,67 +187,26 @@ func (c *Client) Pages(ctx context.Context, cql string, max int) ([]Page, error)
 // HTTP 429 up to maxRetries.
 func (c *Client) get(ctx context.Context, path string, params url.Values, out any) error {
 	endpoint := c.baseURL + path + "?" + params.Encode()
-	for attempt := 0; ; attempt++ {
+	resp, body, err := httputil.Do(ctx, c.http, c.maxRetries, nil, func() (*http.Request, error) {
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 		if err != nil {
-			return fmt.Errorf("confluence: new request: %w", err)
+			return nil, fmt.Errorf("new request: %w", err)
 		}
 		req.Header.Set("Authorization", c.auth)
 		req.Header.Set("Accept", "application/json")
-
-		resp, err := c.http.Do(req)
-		if err != nil {
-			return fmt.Errorf("confluence %s: %w", path, err)
-		}
-
-		if resp.StatusCode == http.StatusTooManyRequests {
-			wait := retryAfter(resp)
-			_ = resp.Body.Close()
-			if attempt >= c.maxRetries {
-				return fmt.Errorf("confluence %s: %w", path, ErrRateLimited)
-			}
-			if err := sleep(ctx, wait); err != nil {
-				return err
-			}
-			continue
-		}
-
-		body, err := io.ReadAll(resp.Body)
-		_ = resp.Body.Close()
-		if err != nil {
-			return fmt.Errorf("confluence %s: read body: %w", path, err)
-		}
-		if resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("confluence %s: %w %d", path, ErrStatus, resp.StatusCode)
-		}
-		if err := json.Unmarshal(body, out); err != nil {
-			return fmt.Errorf("confluence %s: decode: %w", path, err)
-		}
-		return nil
+		return req, nil
+	})
+	if errors.Is(err, httputil.ErrRateLimited) {
+		return fmt.Errorf("confluence %s: %w", path, ErrRateLimited)
 	}
-}
-
-// retryAfter reads the Retry-After header in seconds, defaulting to one second.
-func retryAfter(resp *http.Response) time.Duration {
-	if v := resp.Header.Get("Retry-After"); v != "" {
-		if secs, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && secs >= 0 {
-			return time.Duration(secs) * time.Second
-		}
+	if err != nil {
+		return fmt.Errorf("confluence %s: %w", path, err)
 	}
-	return time.Second
-}
-
-// sleep waits for d or until ctx is canceled.
-func sleep(ctx context.Context, d time.Duration) error {
-	if d <= 0 {
-		return nil
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("confluence %s: %w %d", path, ErrStatus, resp.StatusCode)
 	}
-	t := time.NewTimer(d)
-	defer t.Stop()
-	select {
-	case <-t.C:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
+	if err := json.Unmarshal(body, out); err != nil {
+		return fmt.Errorf("confluence %s: decode: %w", path, err)
 	}
+	return nil
 }

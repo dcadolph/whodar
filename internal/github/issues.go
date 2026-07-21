@@ -41,5 +41,5 @@ func (i Issue) AssigneeLogins() []string { return accountLogins(i.Assignees) }
 // includes pull requests, which the caller can filter with IsPullRequest.
 func (c *Client) Issues(ctx context.Context, owner, repo string) ([]Issue, error) {
 	q := url.Values{"state": {"all"}, "per_page": {"100"}, "sort": {"updated"}, "direction": {"desc"}}
-	return getAll[Issue](ctx, c, "/repos/"+owner+"/"+repo+"/issues", q)
+	return getAll[Issue](ctx, c, repoPath(owner, repo, "issues"), q)
 }

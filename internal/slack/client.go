@@ -8,28 +8,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
+
+	"github.com/dcadolph/whodar/internal/httputil"
 )
 
 // defaultBaseURL is the Slack Web API root.
 const defaultBaseURL = "https://slack.com/api"
-
-// ErrRateLimited indicates Slack kept returning 429 past the retry budget.
-var ErrRateLimited = errors.New("slack: rate limited")
-
-// ErrAPI indicates Slack returned a logical error (ok=false).
-var ErrAPI = errors.New("slack: api error")
-
-// Doer performs an HTTP request. *http.Client satisfies it; tests inject a stub.
-type Doer interface {
-	// Do performs the request and returns the response.
-	Do(req *http.Request) (*http.Response, error)
-}
 
 // Client calls the Slack Web API.
 type Client struct {
@@ -38,7 +26,7 @@ type Client struct {
 	// baseURL is the API root, overridable for tests.
 	baseURL string
 	// http performs requests.
-	http Doer
+	http httputil.Doer
 	// maxRetries bounds retries on HTTP 429.
 	maxRetries int
 }
@@ -47,7 +35,7 @@ type Client struct {
 type Option func(*Client)
 
 // WithHTTPClient sets the HTTP doer.
-func WithHTTPClient(d Doer) Option {
+func WithHTTPClient(d httputil.Doer) Option {
 	return func(c *Client) {
 		if d != nil {
 			c.http = d
@@ -288,71 +276,31 @@ func (c *Client) History(ctx context.Context, channelID, oldest string, limit in
 // do calls a Slack Web API method with form params and decodes the result into
 // out. It retries on HTTP 429 up to maxRetries, honoring Retry-After.
 func (c *Client) do(ctx context.Context, method string, params url.Values, out response) error {
-	for attempt := 0; ; attempt++ {
+	endpoint := c.baseURL + "/" + method
+	resp, body, err := httputil.Do(ctx, c.http, c.maxRetries, nil, func() (*http.Request, error) {
 		req, err := http.NewRequestWithContext(
-			ctx, http.MethodPost, c.baseURL+"/"+method, strings.NewReader(params.Encode()))
+			ctx, http.MethodPost, endpoint, strings.NewReader(params.Encode()))
 		if err != nil {
-			return fmt.Errorf("slack %s: new request: %w", method, err)
+			return nil, fmt.Errorf("new request: %w", err)
 		}
 		req.Header.Set("Authorization", "Bearer "+c.token)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-		resp, err := c.http.Do(req)
-		if err != nil {
-			return fmt.Errorf("slack %s: %w", method, err)
-		}
-
-		if resp.StatusCode == http.StatusTooManyRequests {
-			wait := retryAfter(resp)
-			_ = resp.Body.Close()
-			if attempt >= c.maxRetries {
-				return fmt.Errorf("slack %s: %w", method, ErrRateLimited)
-			}
-			if err := sleep(ctx, wait); err != nil {
-				return err
-			}
-			continue
-		}
-
-		body, err := io.ReadAll(resp.Body)
-		_ = resp.Body.Close()
-		if err != nil {
-			return fmt.Errorf("slack %s: read body: %w", method, err)
-		}
-		if resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("slack %s: unexpected status %d", method, resp.StatusCode)
-		}
-		if err := json.Unmarshal(body, out); err != nil {
-			return fmt.Errorf("slack %s: decode: %w", method, err)
-		}
-		if !out.ok() {
-			return fmt.Errorf("slack %s: %w: %s", method, ErrAPI, out.errMsg())
-		}
-		return nil
+		return req, nil
+	})
+	if errors.Is(err, httputil.ErrRateLimited) {
+		return fmt.Errorf("slack %s: %w", method, ErrRateLimited)
 	}
-}
-
-// retryAfter reads the Retry-After header in seconds, defaulting to one second.
-func retryAfter(resp *http.Response) time.Duration {
-	if v := resp.Header.Get("Retry-After"); v != "" {
-		if secs, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && secs >= 0 {
-			return time.Duration(secs) * time.Second
-		}
+	if err != nil {
+		return fmt.Errorf("slack %s: %w", method, err)
 	}
-	return time.Second
-}
-
-// sleep waits for d or until ctx is canceled.
-func sleep(ctx context.Context, d time.Duration) error {
-	if d <= 0 {
-		return nil
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("slack %s: unexpected status %d", method, resp.StatusCode)
 	}
-	t := time.NewTimer(d)
-	defer t.Stop()
-	select {
-	case <-t.C:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
+	if err := json.Unmarshal(body, out); err != nil {
+		return fmt.Errorf("slack %s: decode: %w", method, err)
 	}
+	if !out.ok() {
+		return fmt.Errorf("slack %s: %w: %s", method, ErrAPI, out.errMsg())
+	}
+	return nil
 }
