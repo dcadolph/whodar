@@ -32,3 +32,7 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Optional: a token with contents:write on the homebrew-whodar tap.
+          # When set, the Homebrew cask is pushed on every release; when unset,
+          # the release still succeeds and only the cask push is skipped.
+          TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}

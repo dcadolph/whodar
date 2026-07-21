@@ -67,15 +67,15 @@ docker_manifests:
 
 homebrew_casks:
   - name: whodar
-    # The built-in CI token cannot push to the separate homebrew-whodar tap
-    # repo, so the cask is generated but not uploaded. To auto-publish it on
-    # every release, add a token with write access to the tap and flip this to
-    # false.
-    skip_upload: "true"
+    # Auto-publish the cask to the tap when a write-scoped token is available as
+    # TAP_GITHUB_TOKEN. Without it the release still succeeds and the cask is
+    # simply not pushed, so a missing secret never breaks a release.
+    skip_upload: '{{ if index .Env "TAP_GITHUB_TOKEN" }}false{{ else }}true{{ end }}'
     repository:
       owner: dcadolph
       name: homebrew-whodar
       branch: main
+      token: '{{ index .Env "TAP_GITHUB_TOKEN" }}'
     homepage: "https://github.com/dcadolph/whodar"
     description: "Know who knows. Find who to talk to about X across your work tools."
     hooks:
