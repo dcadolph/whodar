@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -78,7 +79,60 @@ func TestGitHubFetch(t *testing.T) {
 	if _, ok := byID["github:ghost"]; ok {
 		t.Error("pull request returned by the issues endpoint should be skipped")
 	}
-	if kim := byID["codeowners:kim"]; kim.Name != "@kim" {
-		t.Errorf("codeowners record = %+v, want @kim", kim)
+	// A repo's own CODEOWNERS @login remaps into the github namespace, so it
+	// merges with that login's pull request and issue activity.
+	if kim := byID["github:kim"]; kim.Name != "@kim" {
+		t.Errorf("codeowners record = %+v, want @kim under github:kim", kim)
+	}
+	if _, ok := byID["codeowners:kim"]; ok {
+		t.Error("a repo's own CODEOWNERS @login should not stay in the codeowners namespace")
+	}
+}
+
+// TestGitHubFetchSkipsBadRepo verifies one failing repository is logged and
+// skipped rather than discarding every other repository's data.
+func TestGitHubFetchSkipsBadRepo(t *testing.T) {
+	t.Parallel()
+	mux := http.NewServeMux()
+	// The good repo answers every endpoint.
+	mux.HandleFunc("/repos/o/good", func(w http.ResponseWriter, _ *http.Request) {
+		io.WriteString(w, `{"name":"good","full_name":"o/good","topics":["billing"]}`)
+	})
+	mux.HandleFunc("/repos/o/good/contributors", func(w http.ResponseWriter, _ *http.Request) {
+		io.WriteString(w, `[{"login":"jane","contributions":5}]`)
+	})
+	mux.HandleFunc("/repos/o/good/pulls", func(w http.ResponseWriter, _ *http.Request) {
+		io.WriteString(w, `[]`)
+	})
+	mux.HandleFunc("/repos/o/good/issues", func(w http.ResponseWriter, _ *http.Request) {
+		io.WriteString(w, `[]`)
+	})
+	// The bad repo fails on its metadata endpoint.
+	mux.HandleFunc("/repos/o/bad", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	var logBuf strings.Builder
+	client := github.New("ghp-test", github.WithBaseURL(srv.URL))
+	recs, err := NewGitHubWithClient(client, GitHubOptions{
+		Repos: []string{"o/bad", "o/good"}, Log: &logBuf,
+	}).Fetch(context.Background())
+	if err != nil {
+		t.Fatalf("Fetch: one bad repo should not fail the run: %v", err)
+	}
+
+	var foundJane bool
+	for _, r := range recs {
+		if r.PersonID == "github:jane" {
+			foundJane = true
+		}
+	}
+	if !foundJane {
+		t.Error("good repo's contributor was dropped when another repo failed")
+	}
+	if !strings.Contains(logBuf.String(), "skipping o/bad") {
+		t.Errorf("expected a skip warning for o/bad, log = %q", logBuf.String())
 	}
 }

@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -19,15 +18,6 @@ import (
 
 // defaultBaseURL is the GitHub REST API root.
 const defaultBaseURL = "https://api.github.com"
-
-// ErrNotFound indicates the requested resource does not exist.
-var ErrNotFound = errors.New("github: not found")
-
-// ErrRateLimited indicates the API rate limit was exhausted.
-var ErrRateLimited = errors.New("github: rate limited")
-
-// ErrStatus indicates an unexpected HTTP status.
-var ErrStatus = errors.New("github: unexpected status")
 
 // Doer performs an HTTP request. *http.Client satisfies it; tests inject a stub.
 type Doer interface {
@@ -240,8 +230,10 @@ func (c *Client) get(ctx context.Context, path string, query url.Values, out any
 }
 
 // getAll fetches every page of a list endpoint by following the Link header,
-// up to maxPages. Pagination stays on the API host so the bearer token
-// cannot be sent anywhere else.
+// up to maxPages. Pagination stays on the API host so the bearer token cannot be
+// sent anywhere else. If the cap is reached while another page remains, it
+// returns the partial results with ErrTruncated rather than passing them off as
+// complete, so the caller can warn instead of indexing a busy repo as whole.
 func getAll[T any](ctx context.Context, c *Client, path string, query url.Values) ([]T, error) {
 	base, err := url.Parse(c.baseURL)
 	if err != nil {
@@ -252,18 +244,22 @@ func getAll[T any](ctx context.Context, c *Client, path string, query url.Values
 		endpoint += "?" + query.Encode()
 	}
 	var all []T
-	for page := 0; endpoint != "" && page < maxPages; page++ {
+	for page := 0; endpoint != ""; page++ {
+		if page >= maxPages {
+			return all, fmt.Errorf("github %s: %w at %d pages", path, ErrTruncated, maxPages)
+		}
 		var batch []T
 		next, err := c.getURL(ctx, endpoint, path, &batch)
 		if err != nil {
 			return nil, err
 		}
 		all = append(all, batch...)
-		if next != "" {
-			u, err := url.Parse(next)
-			if err != nil || u.Host != base.Host {
-				break
-			}
+		if next == "" {
+			break
+		}
+		u, err := url.Parse(next)
+		if err != nil || u.Host != base.Host {
+			break
 		}
 		endpoint = next
 	}

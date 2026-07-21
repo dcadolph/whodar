@@ -87,6 +87,29 @@ func TestPagination(t *testing.T) {
 	}
 }
 
+// TestPaginationTruncationSignaled verifies a listing that never stops
+// advertising a next page is reported as truncated, with the partial results
+// still returned, rather than passed off as complete.
+func TestPaginationTruncationSignaled(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewUnstartedServer(nil)
+	base := "http://" + srv.Listener.Addr().String()
+	srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Link", "<"+base+`/repos/o/r/contributors?page=2>; rel="next"`)
+		io.WriteString(w, `[{"login":"jane","contributions":1}]`)
+	})
+	srv.Start()
+	t.Cleanup(srv.Close)
+
+	cons, err := New("ghp-test", WithBaseURL(base)).Contributors(context.Background(), "o", "r")
+	if !errors.Is(err, ErrTruncated) {
+		t.Fatalf("err = %v, want ErrTruncated", err)
+	}
+	if len(cons) == 0 {
+		t.Error("truncation should still return the partial results")
+	}
+}
+
 // TestPaginationStaysOnHost verifies a next link naming a foreign host is not
 // followed, so the bearer token stays on the API host.
 func TestPaginationStaysOnHost(t *testing.T) {

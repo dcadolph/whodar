@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/dcadolph/whodar/internal/github"
+	"github.com/dcadolph/whodar/internal/util"
 )
 
 // ErrNoRepos indicates no repositories were given to the GitHub connector.
@@ -112,59 +113,15 @@ func (g *GitHub) Fetch(ctx context.Context) ([]Record, error) {
 		if !ok {
 			continue
 		}
-		repo, err := g.client.Repo(ctx, owner, name)
+		recs, err := g.indexRepo(ctx, full, owner, name, bump)
+		codeOwnerRecords = append(codeOwnerRecords, recs...)
 		if err != nil {
-			return nil, fmt.Errorf("github repo %s: %w", full, err)
-		}
-		repoTokens := repoTopicSet(repo)
-
-		cons, err := g.client.Contributors(ctx, owner, name)
-		if err != nil {
-			return nil, fmt.Errorf("github contributors %s: %w", full, err)
-		}
-		for _, c := range cons {
-			bump(c.Login, repoTokens, time.Time{})
-		}
-
-		pulls, err := g.client.PullRequests(ctx, owner, name)
-		if err != nil {
-			return nil, fmt.Errorf("github pulls %s: %w", full, err)
-		}
-		for _, pr := range pulls {
-			tokens := append(pr.LabelNames(), titleTokens(pr.Title)...)
-			bump(pr.Author(), tokens, pr.UpdatedAt)
-			for _, u := range pr.Reviewers() {
-				bump(u, tokens, pr.UpdatedAt)
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				return nil, err
 			}
-			for _, u := range pr.AssigneeLogins() {
-				bump(u, tokens, pr.UpdatedAt)
-			}
+			fmt.Fprintf(g.opts.Log, "github: skipping %s: %v\n", full, err)
+			continue
 		}
-
-		issues, err := g.client.Issues(ctx, owner, name)
-		if err != nil {
-			return nil, fmt.Errorf("github issues %s: %w", full, err)
-		}
-		var issueCount int
-		for _, is := range issues {
-			if is.IsPullRequest() {
-				continue
-			}
-			issueCount++
-			tokens := append(is.LabelNames(), titleTokens(is.Title)...)
-			bump(is.Author(), tokens, is.UpdatedAt)
-			for _, u := range is.AssigneeLogins() {
-				bump(u, tokens, is.UpdatedAt)
-			}
-		}
-
-		if content := g.codeOwners(ctx, owner, name); content != nil {
-			if recs, err := parseCodeOwners(ctx, bytes.NewReader(content)); err == nil {
-				codeOwnerRecords = append(codeOwnerRecords, recs...)
-			}
-		}
-		fmt.Fprintf(g.opts.Log, "github: indexed %s (%d contributors, %d pulls, %d issues)\n",
-			full, len(cons), len(pulls), issueCount)
 	}
 
 	accounts := g.resolveAccounts(ctx, counts)
@@ -177,6 +134,91 @@ func (g *GitHub) Fetch(ctx context.Context) ([]Record, error) {
 	}
 	records = append(records, codeOwnerRecords...)
 	return records, nil
+}
+
+// indexRepo tallies one repository's contributors, pull requests, issues, and
+// CODEOWNERS through bump, returning that repo's CODEOWNERS records. A truncated
+// listing is indexed as a partial set with a warning. A hard error is returned
+// so the caller can skip this repo, or abort on context cancellation, without
+// discarding the repos already indexed.
+func (g *GitHub) indexRepo(
+	ctx context.Context, full, owner, name string, bump func(string, []string, time.Time),
+) ([]Record, error) {
+	repo, err := g.client.Repo(ctx, owner, name)
+	if err != nil {
+		return nil, fmt.Errorf("repo: %w", err)
+	}
+	repoTokens := repoTopicSet(repo)
+
+	cons, err := g.client.Contributors(ctx, owner, name)
+	if e := g.usable(full, "contributors", len(cons), err); e != nil {
+		return nil, fmt.Errorf("contributors: %w", e)
+	}
+	for _, c := range cons {
+		bump(c.Login, repoTokens, time.Time{})
+	}
+
+	pulls, err := g.client.PullRequests(ctx, owner, name)
+	if e := g.usable(full, "pulls", len(pulls), err); e != nil {
+		return nil, fmt.Errorf("pulls: %w", e)
+	}
+	for _, pr := range pulls {
+		tokens := append(pr.LabelNames(), titleTokens(pr.Title)...)
+		bump(pr.Author(), tokens, pr.UpdatedAt)
+		for _, u := range pr.Reviewers() {
+			bump(u, tokens, pr.UpdatedAt)
+		}
+		for _, u := range pr.AssigneeLogins() {
+			bump(u, tokens, pr.UpdatedAt)
+		}
+	}
+
+	issues, err := g.client.Issues(ctx, owner, name)
+	if e := g.usable(full, "issues", len(issues), err); e != nil {
+		return nil, fmt.Errorf("issues: %w", e)
+	}
+	var issueCount int
+	for _, is := range issues {
+		if is.IsPullRequest() {
+			continue
+		}
+		issueCount++
+		tokens := append(is.LabelNames(), titleTokens(is.Title)...)
+		bump(is.Author(), tokens, is.UpdatedAt)
+		for _, u := range is.AssigneeLogins() {
+			bump(u, tokens, is.UpdatedAt)
+		}
+	}
+
+	var codeOwnerRecords []Record
+	if content := g.codeOwners(ctx, owner, name); content != nil {
+		recs, err := parseCodeOwners(ctx, bytes.NewReader(content))
+		switch {
+		case errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded):
+			return nil, err
+		case err != nil:
+			fmt.Fprintf(g.opts.Log, "github: %s CODEOWNERS parse failed: %v\n", full, err)
+		default:
+			codeOwnerRecords = remapCodeOwners(recs)
+		}
+	}
+	fmt.Fprintf(g.opts.Log, "github: indexed %s (%d contributors, %d pulls, %d issues)\n",
+		full, len(cons), len(pulls), issueCount)
+	return codeOwnerRecords, nil
+}
+
+// usable reports whether a listing error is tolerable. A nil error and a
+// truncation, whose partial results are still usable, both return nil; the
+// truncation is logged. Any other error is returned so the repo is skipped.
+func (g *GitHub) usable(full, what string, n int, err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, github.ErrTruncated) {
+		fmt.Fprintf(g.opts.Log, "github: %s %s truncated, indexing %d\n", full, what, n)
+		return nil
+	}
+	return err
 }
 
 // repoList resolves the explicit repos plus any from the org, capped.
@@ -230,7 +272,7 @@ func (g *GitHub) codeOwners(ctx context.Context, owner, name string) []byte {
 func githubPersonRecord(login string, topics []string, a github.Account) Record {
 	rec := Record{Kind: KindPerson, Source: "github", Weight: 1, Topics: topics}
 	if a.Email != "" {
-		rec.Email = strings.ToLower(a.Email)
+		rec.Email = util.NormalizeEmail(a.Email)
 		rec.Name = a.Name
 		if rec.Name == "" {
 			rec.Name = "@" + login
@@ -243,6 +285,21 @@ func githubPersonRecord(login string, topics []string, a github.Account) Record 
 		rec.Name = a.Name
 	}
 	return rec
+}
+
+// remapCodeOwners rewrites a repo's own CODEOWNERS @login owners into the github
+// identity namespace, so a login that also authored pull requests or issues in
+// the same repo merges into one person. Team owners (@org/team) and email owners
+// keep their own contact entries.
+func remapCodeOwners(recs []Record) []Record {
+	for i := range recs {
+		login, ok := strings.CutPrefix(recs[i].Name, "@")
+		if !ok || strings.Contains(login, "/") {
+			continue
+		}
+		recs[i].PersonID = "github:" + strings.ToLower(login)
+	}
+	return recs
 }
 
 // repoTopicSet derives a repo's topic tags from its GitHub topics and the words
