@@ -18,7 +18,7 @@ import (
 // testHandler builds a handler whose Ask returns one canned person.
 func testHandler(t *testing.T) http.Handler {
 	t.Helper()
-	ask := func(_ context.Context, _, _ string, _ int) (resolve.Answer, error) {
+	ask := func(_ context.Context, _, _, _ string, _ int) (resolve.Answer, error) {
 		return resolve.Answer{
 			Summary: "talk to jane",
 			People: []model.Match{{
@@ -95,7 +95,7 @@ func TestNilAskPanics(t *testing.T) {
 func TestFeedbackAPI(t *testing.T) {
 	t.Parallel()
 	var got feedback.Entry
-	ask := func(_ context.Context, _, _ string, _ int) (resolve.Answer, error) {
+	ask := func(_ context.Context, _, _, _ string, _ int) (resolve.Answer, error) {
 		return resolve.Answer{}, nil
 	}
 	h, err := Handler(Config{
@@ -146,7 +146,7 @@ func TestFeedbackAPIDisabled(t *testing.T) {
 // unknown identifiers.
 func TestPersonAPI(t *testing.T) {
 	t.Parallel()
-	ask := func(_ context.Context, _, _ string, _ int) (resolve.Answer, error) {
+	ask := func(_ context.Context, _, _, _ string, _ int) (resolve.Answer, error) {
 		return resolve.Answer{}, nil
 	}
 	person := func(id string) (resolve.JSONProfile, bool) {
@@ -180,11 +180,196 @@ func TestPersonAPI(t *testing.T) {
 	}
 }
 
+// TestDirectoryAPI verifies the directory endpoint serves the inventory and
+// is absent when not configured.
+func TestDirectoryAPI(t *testing.T) {
+	t.Parallel()
+	ask := func(_ context.Context, _, _, _ string, _ int) (resolve.Answer, error) {
+		return resolve.Answer{}, nil
+	}
+	dir := resolve.Directory{People: []resolve.DirectoryPerson{{ID: "jane@x.com", Name: "Jane Roe"}}}
+	h, err := Handler(Config{Ask: ask, Version: "test", Directory: &dir})
+	if err != nil {
+		t.Fatalf("Handler: %v", err)
+	}
+
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/directory", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	var got resolve.Directory
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(got.People) != 1 || got.People[0].Name != "Jane Roe" {
+		t.Errorf("directory = %+v", got)
+	}
+
+	rec = httptest.NewRecorder()
+	testHandler(t).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/directory", nil))
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("unconfigured status = %d, want 404", rec.Code)
+	}
+}
+
+// TestModesAPI verifies the modes endpoint reports mode and provider
+// readiness and is absent when not configured.
+func TestModesAPI(t *testing.T) {
+	t.Parallel()
+	ask := func(_ context.Context, _, _, _ string, _ int) (resolve.Answer, error) {
+		return resolve.Answer{}, nil
+	}
+	modes := func(context.Context) ModesReport {
+		return ModesReport{
+			Modes: map[string]ModeInfo{"keyword": {Ready: true}},
+			Providers: map[string]ModeInfo{
+				"ollama": {Ready: false, Hint: "Ollama is not running on this machine."},
+			},
+			Provider: "ollama",
+		}
+	}
+	h, err := Handler(Config{Ask: ask, Version: "test", Modes: modes})
+	if err != nil {
+		t.Fatalf("Handler: %v", err)
+	}
+
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/modes", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	var got ModesReport
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if !got.Modes["keyword"].Ready || got.Providers["ollama"].Ready || got.Provider != "ollama" {
+		t.Errorf("report = %+v", got)
+	}
+
+	rec = httptest.NewRecorder()
+	testHandler(t).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/modes", nil))
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("unconfigured status = %d, want 404", rec.Code)
+	}
+}
+
+// TestAskProviderParam verifies the provider query parameter reaches the ask
+// function.
+func TestAskProviderParam(t *testing.T) {
+	t.Parallel()
+	var gotProvider string
+	ask := func(_ context.Context, _, _, provider string, _ int) (resolve.Answer, error) {
+		gotProvider = provider
+		return resolve.Answer{}, nil
+	}
+	h, err := Handler(Config{Ask: ask, Version: "test"})
+	if err != nil {
+		t.Fatalf("Handler: %v", err)
+	}
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/ask?q=x&mode=llm&provider=anthropic", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if gotProvider != "anthropic" {
+		t.Errorf("provider = %q, want anthropic", gotProvider)
+	}
+}
+
+// TestAuthToken verifies the token gate: header, query parameter, and cookie
+// all admit; anything else is a 401; a query token sets the session cookie.
+func TestAuthToken(t *testing.T) {
+	t.Parallel()
+	ask := func(_ context.Context, _, _, _ string, _ int) (resolve.Answer, error) {
+		return resolve.Answer{}, nil
+	}
+	h, err := Handler(Config{Ask: ask, Version: "test", AuthToken: "sekret"})
+	if err != nil {
+		t.Fatalf("Handler: %v", err)
+	}
+	tests := []struct {
+		Target     string
+		Bearer     string
+		Cookie     string
+		WantCode   int
+		WantCookie bool
+	}{{ // Test 0: No credential is a 401.
+		Target: "/api/ask?q=x", WantCode: http.StatusUnauthorized,
+	}, { // Test 1: A wrong bearer token is a 401.
+		Target: "/api/ask?q=x", Bearer: "nope", WantCode: http.StatusUnauthorized,
+	}, { // Test 2: The right bearer token admits.
+		Target: "/api/ask?q=x", Bearer: "sekret", WantCode: http.StatusOK,
+	}, { // Test 3: The right query token admits and sets the session cookie.
+		Target: "/?token=sekret", WantCode: http.StatusOK, WantCookie: true,
+	}, { // Test 4: A wrong query token is a 401.
+		Target: "/?token=nope", WantCode: http.StatusUnauthorized,
+	}, { // Test 5: The session cookie admits.
+		Target: "/api/ask?q=x", Cookie: "sekret", WantCode: http.StatusOK,
+	}}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			req := httptest.NewRequest(http.MethodGet, test.Target, nil)
+			if test.Bearer != "" {
+				req.Header.Set("Authorization", "Bearer "+test.Bearer)
+			}
+			if test.Cookie != "" {
+				req.AddCookie(&http.Cookie{Name: authCookie, Value: test.Cookie})
+			}
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+			if rec.Code != test.WantCode {
+				t.Fatalf("status = %d, want %d: %s", rec.Code, test.WantCode, rec.Body.String())
+			}
+			gotCookie := strings.Contains(rec.Header().Get("Set-Cookie"), authCookie+"=")
+			if gotCookie != test.WantCookie {
+				t.Errorf("set-cookie = %t, want %t", gotCookie, test.WantCookie)
+			}
+		})
+	}
+}
+
+// TestFeedbackCrossOrigin verifies a cross-origin vote is rejected and a
+// same-origin one is recorded.
+func TestFeedbackCrossOrigin(t *testing.T) {
+	t.Parallel()
+	recorded := 0
+	ask := func(_ context.Context, _, _, _ string, _ int) (resolve.Answer, error) {
+		return resolve.Answer{}, nil
+	}
+	h, err := Handler(Config{
+		Ask:      ask,
+		Feedback: func(feedback.Entry) error { recorded++; return nil },
+		Version:  "test",
+	})
+	if err != nil {
+		t.Fatalf("Handler: %v", err)
+	}
+	body := `{"query":"billing","person":"jane@x.com","vote":"helpful"}`
+
+	req := httptest.NewRequest(http.MethodPost, "/api/feedback", strings.NewReader(body))
+	req.Header.Set("Origin", "http://evil.example")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden || recorded != 0 {
+		t.Errorf("cross-origin: status = %d recorded = %d, want 403 and 0", rec.Code, recorded)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/api/feedback", strings.NewReader(body))
+	req.Header.Set("Origin", "http://"+req.Host)
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || recorded != 1 {
+		t.Errorf("same-origin: status = %d recorded = %d, want 200 and 1", rec.Code, recorded)
+	}
+}
+
 // TestAskAPIModelDown verifies an unreachable model maps to guidance instead
 // of a raw dial error.
 func TestAskAPIModelDown(t *testing.T) {
 	t.Parallel()
-	ask := func(_ context.Context, _, _ string, _ int) (resolve.Answer, error) {
+	ask := func(_ context.Context, _, _, _ string, _ int) (resolve.Answer, error) {
 		return resolve.Answer{}, fmt.Errorf("llm resolve: %w: connection refused", llm.ErrModel)
 	}
 	h, err := Handler(Config{Ask: ask, Version: "test"})

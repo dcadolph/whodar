@@ -1,9 +1,10 @@
-// whodar web UI: post the query to /api/ask and render people and channels.
-// Result text is set with textContent so indexed data cannot inject markup.
+// whodar web UI: an ask view over /api/ask and directory views over
+// /api/directory, routed by location.hash. Result text is set with
+// textContent so indexed data cannot inject markup.
 
 const form = document.getElementById("ask-form");
 const qInput = document.getElementById("q");
-const modeSel = document.getElementById("mode");
+const modeSeg = document.getElementById("mode-seg");
 const statusEl = document.getElementById("status");
 const summaryEl = document.getElementById("summary");
 const peopleSection = document.getElementById("people-section");
@@ -11,6 +12,122 @@ const channelsSection = document.getElementById("channels-section");
 const peopleEl = document.getElementById("people");
 const channelsEl = document.getElementById("channels");
 const button = form.querySelector("button");
+const examplesEl = document.getElementById("examples");
+const askView = document.getElementById("view-ask");
+const dirView = document.getElementById("view-directory");
+const dirTitle = document.getElementById("dir-title");
+const dirFilter = document.getElementById("dir-filter");
+const dirStatus = document.getElementById("dir-status");
+const dirList = document.getElementById("dir-list");
+const sideNav = document.getElementById("side-nav");
+const facetTeam = document.getElementById("facet-team");
+const facetOrg = document.getElementById("facet-org");
+
+// The active answer mode and AI provider, driven by the segmented controls.
+let currentMode = "keyword";
+let currentProvider = "ollama";
+
+// providerTouched blocks the server default from stomping a user's pick.
+let providerTouched = false;
+
+// modesReport holds readiness from /api/modes: modes, providers, provider.
+let modesReport = { modes: {}, providers: {} };
+
+const providerSeg = document.getElementById("provider-seg");
+
+// PROVIDER_LABELS names providers the way people know them.
+const PROVIDER_LABELS = {
+  ollama: "the local model", anthropic: "Claude", openai: "ChatGPT", gemini: "Gemini",
+};
+
+modeSeg.addEventListener("click", (event) => {
+  const btn = event.target.closest(".seg-btn");
+  if (!btn) return;
+  currentMode = btn.dataset.mode;
+  for (const b of modeSeg.querySelectorAll(".seg-btn")) {
+    b.classList.toggle("active", b === btn);
+    b.setAttribute("aria-pressed", String(b === btn));
+  }
+  providerSeg.hidden = currentMode !== "llm";
+  showModeHint();
+  if (currentMode !== "keyword") loadModes().then(showModeHint);
+});
+
+providerSeg.addEventListener("click", (event) => {
+  const btn = event.target.closest(".seg-btn");
+  if (!btn) return;
+  currentProvider = btn.dataset.provider;
+  providerTouched = true;
+  syncProviderButtons();
+  showModeHint();
+  loadModes().then(showModeHint);
+});
+
+// syncProviderButtons marks the active provider button.
+function syncProviderButtons() {
+  for (const b of providerSeg.querySelectorAll(".seg-btn")) {
+    const active = b.dataset.provider === currentProvider;
+    b.classList.toggle("active", active);
+    b.setAttribute("aria-pressed", String(active));
+  }
+}
+
+// providerInfo is the readiness of the currently selected AI provider.
+function providerInfo() {
+  return (modesReport.providers || {})[currentProvider] || (modesReport.modes || {}).llm;
+}
+
+// loadModes refreshes readiness, marks unready modes and providers with a
+// dot, and upgrades tooltips with the specific guidance.
+async function loadModes() {
+  try {
+    const res = await fetch("/api/modes");
+    if (!res.ok) return;
+    modesReport = await res.json();
+  } catch (err) {
+    return;
+  }
+  if (!providerTouched && modesReport.provider) {
+    currentProvider = modesReport.provider;
+    syncProviderButtons();
+  }
+  const modes = modesReport.modes || {};
+  for (const b of modeSeg.querySelectorAll(".seg-btn")) {
+    const info = b.dataset.mode === "llm" ? providerInfo() : modes[b.dataset.mode];
+    if (!info) continue;
+    b.classList.toggle("warn", info.ready === false);
+    // The AI button keeps its generic tooltip; provider buttons carry the
+    // provider-specific guidance.
+    if (info.hint && b.dataset.mode !== "llm") b.dataset.tip = info.hint;
+  }
+  const providers = modesReport.providers || {};
+  for (const b of providerSeg.querySelectorAll(".seg-btn")) {
+    const info = providers[b.dataset.provider];
+    if (!info) continue;
+    b.classList.toggle("warn", info.ready === false);
+    if (info.hint) b.dataset.tip = info.hint;
+  }
+}
+
+// showModeHint puts the selected mode or provider's guidance on the status
+// line, so picking AI without a model tells you what to do before you ask.
+function showModeHint() {
+  const info = currentMode === "llm" ? providerInfo() : (modesReport.modes || {})[currentMode];
+  if (info && info.hint) statusEl.textContent = info.hint;
+}
+
+const EXAMPLE_QUERIES = [
+  "who do I talk to about billing retries",
+  "who knows terraform",
+  "kubernetes deploys",
+];
+
+for (const example of EXAMPLE_QUERIES) {
+  const b = el("button", "example", example);
+  b.type = "button";
+  b.addEventListener("click", () => runAsk(example));
+  examplesEl.appendChild(b);
+}
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -22,11 +139,16 @@ async function ask() {
   if (!q) return;
 
   button.disabled = true;
+  examplesEl.hidden = true;
   clearResults();
-  statusEl.textContent = modeSel.value === "llm" ? "Asking the local model..." : "Searching...";
+  statusEl.textContent =
+    currentMode === "llm" ? "Asking " + (PROVIDER_LABELS[currentProvider] || "the model") + "..."
+    : currentMode === "semantic" ? "Searching by meaning..."
+    : "Searching...";
 
   try {
-    const params = new URLSearchParams({ q, mode: modeSel.value });
+    const params = new URLSearchParams({ q, mode: currentMode });
+    if (currentMode === "llm" && currentProvider) params.set("provider", currentProvider);
     setParam("person", "");
     setParam("q", q);
     const res = await fetch("/api/ask?" + params.toString());
@@ -43,6 +165,14 @@ async function ask() {
   }
 }
 
+// runAsk switches to the ask view and runs the query.
+function runAsk(q) {
+  qInput.value = q;
+  if (location.hash && location.hash !== "#/") location.hash = "#/";
+  showView("ask");
+  ask();
+}
+
 // setParam updates one query parameter in the address bar without reloading.
 function setParam(key, val) {
   const p = new URLSearchParams(location.search);
@@ -52,17 +182,7 @@ function setParam(key, val) {
     p.delete(key);
   }
   const s = p.toString();
-  history.replaceState(null, "", s ? "?" + s : location.pathname);
-}
-
-// A shared link carries the question and person in the URL; run them on load.
-const linked = new URLSearchParams(location.search);
-if (linked.get("q")) {
-  qInput.value = linked.get("q");
-  ask();
-}
-if (linked.get("person")) {
-  openProfile(linked.get("person"));
+  history.replaceState(null, "", (s ? "?" + s : location.pathname) + location.hash);
 }
 
 function clearResults() {
@@ -82,13 +202,14 @@ function render(data) {
   const people = data.people || [];
   const channels = data.channels || [];
 
-  for (const p of people) peopleEl.appendChild(personCard(p, data.query));
-  for (const c of channels) channelsEl.appendChild(channelCard(c, data.query));
+  people.forEach((p, i) => peopleEl.appendChild(personCard(p, data.query, i)));
+  channels.forEach((c, i) => channelsEl.appendChild(channelCard(c, data.query, i)));
   peopleSection.hidden = people.length === 0;
   channelsSection.hidden = channels.length === 0;
 
   if (people.length === 0 && channels.length === 0) {
-    statusEl.textContent = "No matches. Try different words.";
+    statusEl.textContent =
+      "No matches. Try fewer or different words, or browse Topics for what the index knows.";
   } else {
     statusEl.textContent = people.length + " people, " + channels.length + " channels";
   }
@@ -141,8 +262,14 @@ function voteButtons(query, target) {
   return wrap;
 }
 
-function personCard(p, query) {
+// rankBadge renders the zero-padded position marker in a result card corner.
+function rankBadge(i) {
+  return el("span", "rank", String(i + 1).padStart(2, "0"));
+}
+
+function personCard(p, query, i) {
   const card = el("div", "card");
+  card.appendChild(rankBadge(i));
   const name = el("div", "name");
   const toggle = el("button", "name-toggle", p.name || p.email || "unknown");
   toggle.type = "button";
@@ -239,10 +366,16 @@ function closeProfile() {
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") closeProfile();
+  const tag = document.activeElement && document.activeElement.tagName;
+  if (event.key === "/" && tag !== "INPUT" && tag !== "TEXTAREA" && tag !== "SELECT") {
+    event.preventDefault();
+    (currentView === "ask" ? qInput : dirFilter).focus();
+  }
 });
 
-function channelCard(c, query) {
+function channelCard(c, query, i) {
   const card = el("div", "card");
+  card.appendChild(rankBadge(i));
   const name = el("div", "name", "#" + c.name);
   name.appendChild(copyButton("#" + c.name));
   const badge = confidenceBadge(c.confidence);
@@ -281,3 +414,230 @@ function copyButton(text) {
   });
   return button;
 }
+
+// Directory views: one fetch, cached for the page's life, filtered client side.
+
+const DIR_VIEWS = {
+  people: { title: "People", empty: "No people indexed yet." },
+  channels: { title: "Channels", empty: "No channels indexed yet." },
+  teams: { title: "Teams", empty: "No teams indexed yet." },
+  topics: { title: "Topics", empty: "No topics indexed yet." },
+};
+
+let dirPromise = null;
+
+// directory fetches /api/directory once and caches the result.
+function directory() {
+  if (!dirPromise) {
+    dirPromise = fetch("/api/directory").then((res) => {
+      if (!res.ok) throw new Error(res.statusText);
+      return res.json();
+    });
+    dirPromise.catch(() => (dirPromise = null));
+  }
+  return dirPromise;
+}
+
+let currentView = "ask";
+
+// pendingTeamFacet carries a team chosen in the Teams view into the People
+// facet on the next render.
+let pendingTeamFacet = "";
+
+// viewFromHash maps the location hash to a view name.
+function viewFromHash() {
+  const name = location.hash.replace(/^#\//, "");
+  return DIR_VIEWS[name] ? name : "ask";
+}
+
+// showView flips between the ask view and a directory view and marks the nav.
+function showView(view) {
+  currentView = view;
+  askView.hidden = view !== "ask";
+  dirView.hidden = view === "ask";
+  for (const a of sideNav.querySelectorAll("a")) {
+    a.classList.toggle("active", a.dataset.view === view);
+  }
+  facetTeam.hidden = view !== "people";
+  facetOrg.hidden = view !== "people";
+  if (view !== "ask") {
+    dirTitle.textContent = DIR_VIEWS[view].title;
+    dirFilter.placeholder = "Filter " + view + "...";
+    renderDirectory(view);
+  }
+}
+
+// fillFacets populates the team and org dropdowns from the people directory,
+// once, and applies any team picked from the Teams view.
+function fillFacets(people) {
+  if (!facetTeam.options.length) {
+    fillFacet(facetTeam, "All teams", people.map((p) => p.team));
+    fillFacet(facetOrg, "All orgs", people.map((p) => p.org));
+  }
+  if (pendingTeamFacet) {
+    facetTeam.value = pendingTeamFacet;
+    if (facetTeam.value !== pendingTeamFacet) facetTeam.value = "";
+    pendingTeamFacet = "";
+  }
+}
+
+// fillFacet fills one dropdown with an all option plus sorted unique values.
+function fillFacet(sel, allLabel, values) {
+  const all = document.createElement("option");
+  all.value = "";
+  all.textContent = allLabel;
+  sel.appendChild(all);
+  const unique = [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  for (const v of unique) {
+    const opt = document.createElement("option");
+    opt.value = v;
+    opt.textContent = v;
+    sel.appendChild(opt);
+  }
+}
+
+// fillNavCounts writes entity counts into the sidebar once the directory
+// loads. A failed load just leaves the nav plain.
+async function fillNavCounts() {
+  try {
+    const dir = await directory();
+    for (const span of document.querySelectorAll(".nav-count")) {
+      span.textContent = (dir[span.dataset.count] || []).length;
+    }
+  } catch (err) {
+    // The nav works without counts.
+  }
+}
+
+async function renderDirectory(view) {
+  dirStatus.textContent = "Loading...";
+  dirList.replaceChildren();
+  let dir;
+  try {
+    dir = await directory();
+  } catch (err) {
+    dirStatus.textContent = "Could not load the directory: " + err.message;
+    return;
+  }
+  if (currentView !== view) return;
+
+  const rows = dir[view] || [];
+  if (view === "people") fillFacets(rows);
+  const q = dirFilter.value.trim().toLowerCase();
+  let shown = q ? rows.filter((r) => rowText(r).includes(q)) : rows;
+  if (view === "people") {
+    if (facetTeam.value) shown = shown.filter((r) => r.team === facetTeam.value);
+    if (facetOrg.value) shown = shown.filter((r) => r.org === facetOrg.value);
+  }
+
+  dirList.replaceChildren();
+  for (const r of shown) dirList.appendChild(directoryRow(view, r));
+  if (rows.length === 0) {
+    dirStatus.textContent = DIR_VIEWS[view].empty;
+  } else if (shown.length !== rows.length) {
+    dirStatus.textContent = shown.length + " of " + rows.length;
+  } else {
+    dirStatus.textContent = String(rows.length);
+  }
+}
+
+// rowText flattens a directory row for filtering.
+function rowText(r) {
+  return [r.name, r.email, r.title, r.team, r.topic, r.org, ...(r.topics || [])]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function directoryRow(view, r) {
+  switch (view) {
+    case "people":
+      return dirPersonRow(r);
+    case "channels":
+      return dirChannelRow(r);
+    case "teams":
+      return dirTeamRow(r);
+    default:
+      return dirTopicRow(r);
+  }
+}
+
+function dirPersonRow(p) {
+  const card = el("div", "card");
+  const name = el("div", "name");
+  const toggle = el("button", "name-toggle", p.name || p.id);
+  toggle.type = "button";
+  toggle.title = "Show everything whodar knows";
+  toggle.addEventListener("click", () => openProfile(p.id));
+  name.appendChild(toggle);
+  card.appendChild(name);
+  const sub = [p.title, p.team, p.org].filter(Boolean).join(" · ");
+  if (sub) card.appendChild(el("div", "sub", sub));
+  if (p.email) card.appendChild(el("div", "sub", p.email));
+  chips(card, p.topics);
+  return card;
+}
+
+function dirChannelRow(c) {
+  const card = el("div", "card");
+  const name = el("div", "name", "#" + c.name);
+  name.appendChild(copyButton("#" + c.name));
+  card.appendChild(name);
+  if (c.topic) card.appendChild(el("div", "sub", c.topic));
+  card.appendChild(el("div", "sub", c.members + " active " + (c.members === 1 ? "person" : "people")));
+  return card;
+}
+
+function dirTeamRow(t) {
+  const card = el("div", "card");
+  const name = el("div", "name");
+  const toggle = el("button", "name-toggle", t.name);
+  toggle.type = "button";
+  toggle.title = "Show this team's people";
+  toggle.addEventListener("click", () => {
+    pendingTeamFacet = t.name;
+    dirFilter.value = "";
+    if (location.hash === "#/people") {
+      renderDirectory("people");
+    } else {
+      location.hash = "#/people";
+    }
+  });
+  name.appendChild(toggle);
+  card.appendChild(name);
+  const sub = [t.org, t.people + (t.people === 1 ? " person" : " people")].filter(Boolean).join(" · ");
+  if (sub) card.appendChild(el("div", "sub", sub));
+  return card;
+}
+
+function dirTopicRow(t) {
+  const card = el("div", "card card-row");
+  const toggle = el("button", "name-toggle", t.name);
+  toggle.type = "button";
+  toggle.title = "Ask who knows about this";
+  toggle.addEventListener("click", () => runAsk(t.name));
+  card.appendChild(toggle);
+  card.appendChild(el("span", "count", t.people + (t.people === 1 ? " person" : " people")));
+  return card;
+}
+
+dirFilter.addEventListener("input", () => {
+  if (currentView !== "ask") renderDirectory(currentView);
+});
+facetTeam.addEventListener("change", () => renderDirectory("people"));
+facetOrg.addEventListener("change", () => renderDirectory("people"));
+
+window.addEventListener("hashchange", () => showView(viewFromHash()));
+
+// A shared link carries the question and person in the URL; run them on load.
+const linked = new URLSearchParams(location.search);
+if (linked.get("q")) {
+  qInput.value = linked.get("q");
+  ask();
+}
+if (linked.get("person")) {
+  openProfile(linked.get("person"));
+}
+showView(viewFromHash());
+fillNavCounts();
+loadModes();
