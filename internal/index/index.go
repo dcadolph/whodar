@@ -14,9 +14,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/agnivade/levenshtein"
+
 	"github.com/dcadolph/whodar/internal/connector"
 	"github.com/dcadolph/whodar/internal/identity"
 	"github.com/dcadolph/whodar/internal/model"
+	"github.com/dcadolph/whodar/internal/util"
 )
 
 // DefaultHalfLife is the age at which a dated record's weight halves.
@@ -322,7 +325,8 @@ func (ix *Index) Search(query string, limit int) []model.Match {
 	if len(terms) == 0 {
 		return nil
 	}
-	scores, matched := scoreByTerms(ix.postings, terms, len(ix.Graph.People))
+	resolved := resolveTerms(ix.postings, terms)
+	scores, matched := scoreByTerms(ix.postings, terms, resolved, len(ix.Graph.People), lengthsOf(ix.postings))
 	nets := ix.feedbackNets(terms, false)
 
 	matches := make([]model.Match, 0, len(scores))
@@ -335,7 +339,7 @@ func (ix *Index) Search(query string, limit int) []model.Match {
 		if p.TeamID != "" {
 			team = ix.Graph.Teams[p.TeamID]
 		}
-		reasons, evidence := ix.reasons(pid, matched[pid])
+		reasons, evidence := ix.reasons(pid, matched[pid], resolved)
 		if net := nets[pid]; net != 0 {
 			sc *= ix.feedbackFactor(net)
 			reasons = append(reasons, feedbackReason(net))
@@ -368,8 +372,12 @@ func (ix *Index) SearchChannels(query string, limit int) []model.ChannelMatch {
 	if len(terms) == 0 {
 		return nil
 	}
-	scores, matched := scoreByTerms(ix.channelPostings, terms, len(ix.Graph.Channels))
-	personScores, _ := scoreByTerms(ix.postings, terms, len(ix.Graph.People))
+	resolved := resolveTerms(ix.channelPostings, terms)
+	scores, matched := scoreByTerms(
+		ix.channelPostings, terms, resolved, len(ix.Graph.Channels), lengthsOf(ix.channelPostings))
+	personResolved := resolveTerms(ix.postings, terms)
+	personScores, _ := scoreByTerms(
+		ix.postings, terms, personResolved, len(ix.Graph.People), lengthsOf(ix.postings))
 	nets := ix.feedbackNets(terms, true)
 
 	matches := make([]model.ChannelMatch, 0, len(scores))
@@ -378,7 +386,7 @@ func (ix *Index) SearchChannels(query string, limit int) []model.ChannelMatch {
 		if ch == nil {
 			continue
 		}
-		reasons, evidence := ix.channelReasons(cid, matched[cid])
+		reasons, evidence := ix.channelReasons(cid, matched[cid], resolved)
 		if net := nets[cid]; net != 0 {
 			sc *= ix.feedbackFactor(net)
 			reasons = append(reasons, feedbackReason(net))
@@ -423,18 +431,138 @@ func (ix *Index) topMembers(ch *model.Channel, scores map[model.ID]float64, n in
 	return out
 }
 
-// scoreByTerms accumulates per-entity scores over terms, weighting each term by
-// inverse document frequency so rarer terms count for more. It returns the
+// BM25-style ranking parameters. k1 governs how quickly repeated weight for
+// one term saturates, b governs how strongly an entity whose accumulated
+// profile is far larger than average is discounted, and termWeightCap bounds
+// one term's weight before saturation so unbounded repetition in free text
+// cannot outrank an explicit topic tag.
+const (
+	bm25K1        = 1.2
+	bm25B         = 0.75
+	termWeightCap = 4.0
+)
+
+// Fuzzy matching bounds. Terms shorter than fuzzyMinLen never fuzz, one edit
+// is allowed from fuzzyMinLen, two from fuzzyTwoEditLen, and each edit
+// multiplies the term's contribution by fuzzyPenalty so an exact match always
+// outranks a corrected one.
+const (
+	fuzzyMinLen     = 4
+	fuzzyTwoEditLen = 7
+	fuzzyPenalty    = 0.7
+)
+
+// termHit is the resolution of one query term against a posting vocabulary:
+// the key to score with and the penalty its edits cost.
+type termHit struct {
+	// key is the posting key the term scores against.
+	key string
+	// penalty scales the term's contribution; one for an exact match.
+	penalty float64
+}
+
+// fuzzy reports whether the resolution corrected the term.
+func (h termHit) fuzzy() bool { return h.penalty < 1 }
+
+// resolveTerms maps each query term to its posting key, fuzzily when the
+// exact stem has no posting. Terms that resolve to nothing are absent.
+func resolveTerms(postings map[string]map[model.ID]float64, terms []string) map[string]termHit {
+	out := make(map[string]termHit, len(terms))
+	for _, term := range terms {
+		if hit, ok := resolveTerm(postings, term); ok {
+			out[term] = hit
+		}
+	}
+	return out
+}
+
+// resolveTerm returns the posting key for one term: its own stem when a
+// posting exists, otherwise the closest vocabulary key within the allowed
+// edit distance. Ties break to the lexicographically smallest key so results
+// are deterministic.
+func resolveTerm(postings map[string]map[model.ID]float64, term string) (termHit, bool) {
+	key := stem(term)
+	if len(postings[key]) > 0 {
+		return termHit{key: key, penalty: 1}, true
+	}
+	runes := len([]rune(term))
+	if runes < fuzzyMinLen {
+		return termHit{}, false
+	}
+	maxDist := 1
+	if runes >= fuzzyTwoEditLen {
+		maxDist = 2
+	}
+	best, bestDist := "", maxDist+1
+	for cand := range postings {
+		if diff := len(cand) - len(key); diff > maxDist || diff < -maxDist {
+			continue
+		}
+		d := levenshtein.ComputeDistance(key, cand)
+		if d < bestDist || (d == bestDist && best != "" && cand < best) {
+			best, bestDist = cand, d
+		}
+	}
+	if best == "" || bestDist > maxDist {
+		return termHit{}, false
+	}
+	return termHit{key: best, penalty: math.Pow(fuzzyPenalty, float64(bestDist))}, true
+}
+
+// entityLens holds the accumulated posting mass per entity and its average,
+// the document-length inputs to BM25 length normalization.
+type entityLens struct {
+	// byID is the summed posting weight per entity across all tokens.
+	byID map[model.ID]float64
+	// avg is the mean of byID, at least one so normalization never divides
+	// by zero.
+	avg float64
+}
+
+// lengthsOf sums posting weight per entity across all tokens. It runs per
+// query so the index needs no cache invalidation and stays safe for
+// concurrent readers.
+func lengthsOf(postings map[string]map[model.ID]float64) entityLens {
+	byID := make(map[model.ID]float64, len(postings))
+	total := 0.0
+	for _, posting := range postings {
+		for id, w := range posting {
+			byID[id] += w
+			total += w
+		}
+	}
+	avg := 1.0
+	if len(byID) > 0 {
+		avg = total / float64(len(byID))
+	}
+	if avg <= 0 {
+		avg = 1
+	}
+	return entityLens{byID: byID, avg: avg}
+}
+
+// scoreByTerms accumulates per-entity scores over the resolved terms. Each
+// term is weighted by inverse document frequency so rarer terms count for
+// more, its accumulated weight is capped and saturated so a person who
+// repeats a word endlessly cannot outrank the explicit owner, entities with
+// far more accumulated text than average are discounted, and a fuzzily
+// corrected term contributes at its resolution penalty. It returns the
 // scores and, per entity, the set of terms that matched.
 func scoreByTerms(
 	postings map[string]map[model.ID]float64,
 	terms []string,
+	resolved map[string]termHit,
 	universe int,
+	lens entityLens,
 ) (map[model.ID]float64, map[model.ID]map[string]bool) {
 	scores := make(map[model.ID]float64)
 	matched := make(map[model.ID]map[string]bool)
 	for _, term := range terms {
-		posting := postings[stem(term)]
+		hit, ok := resolved[term]
+		if !ok {
+			continue
+		}
+		posting := postings[hit.key]
 		if len(posting) == 0 {
 			continue
 		}
@@ -443,7 +571,12 @@ func scoreByTerms(
 			idf = 1 + math.Log(float64(universe)/float64(len(posting)))
 		}
 		for id, w := range posting {
-			scores[id] += w * idf
+			w = min(w, termWeightCap)
+			// The normalizer floors at one: an above-average profile is
+			// discounted for verbosity, but a sparse or decayed profile gets
+			// no boost, since its raw weight already says how little is there.
+			norm := max(1, 1-bm25B+bm25B*(lens.byID[id]/lens.avg))
+			scores[id] += hit.penalty * idf * (w * (bm25K1 + 1)) / (w + bm25K1*norm)
 			if matched[id] == nil {
 				matched[id] = make(map[string]bool)
 			}
@@ -454,22 +587,29 @@ func scoreByTerms(
 }
 
 // reasons describes, for each matched term, which field of the person it hit,
-// and returns the strongest evidence among those hits.
-func (ix *Index) reasons(pid model.ID, terms map[string]bool) ([]string, float64) {
+// and returns the strongest evidence among those hits. A fuzzily corrected
+// term classifies by its resolved stem and says so.
+func (ix *Index) reasons(
+	pid model.ID, terms map[string]bool, resolved map[string]termHit,
+) ([]string, float64) {
 	pt := ix.texts[pid]
 	out := make([]string, 0, len(terms))
 	var evidence float64
 	for term := range terms {
+		hit := resolved[term]
 		field, strength := "mention", evidenceMention
 		switch {
-		case pt != nil && containsToken(pt.Topics, term):
+		case pt != nil && stemMatches(hit.key, pt.Topics...):
 			field, strength = "topic", evidenceTopic
-		case pt != nil && strings.Contains(pt.Title, term):
+		case pt != nil && stemMatches(hit.key, pt.Title):
 			field, strength = "title", evidenceTitle
-		case pt != nil && strings.Contains(pt.Team, term):
+		case pt != nil && stemMatches(hit.key, pt.Team):
 			field, strength = "team", evidenceTeam
 		}
 		evidence = max(evidence, strength)
+		if hit.fuzzy() {
+			field += ", fuzzy"
+		}
 		out = append(out, fmt.Sprintf("%s (%s)", term, field))
 	}
 	sort.Strings(out)
@@ -477,22 +617,29 @@ func (ix *Index) reasons(pid model.ID, terms map[string]bool) ([]string, float64
 }
 
 // channelReasons describes, for each matched term, which field of the channel
-// it hit, and returns the strongest evidence among those hits.
-func (ix *Index) channelReasons(cid model.ID, terms map[string]bool) ([]string, float64) {
+// it hit, and returns the strongest evidence among those hits. A fuzzily
+// corrected term classifies by its resolved stem and says so.
+func (ix *Index) channelReasons(
+	cid model.ID, terms map[string]bool, resolved map[string]termHit,
+) ([]string, float64) {
 	ct := ix.channelTexts[cid]
 	out := make([]string, 0, len(terms))
 	var evidence float64
 	for term := range terms {
+		hit := resolved[term]
 		field, strength := "mention", evidenceMention
 		switch {
-		case ct != nil && containsToken(ct.Topics, term):
+		case ct != nil && stemMatches(hit.key, ct.Topics...):
 			field, strength = "topic", evidenceTopic
-		case ct != nil && strings.Contains(ct.Topic, term):
+		case ct != nil && stemMatches(hit.key, ct.Topic):
 			field, strength = "topic", evidenceTopic
-		case ct != nil && strings.Contains(ct.Name, term):
+		case ct != nil && stemMatches(hit.key, ct.Name):
 			field, strength = "name", evidenceTopic
 		}
 		evidence = max(evidence, strength)
+		if hit.fuzzy() {
+			field += ", fuzzy"
+		}
 		out = append(out, fmt.Sprintf("%s (%s)", term, field))
 	}
 	sort.Strings(out)
@@ -519,23 +666,13 @@ type snapshot struct {
 	Aliases map[model.ID]model.ID `json:"aliases,omitempty"`
 }
 
-// Save writes the index to path as JSON, creating parent directories as needed.
-func (ix *Index) Save(path string) (err error) {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+// Save writes the index to path as compact JSON readable only by the owner,
+// creating parent directories as needed. The write goes through a temporary
+// file and a rename so a crash cannot truncate an existing index.
+func (ix *Index) Save(path string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return fmt.Errorf("index: mkdir: %w", err)
 	}
-	f, err := os.Create(path)
-	if err != nil {
-		return fmt.Errorf("index: create: %w", err)
-	}
-	defer func() {
-		if cerr := f.Close(); cerr != nil && err == nil {
-			err = fmt.Errorf("index: close: %w", cerr)
-		}
-	}()
-
-	enc := json.NewEncoder(f)
-	enc.SetIndent("", "  ")
 	snap := snapshot{
 		Graph:           ix.Graph,
 		Postings:        ix.postings,
@@ -546,8 +683,12 @@ func (ix *Index) Save(path string) (err error) {
 		ChannelVecs:     ix.channelVecs,
 		Aliases:         ix.identityResolver().Pairs(),
 	}
-	if err := enc.Encode(snap); err != nil {
+	raw, err := json.Marshal(snap)
+	if err != nil {
 		return fmt.Errorf("index: encode: %w", err)
+	}
+	if err := util.WriteFileAtomic(path, raw, 0o600); err != nil {
+		return fmt.Errorf("index: write: %w", err)
 	}
 	return nil
 }

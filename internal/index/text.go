@@ -1,7 +1,6 @@
 package index
 
 import (
-	"slices"
 	"strings"
 
 	"github.com/kljensen/snowball"
@@ -18,6 +17,8 @@ var stopwords = map[string]bool{
 	"is": true, "it": true, "we": true, "me": true, "my": true, "an": true,
 	"at": true, "be": true, "as": true, "by": true, "us": true, "need": true,
 	"help": true, "have": true, "has": true, "get": true, "got": true,
+	"know": true, "knows": true, "handle": true, "handles": true,
+	"where": true, "when": true, "which": true, "why": true,
 }
 
 // tokenize lowercases text and splits it into searchable tokens, dropping
@@ -71,11 +72,16 @@ func stem(token string) string {
 	return s
 }
 
-// containsToken reports whether any phrase contains term as a whole token.
-func containsToken(phrases []string, term string) bool {
-	for _, ph := range phrases {
-		if slices.Contains(tokenize(ph), term) {
-			return true
+// stemMatches reports whether the stem want equals the stem of any token of
+// the given texts. It mirrors the scorer, which compares stems, so reasons
+// and confidence agree with what actually scored, including fuzzy hits that
+// resolved to a different stem than the raw query term.
+func stemMatches(want string, texts ...string) bool {
+	for _, txt := range texts {
+		for _, tok := range tokenize(txt) {
+			if stem(tok) == want {
+				return true
+			}
 		}
 	}
 	return false

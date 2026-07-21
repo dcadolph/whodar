@@ -20,6 +20,8 @@ func sampleRecords() []connector.Record {
 			Team: "Infra", Topics: []string{"kafka"}},
 		{Source: "t", Name: "Carol Ng", Email: "carol@x.com", Title: "Engineer",
 			Team: "Billing", Text: "owns the billing dashboards"},
+		{Source: "t", Name: "Dana Fox", Email: "dana@x.com", Title: "Author of runbooks",
+			Team: "Docs", Text: "auth service reviews"},
 	}
 }
 
@@ -36,6 +38,12 @@ func TestSearchRanking(t *testing.T) {
 		{Name: "team text", Query: "billing dashboards", WantTop: "carol@x.com",
 			WantReason: "dashboards (mention)"},
 		{Name: "title", Query: "sre", WantTop: "bob@x.com", WantReason: "sre (title)"},
+		{Name: "inflected topic", Query: "retry", WantTop: "jane@x.com",
+			WantReason: "retry (topic)"},
+		{Name: "no substring inflation", Query: "auth", WantTop: "dana@x.com",
+			WantReason: "auth (mention)"},
+		{Name: "fuzzy topic typo", Query: "kafkaa", WantTop: "bob@x.com",
+			WantReason: "kafkaa (topic, fuzzy)"},
 	}
 
 	ix := New()
@@ -55,6 +63,49 @@ func TestSearchRanking(t *testing.T) {
 				t.Errorf("test %d: reasons %v missing %q", testNum, got[0].Reasons, test.WantReason)
 			}
 		})
+	}
+}
+
+// TestFuzzyMatching verifies typo tolerance: a close typo resolves with a
+// score penalty so exact stays ahead, short terms never fuzz, and nonsense
+// still matches nothing.
+func TestFuzzyMatching(t *testing.T) {
+	t.Parallel()
+	ix := New()
+	ix.Build(sampleRecords())
+
+	exact := ix.Search("kafka", 5)
+	typo := ix.Search("kafkaa", 5)
+	if len(exact) == 0 || len(typo) == 0 {
+		t.Fatalf("exact = %d results, typo = %d results, want both to match", len(exact), len(typo))
+	}
+	if typo[0].Person.ID != "bob@x.com" {
+		t.Errorf("typo top = %s, want bob@x.com", typo[0].Person.ID)
+	}
+	if typo[0].Score >= exact[0].Score {
+		t.Errorf("typo score %.3f not below exact %.3f", typo[0].Score, exact[0].Score)
+	}
+	if got := ix.Search("kfk", 5); len(got) != 0 {
+		t.Errorf("short typo matched %d results, want none", len(got))
+	}
+	if got := ix.Search("zzzzzz", 5); len(got) != 0 {
+		t.Errorf("nonsense matched %d results, want none", len(got))
+	}
+}
+
+// TestConfidenceIgnoresScaffold verifies conversational scaffolding such as
+// "who knows" does not dilute confidence: a dead-on topic owner scores full
+// confidence for the tagline phrasing.
+func TestConfidenceIgnoresScaffold(t *testing.T) {
+	t.Parallel()
+	ix := New()
+	ix.Build(sampleRecords())
+	got := ix.Search("who knows retries", 5)
+	if len(got) == 0 {
+		t.Fatal("no matches")
+	}
+	if got[0].Person.ID != "jane@x.com" || got[0].Confidence != 1.0 {
+		t.Errorf("top = %s confidence = %v, want jane@x.com at 1.0", got[0].Person.ID, got[0].Confidence)
 	}
 }
 

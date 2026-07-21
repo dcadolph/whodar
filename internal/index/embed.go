@@ -46,7 +46,8 @@ func (ix *Index) Embed(ctx context.Context, e Embedder) error {
 	return nil
 }
 
-// SemanticPeople ranks people by cosine similarity to the query vector.
+// SemanticPeople ranks people by cosine similarity to the query vector. The
+// similarity doubles as the confidence, clamped at zero.
 func (ix *Index) SemanticPeople(query []float32, limit int) []model.Match {
 	ranked := rankByCosine(ix.personVecs, query, limit)
 	out := make([]model.Match, 0, len(ranked))
@@ -60,10 +61,11 @@ func (ix *Index) SemanticPeople(query []float32, limit int) []model.Match {
 			team = ix.Graph.Teams[p.TeamID]
 		}
 		out = append(out, model.Match{
-			Person:  p,
-			Team:    team,
-			Score:   r.score,
-			Reasons: []string{"semantic match"},
+			Person:     p,
+			Team:       team,
+			Score:      r.score,
+			Confidence: max(0, r.score),
+			Reasons:    []string{"semantic match"},
 		})
 	}
 	return out
@@ -83,6 +85,7 @@ func (ix *Index) SemanticChannels(query []float32, limit int) []model.ChannelMat
 		out = append(out, model.ChannelMatch{
 			Channel:    ch,
 			Score:      r.score,
+			Confidence: max(0, r.score),
 			Reasons:    []string{"semantic match"},
 			TopMembers: ix.topMembers(ch, memberScores, 3),
 		})

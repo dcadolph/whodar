@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/dcadolph/whodar/internal/util"
 )
 
 // Votes a user can cast on one result.
@@ -149,13 +151,14 @@ func (s *Store) Clear(f Filter) (int, error) {
 	return removed, s.save()
 }
 
-// save writes the entries to the store's path. Callers hold the lock.
+// save writes the entries to the store's path atomically. Callers hold the
+// lock.
 func (s *Store) save() error {
-	raw, err := json.MarshalIndent(s.entries, "", "  ")
+	raw, err := json.Marshal(s.entries)
 	if err != nil {
 		return fmt.Errorf("feedback: encode: %w", err)
 	}
-	if err := os.WriteFile(s.path, raw, 0o600); err != nil {
+	if err := util.WriteFileAtomic(s.path, raw, 0o600); err != nil {
 		return fmt.Errorf("feedback: write %s: %w", s.path, err)
 	}
 	return nil

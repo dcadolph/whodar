@@ -49,6 +49,9 @@ func TestSemanticSearch(t *testing.T) {
 	if len(got) == 0 || got[0].Person.Email != "jane@x.com" {
 		t.Fatalf("top semantic person = %v, want jane@x.com", got)
 	}
+	if got[0].Confidence <= 0 || got[0].Confidence != got[0].Score {
+		t.Errorf("confidence = %v score = %v, want similarity as confidence", got[0].Confidence, got[0].Score)
+	}
 }
 
 // TestEmbedSaveLoad verifies vectors survive a round trip to disk.
