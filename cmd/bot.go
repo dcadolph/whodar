@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -127,13 +125,10 @@ func runSocketBot(cmd *cobra.Command, engine *bot.Engine, replier bot.Replier, b
 	if appToken == "" {
 		return fmt.Errorf("%w: set %s for socket transport", ErrBadArgs, slackAppTokenEnv)
 	}
-	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
 	runner := bot.NewSocketRunner(slack.New(appToken), engine, replier, botUserID,
 		bot.WithLog(cmd.ErrOrStderr()), bot.WithResponder(bot.ResponderFunc(slack.Respond)))
 	fmt.Fprintln(cmd.ErrOrStderr(), "whodar bot: connected over socket mode (Ctrl-C to stop)")
-	return runner.Run(ctx)
+	return runner.Run(cmd.Context())
 }
 
 // runEventsBot serves the Slack Events API until interrupted.
@@ -150,8 +145,7 @@ func runEventsBot(cmd *cobra.Command, engine *bot.Engine, replier bot.Replier, b
 	mux.Handle("/slack/commands", slash)
 	srv := &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 5 * time.Second}
 
-	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
+	ctx := cmd.Context()
 	errCh := make(chan error, 1)
 	go func() { errCh <- srv.ListenAndServe() }()
 	fmt.Fprintf(cmd.ErrOrStderr(),

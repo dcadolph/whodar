@@ -8,9 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -42,7 +40,7 @@ type webConfig struct {
 	embedModel string
 	// ollamaURL is the Ollama base URL.
 	ollamaURL string
-	// provider is the llm-mode provider: ollama, anthropic, or openai.
+	// provider is the llm-mode provider: ollama, anthropic, openai, or gemini.
 	provider string
 	// openaiURL is an OpenAI-compatible base URL for the openai provider.
 	openaiURL string
@@ -151,16 +149,14 @@ func serveWeb(cmd *cobra.Command, opts *options, ix *index.Index, store *feedbac
 
 	handler, err := web.Handler(web.Config{
 		Ask: ask, Feedback: vote, Person: person, Version: version, AuthToken: token,
-		Directory: &dir, Modes: modes,
+		Directory: &dir, Modes: modes, Log: cmd.ErrOrStderr(),
 	})
 	if err != nil {
 		return err
 	}
 	srv := &http.Server{Addr: cfg.addr, Handler: handler, ReadHeaderTimeout: 5 * time.Second}
 
-	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
+	ctx := cmd.Context()
 	errCh := make(chan error, 1)
 	go func() { errCh <- srv.ListenAndServe() }()
 	fmt.Fprintf(cmd.ErrOrStderr(), "whodar serving on http://%s (Ctrl-C to stop)\n", cfg.addr)
