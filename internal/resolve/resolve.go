@@ -1,13 +1,15 @@
 // Package resolve answers queries against an index through swappable resolvers.
 // The keyword resolver needs no LLM. The LLM resolver retrieves candidates with
-// the keyword index, then asks a local model to rank them and write a short
-// recommendation, grounded so it cannot invent people or channels.
+// the keyword index, then asks a model to rank them. The written recommendation
+// is composed locally from the top-ranked candidates, so it can never name a
+// person or channel the model invented.
 package resolve
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/dcadolph/whodar/internal/index"
@@ -82,10 +84,9 @@ const llmSystem = `You help an employee find who to talk to and which channel to
 You are given a question and a list of candidate people and channels retrieved from an
 internal index. Pick and rank only the most relevant candidates. Never invent a person,
 email, or channel that is not in the candidate list. Reply only as JSON of the form:
-{"summary":"<one or two sentences naming the best person and channel>",
-"people":["<email or name from candidates, best first>"],
+{"people":["<email or name from candidates, best first>"],
 "channels":["<channel name from candidates, best first>"]}.
-If no candidate is relevant, return empty arrays and say so in the summary.`
+If no candidate is relevant, return empty arrays.`
 
 // redactedSystem is the system prompt for the redacted path: candidates are
 // numbered and carry no identifiers, people are roles, channels are only the
@@ -99,11 +100,12 @@ Reply only as JSON of the form:
 If no candidate is relevant, return empty arrays.`
 
 // LLM is a resolver that retrieves candidates with the keyword index, then asks
-// a model to rank them and summarize. It stays grounded: model output is
-// matched back to retrieved candidates and anything invented is dropped. In
+// a model to rank them. It stays grounded: model output is matched back to
+// retrieved candidates, anything invented is dropped, and the written summary is
+// composed locally from the top result so the model never authors a name. In
 // redacted mode, built for cloud models under the redacted policy, candidates
-// leave the machine as numbered roles with no names or emails, the model
-// returns numbers, and the summary is written locally.
+// leave the machine as numbered roles with no names or emails and the model
+// returns numbers.
 type LLM struct {
 	// ix retrieves candidates.
 	ix *index.Index
@@ -136,19 +138,65 @@ func NewRedactedLLM(ix *index.Index, chat Chatter, embedder Embedder) *LLM {
 	return l
 }
 
-// llmResult is the JSON the model is asked to return.
+// llmResult is the JSON the model is asked to return. Any summary the model
+// includes is ignored: the recommendation is written locally from the grounded
+// top result.
 type llmResult struct {
-	// Summary is the written recommendation.
-	Summary string `json:"summary"`
-	// People is the ranked list of person emails or names.
-	People []string `json:"people"`
-	// Channels is the ranked list of channel names.
-	Channels []string `json:"channels"`
+	// People is the ranked list of person emails, names, or candidate numbers.
+	People []rankToken `json:"people"`
+	// Channels is the ranked list of channel names or candidate numbers.
+	Channels []rankToken `json:"channels"`
 }
 
-// Resolve retrieves candidates, asks the model to rank and summarize them, and
-// returns the grounded result. If the model reply cannot be parsed, it falls
-// back to keyword order and uses the raw reply as the summary.
+// rankToken is one entry in a model's ranked list. The redacted prompt asks for
+// a candidate number, but models variously return the bare integer, the number
+// as a string, or the name, so it decodes from a JSON string or number alike.
+type rankToken string
+
+// UnmarshalJSON accepts a JSON string or number and stores its string form.
+// Anything else decodes to the empty token, which matches no candidate and is
+// dropped downstream, so one odd entry never fails the whole ranking.
+func (t *rankToken) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		*t = rankToken(s)
+		return nil
+	}
+	var n json.Number
+	if err := json.Unmarshal(data, &n); err == nil {
+		*t = rankToken(n.String())
+		return nil
+	}
+	*t = ""
+	return nil
+}
+
+// rankStrings returns the ranked tokens as a plain string slice for reordering.
+func rankStrings(tokens []rankToken) []string {
+	out := make([]string, len(tokens))
+	for i, t := range tokens {
+		out[i] = string(t)
+	}
+	return out
+}
+
+// extractJSON returns the JSON object embedded in a model reply that may wrap it
+// in a markdown code fence or surround it with prose: the substring from the
+// first opening brace to the last closing brace, or the trimmed reply when it
+// holds no braces.
+func extractJSON(raw string) string {
+	start := strings.IndexByte(raw, '{')
+	end := strings.LastIndexByte(raw, '}')
+	if start >= 0 && end > start {
+		return raw[start : end+1]
+	}
+	return strings.TrimSpace(raw)
+}
+
+// Resolve retrieves candidates, asks the model to rank them, and returns the
+// grounded result with a locally written summary. If the model reply cannot be
+// parsed, it keeps keyword order. An explicit empty ranking is honored as the
+// model abstaining, not overridden with the full candidate list.
 func (l *LLM) Resolve(ctx context.Context, query string, limit int) (Answer, error) {
 	n := candidateN(limit)
 	people, channels := l.retrieve(ctx, query, n)
@@ -166,26 +214,44 @@ func (l *LLM) Resolve(ctx context.Context, query string, limit int) (Answer, err
 	}
 
 	var out llmResult
-	if jsonErr := json.Unmarshal([]byte(raw), &out); jsonErr != nil {
-		ans := Answer{
-			People:   capPeople(people, limit),
-			Channels: capChannels(channels, limit),
-			Summary:  strings.TrimSpace(raw),
-		}
-		if l.redact {
-			ans.Summary = localSummary(ans.People, ans.Channels)
-		}
-		return ans, nil
+	if jsonErr := json.Unmarshal([]byte(extractJSON(raw)), &out); jsonErr != nil {
+		// The reply was not usable JSON: keep keyword order rather than trusting
+		// unparsed prose, and write the summary from those grounded results.
+		return groundedAnswer(capList(people, limit), capList(channels, limit)), nil
 	}
-	ans := Answer{
-		People:   capPeople(reorderPeople(people, out.People), limit),
-		Channels: capChannels(reorderChannels(channels, out.Channels), limit),
-		Summary:  strings.TrimSpace(out.Summary),
+	return groundedAnswer(
+		rankedPeople(people, out.People, limit),
+		rankedChannels(channels, out.Channels, limit),
+	), nil
+}
+
+// groundedAnswer assembles an Answer and writes its recommendation locally from
+// the top-ranked results, so the summary can never name a non-candidate.
+func groundedAnswer(people []model.Match, channels []model.ChannelMatch) Answer {
+	return Answer{
+		People:   people,
+		Channels: channels,
+		Summary:  localSummary(people, channels),
 	}
-	if l.redact {
-		ans.Summary = localSummary(ans.People, ans.Channels)
+}
+
+// rankedPeople applies the model's ordering to the candidates. A nil ranking,
+// meaning the field was absent, keeps keyword order; an explicit empty ranking
+// is the model abstaining and yields no people.
+func rankedPeople(cands []model.Match, order []rankToken, limit int) []model.Match {
+	if order != nil && len(order) == 0 {
+		return nil
 	}
-	return ans, nil
+	return capList(reorderPeople(cands, rankStrings(order)), limit)
+}
+
+// rankedChannels applies the model's ordering to the channel candidates, with
+// the same abstention rule as rankedPeople.
+func rankedChannels(cands []model.ChannelMatch, order []rankToken, limit int) []model.ChannelMatch {
+	if order != nil && len(order) == 0 {
+		return nil
+	}
+	return capList(reorderChannels(cands, rankStrings(order)), limit)
 }
 
 // retrieve gets candidate people and channels, semantically when an embedder is
@@ -307,7 +373,7 @@ func localSummary(people []model.Match, channels []model.ChannelMatch) string {
 func reorderPeople(cands []model.Match, order []string) []model.Match {
 	byKey := make(map[string]model.Match, len(cands)*3)
 	for i, m := range cands {
-		byKey[fmt.Sprintf("%d", i+1)] = m
+		byKey[strconv.Itoa(i+1)] = m
 		if m.Person.Email != "" {
 			byKey[strings.ToLower(m.Person.Email)] = m
 		}
@@ -338,7 +404,7 @@ func reorderPeople(cands []model.Match, order []string) []model.Match {
 func reorderChannels(cands []model.ChannelMatch, order []string) []model.ChannelMatch {
 	byName := make(map[string]model.ChannelMatch, len(cands)*2)
 	for i, c := range cands {
-		byName[fmt.Sprintf("%d", i+1)] = c
+		byName[strconv.Itoa(i+1)] = c
 		byName[strings.ToLower(c.Channel.Name)] = c
 	}
 	out := make([]model.ChannelMatch, 0, len(cands))
@@ -359,20 +425,12 @@ func reorderChannels(cands []model.ChannelMatch, order []string) []model.Channel
 	return out
 }
 
-// capPeople limits matches to limit; a non-positive limit returns all.
-func capPeople(matches []model.Match, limit int) []model.Match {
-	if limit > 0 && len(matches) > limit {
-		return matches[:limit]
+// capList returns at most limit items; a non-positive limit returns all.
+func capList[T any](items []T, limit int) []T {
+	if limit > 0 && len(items) > limit {
+		return items[:limit]
 	}
-	return matches
-}
-
-// capChannels limits matches to limit; a non-positive limit returns all.
-func capChannels(matches []model.ChannelMatch, limit int) []model.ChannelMatch {
-	if limit > 0 && len(matches) > limit {
-		return matches[:limit]
-	}
-	return matches
+	return items
 }
 
 // Semantic is a resolver that ranks purely by embedding similarity. It needs an

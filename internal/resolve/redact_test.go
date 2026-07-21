@@ -77,6 +77,36 @@ func TestRedactedLLMSendsNoIdentifiers(t *testing.T) {
 	}
 }
 
+// TestRedactedLLMDecodesFlexibleRankings verifies the redacted re-ranking
+// survives the shapes cloud models actually return: bare integer indices, a
+// fenced code block, and prose preceding the JSON. Each must flip Alice and Bob
+// the way the numbers 2 then 1 direct, not silently fall back to keyword order.
+func TestRedactedLLMDecodesFlexibleRankings(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		Name  string
+		Reply string
+	}{
+		{Name: "bare integers", Reply: `{"people":[2,1],"channels":[1]}`},
+		{Name: "string integers", Reply: `{"people":["2","1"],"channels":["1"]}`},
+		{Name: "fenced json", Reply: "```json\n{\"people\":[2,1],\"channels\":[1]}\n```"},
+		{Name: "prose preamble", Reply: `Sure, here you go: {"people":[2,1],"channels":[1]} hope that helps`},
+	}
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) {
+			t.Parallel()
+			chat := &captureChatter{reply: test.Reply}
+			ans, err := NewRedactedLLM(redactIndex(), chat, nil).Resolve(context.Background(), "billing", 5)
+			if err != nil {
+				t.Fatalf("Resolve: %v", err)
+			}
+			if len(ans.People) != 2 || ans.People[0].Person.Email != "bob@corp.com" {
+				t.Fatalf("top person = %v, want bob@corp.com from the number ranking", ans.People)
+			}
+		})
+	}
+}
+
 // TestBuildRedactedPromptOmitsChannelData verifies channel names and topics
 // stay out of the redacted prompt even when they carry sensitive tokens.
 func TestBuildRedactedPromptOmitsChannelData(t *testing.T) {
