@@ -1,6 +1,7 @@
 package index
 
 import (
+	"os"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -106,6 +107,44 @@ func TestConfidenceIgnoresScaffold(t *testing.T) {
 	}
 	if got[0].Person.ID != "jane@x.com" || got[0].Confidence != 1.0 {
 		t.Errorf("top = %s confidence = %v, want jane@x.com at 1.0", got[0].Person.ID, got[0].Confidence)
+	}
+}
+
+// TestDuplicateTermsKeepConfidence verifies a repeated query token neither
+// deflates coverage nor double-counts, so it ranks identically to one token.
+func TestDuplicateTermsKeepConfidence(t *testing.T) {
+	t.Parallel()
+	ix := New()
+	ix.Build(sampleRecords())
+	once := ix.Search("retries", 5)
+	twice := ix.Search("retries retries", 5)
+	if len(once) == 0 || len(twice) == 0 {
+		t.Fatal("no matches")
+	}
+	if once[0].Person.ID != twice[0].Person.ID {
+		t.Fatalf("top differs: %s vs %s", once[0].Person.ID, twice[0].Person.ID)
+	}
+	if once[0].Confidence != twice[0].Confidence || once[0].Score != twice[0].Score {
+		t.Errorf("duplicate token changed ranking: confidence %v vs %v, score %v vs %v",
+			once[0].Confidence, twice[0].Confidence, once[0].Score, twice[0].Score)
+	}
+}
+
+// TestLoadPartialSnapshotMerges verifies a snapshot whose graph omits sub-maps
+// does not panic when records are merged onto it.
+func TestLoadPartialSnapshotMerges(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "index.json")
+	if err := os.WriteFile(path, []byte(`{"graph":{}}`), 0o600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	ix, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	ix.Add(sampleRecords())
+	if len(ix.Search("retries", 5)) == 0 {
+		t.Error("want matches after merging onto a partial snapshot")
 	}
 }
 

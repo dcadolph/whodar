@@ -51,6 +51,7 @@ func (ix *Index) Canonicalize() {
 	for _, ch := range g.Channels {
 		ch.Members = canonicalMembers(ch.Members, r)
 	}
+	ix.refreshStats()
 }
 
 // mergePerson folds src into dst: identity fields fill blanks, topic weights
@@ -107,12 +108,8 @@ func mergePersonText(texts map[model.ID]*personText, from, to model.ID) {
 		texts[to] = src
 		return
 	}
-	if dst.Title == "" {
-		dst.Title = src.Title
-	}
-	if dst.Team == "" {
-		dst.Team = src.Team
-	}
+	dst.Titles = append(dst.Titles, src.Titles...)
+	dst.Teams = append(dst.Teams, src.Teams...)
 	dst.Topics = append(dst.Topics, src.Topics...)
 	dst.Text = strings.TrimSpace(dst.Text + " " + src.Text)
 }

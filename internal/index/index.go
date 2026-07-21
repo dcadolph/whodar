@@ -57,10 +57,11 @@ const (
 // personText holds the normalized field text for a person, used to explain why
 // the person matched a query.
 type personText struct {
-	// Title is the lowercased job title.
-	Title string `json:"title"`
-	// Team is the lowercased team name.
-	Team string `json:"team"`
+	// Titles are the lowercased job titles seen across sources, accumulated so a
+	// title a later record lacks is not lost to last-write-wins.
+	Titles []string `json:"titles"`
+	// Teams are the lowercased team names seen across sources.
+	Teams []string `json:"teams"`
 	// Topics are the lowercased explicit topic names.
 	Topics []string `json:"topics"`
 	// Text is the accumulated lowercased free text.
@@ -109,11 +110,20 @@ type Index struct {
 	fbStep float64
 	// fbMax clamps net votes per result; zero means the default, negative off.
 	fbMax int
+	// personLens and channelLens cache BM25 document lengths, refreshed when
+	// postings change so a query never rescans every posting.
+	personLens  entityLens
+	channelLens entityLens
+	// personVocab and channelVocab bucket posting keys by length so a fuzzy term
+	// scans only candidates within its edit-distance band, not the whole
+	// vocabulary.
+	personVocab  vocabIndex
+	channelVocab vocabIndex
 }
 
 // New returns an empty index with initialized maps.
 func New() *Index {
-	return &Index{
+	ix := &Index{
 		Graph:           model.NewGraph(),
 		postings:        make(map[string]map[model.ID]float64),
 		texts:           make(map[model.ID]*personText),
@@ -125,6 +135,19 @@ func New() *Index {
 		halfLife:        DefaultHalfLife,
 		now:             time.Now,
 	}
+	ix.refreshStats()
+	return ix
+}
+
+// refreshStats recomputes the cached length tables and vocabulary buckets from
+// the current postings. It runs after any operation that changes postings, so
+// serving reads never rescan the full posting set. It must not run concurrently
+// with a search, matching the index's build-then-serve lifecycle.
+func (ix *Index) refreshStats() {
+	ix.personLens = lengthsOf(ix.postings)
+	ix.channelLens = lengthsOf(ix.channelPostings)
+	ix.personVocab = newVocabIndex(ix.postings)
+	ix.channelVocab = newVocabIndex(ix.channelPostings)
 }
 
 // SetHalfLife sets the age at which a dated record's weight halves. Zero or
@@ -169,6 +192,7 @@ func (ix *Index) Add(records []connector.Record) {
 			ix.buildPerson(rec)
 		}
 	}
+	ix.refreshStats()
 }
 
 // LoadAliases merges a JSON alias file into the index's identity resolver so
@@ -238,11 +262,11 @@ func (ix *Index) buildPerson(rec connector.Record) {
 		}
 	}
 	if rec.Title != "" {
-		pt.Title = strings.ToLower(rec.Title)
+		pt.Titles = appendUnique(pt.Titles, strings.ToLower(rec.Title))
 		add(rec.Title, weightTitle)
 	}
 	if rec.Team != "" {
-		pt.Team = strings.ToLower(rec.Team)
+		pt.Teams = appendUnique(pt.Teams, strings.ToLower(rec.Team))
 		add(rec.Team, weightTeam)
 	}
 	for _, top := range rec.Topics {
@@ -321,12 +345,12 @@ func (ix *Index) buildChannel(rec connector.Record) {
 // Search ranks people for query and returns up to limit matches. A non-positive
 // limit returns all matches.
 func (ix *Index) Search(query string, limit int) []model.Match {
-	terms := tokenize(query)
+	terms := distinct(tokenize(query))
 	if len(terms) == 0 {
 		return nil
 	}
-	resolved := resolveTerms(ix.postings, terms)
-	scores, matched := scoreByTerms(ix.postings, terms, resolved, len(ix.Graph.People), lengthsOf(ix.postings))
+	resolved := resolveTerms(ix.postings, ix.personVocab, terms)
+	scores, matched := scoreByTerms(ix.postings, terms, resolved, len(ix.Graph.People), ix.personLens)
 	nets := ix.feedbackNets(terms, false)
 
 	matches := make([]model.Match, 0, len(scores))
@@ -368,16 +392,16 @@ func (ix *Index) Search(query string, limit int) []model.Match {
 // SearchChannels ranks channels for query and returns up to limit matches, each
 // carrying the most relevant active members. A non-positive limit returns all.
 func (ix *Index) SearchChannels(query string, limit int) []model.ChannelMatch {
-	terms := tokenize(query)
+	terms := distinct(tokenize(query))
 	if len(terms) == 0 {
 		return nil
 	}
-	resolved := resolveTerms(ix.channelPostings, terms)
+	resolved := resolveTerms(ix.channelPostings, ix.channelVocab, terms)
 	scores, matched := scoreByTerms(
-		ix.channelPostings, terms, resolved, len(ix.Graph.Channels), lengthsOf(ix.channelPostings))
-	personResolved := resolveTerms(ix.postings, terms)
+		ix.channelPostings, terms, resolved, len(ix.Graph.Channels), ix.channelLens)
+	personResolved := resolveTerms(ix.postings, ix.personVocab, terms)
 	personScores, _ := scoreByTerms(
-		ix.postings, terms, personResolved, len(ix.Graph.People), lengthsOf(ix.postings))
+		ix.postings, terms, personResolved, len(ix.Graph.People), ix.personLens)
 	nets := ix.feedbackNets(terms, true)
 
 	matches := make([]model.ChannelMatch, 0, len(scores))
@@ -464,12 +488,31 @@ type termHit struct {
 // fuzzy reports whether the resolution corrected the term.
 func (h termHit) fuzzy() bool { return h.penalty < 1 }
 
+// vocabIndex groups posting keys by byte length so a fuzzy lookup scans only
+// the keys whose length is within the edit-distance band of the query term,
+// rather than the entire vocabulary.
+type vocabIndex struct {
+	// byLen maps a key's byte length to the keys of that length.
+	byLen map[int][]string
+}
+
+// newVocabIndex buckets a posting vocabulary by key length.
+func newVocabIndex(postings map[string]map[model.ID]float64) vocabIndex {
+	byLen := make(map[int][]string)
+	for k := range postings {
+		byLen[len(k)] = append(byLen[len(k)], k)
+	}
+	return vocabIndex{byLen: byLen}
+}
+
 // resolveTerms maps each query term to its posting key, fuzzily when the
 // exact stem has no posting. Terms that resolve to nothing are absent.
-func resolveTerms(postings map[string]map[model.ID]float64, terms []string) map[string]termHit {
+func resolveTerms(
+	postings map[string]map[model.ID]float64, vocab vocabIndex, terms []string,
+) map[string]termHit {
 	out := make(map[string]termHit, len(terms))
 	for _, term := range terms {
-		if hit, ok := resolveTerm(postings, term); ok {
+		if hit, ok := resolveTerm(postings, vocab, term); ok {
 			out[term] = hit
 		}
 	}
@@ -478,9 +521,12 @@ func resolveTerms(postings map[string]map[model.ID]float64, terms []string) map[
 
 // resolveTerm returns the posting key for one term: its own stem when a
 // posting exists, otherwise the closest vocabulary key within the allowed
-// edit distance. Ties break to the lexicographically smallest key so results
-// are deterministic.
-func resolveTerm(postings map[string]map[model.ID]float64, term string) (termHit, bool) {
+// edit distance. Only keys whose length is within that distance of the stem
+// can match, so the search is confined to those length buckets. Ties break to
+// the lexicographically smallest key so results are deterministic.
+func resolveTerm(
+	postings map[string]map[model.ID]float64, vocab vocabIndex, term string,
+) (termHit, bool) {
 	key := stem(term)
 	if len(postings[key]) > 0 {
 		return termHit{key: key, penalty: 1}, true
@@ -494,13 +540,12 @@ func resolveTerm(postings map[string]map[model.ID]float64, term string) (termHit
 		maxDist = 2
 	}
 	best, bestDist := "", maxDist+1
-	for cand := range postings {
-		if diff := len(cand) - len(key); diff > maxDist || diff < -maxDist {
-			continue
-		}
-		d := levenshtein.ComputeDistance(key, cand)
-		if d < bestDist || (d == bestDist && best != "" && cand < best) {
-			best, bestDist = cand, d
+	for l := len(key) - maxDist; l <= len(key)+maxDist; l++ {
+		for _, cand := range vocab.byLen[l] {
+			d := levenshtein.ComputeDistance(key, cand)
+			if d < bestDist || (d == bestDist && best != "" && cand < best) {
+				best, bestDist = cand, d
+			}
 		}
 	}
 	if best == "" || bestDist > maxDist {
@@ -557,6 +602,7 @@ func scoreByTerms(
 ) (map[model.ID]float64, map[model.ID]map[string]bool) {
 	scores := make(map[model.ID]float64)
 	matched := make(map[model.ID]map[string]bool)
+	scored := make(map[string]bool)
 	for _, term := range terms {
 		hit, ok := resolved[term]
 		if !ok {
@@ -566,6 +612,20 @@ func scoreByTerms(
 		if len(posting) == 0 {
 			continue
 		}
+		// Record the term's coverage for every entity it hit, even if another
+		// term already scored this key, so coverage counts distinct terms.
+		for id := range posting {
+			if matched[id] == nil {
+				matched[id] = make(map[string]bool)
+			}
+			matched[id][term] = true
+		}
+		// Score each resolved key once: two query terms that stem to the same
+		// key describe one piece of evidence, not two.
+		if scored[hit.key] {
+			continue
+		}
+		scored[hit.key] = true
 		idf := 1.0
 		if universe > 0 {
 			idf = 1 + math.Log(float64(universe)/float64(len(posting)))
@@ -577,13 +637,32 @@ func scoreByTerms(
 			// no boost, since its raw weight already says how little is there.
 			norm := max(1, 1-bm25B+bm25B*(lens.byID[id]/lens.avg))
 			scores[id] += hit.penalty * idf * (w * (bm25K1 + 1)) / (w + bm25K1*norm)
-			if matched[id] == nil {
-				matched[id] = make(map[string]bool)
-			}
-			matched[id][term] = true
 		}
 	}
 	return scores, matched
+}
+
+// appendUnique appends s to list when it is not already present, keeping the
+// accumulated field values free of duplicates.
+func appendUnique(list []string, s string) []string {
+	if slices.Contains(list, s) {
+		return list
+	}
+	return append(list, s)
+}
+
+// distinct returns terms with duplicates removed, preserving first-seen order,
+// so a repeated query token neither double-scores nor deflates coverage.
+func distinct(terms []string) []string {
+	seen := make(map[string]bool, len(terms))
+	out := terms[:0]
+	for _, t := range terms {
+		if !seen[t] {
+			seen[t] = true
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 // reasons describes, for each matched term, which field of the person it hit,
@@ -601,9 +680,9 @@ func (ix *Index) reasons(
 		switch {
 		case pt != nil && stemMatches(hit.key, pt.Topics...):
 			field, strength = "topic", evidenceTopic
-		case pt != nil && stemMatches(hit.key, pt.Title):
+		case pt != nil && stemMatches(hit.key, pt.Titles...):
 			field, strength = "title", evidenceTitle
-		case pt != nil && stemMatches(hit.key, pt.Team):
+		case pt != nil && stemMatches(hit.key, pt.Teams...):
 			field, strength = "team", evidenceTeam
 		}
 		evidence = max(evidence, strength)
@@ -721,6 +800,18 @@ func Load(path string) (*Index, error) {
 	if ix.Graph == nil {
 		ix.Graph = model.NewGraph()
 	}
+	if ix.Graph.People == nil {
+		ix.Graph.People = make(map[model.ID]*model.Person)
+	}
+	if ix.Graph.Teams == nil {
+		ix.Graph.Teams = make(map[model.ID]*model.Team)
+	}
+	if ix.Graph.Orgs == nil {
+		ix.Graph.Orgs = make(map[model.ID]*model.Org)
+	}
+	if ix.Graph.Topics == nil {
+		ix.Graph.Topics = make(map[model.ID]*model.Topic)
+	}
 	if ix.Graph.Channels == nil {
 		ix.Graph.Channels = make(map[model.ID]*model.Channel)
 	}
@@ -742,6 +833,7 @@ func Load(path string) (*Index, error) {
 	if ix.channelVecs == nil {
 		ix.channelVecs = make(map[model.ID][]float32)
 	}
+	ix.refreshStats()
 	return ix, nil
 }
 

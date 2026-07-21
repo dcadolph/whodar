@@ -26,7 +26,9 @@ func (ix *Index) AutoJoin() int {
 		if len(key) < minHandleLen {
 			return
 		}
-		if have, ok := byFlat[key]; ok && have != id {
+		// Two entries collide only when they are genuinely distinct people; two
+		// identifiers the resolver already unions are one person, not ambiguity.
+		if have, ok := byFlat[key]; ok && r.Canonical(have) != r.Canonical(id) {
 			ambiguous[key] = true
 			return
 		}
@@ -52,7 +54,7 @@ func (ix *Index) AutoJoin() int {
 			continue
 		}
 		target, ok := byFlat[key]
-		if !ok {
+		if !ok || r.Canonical(target) == r.Canonical(id) {
 			continue
 		}
 		r.Union(target, id)

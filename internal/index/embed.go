@@ -151,7 +151,7 @@ func cosine(a, b []float32) float64 {
 func personEmbedText(p *model.Person, pt *personText) string {
 	parts := []string{p.Name, p.Title}
 	if pt != nil {
-		parts = append(parts, pt.Team)
+		parts = append(parts, pt.Teams...)
 		parts = append(parts, pt.Topics...)
 		parts = append(parts, pt.Text)
 	}
