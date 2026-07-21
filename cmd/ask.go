@@ -204,20 +204,28 @@ func newOllama(model, embedModel, ollamaURL string) *llm.Ollama {
 	return llm.New(model, llm.WithBaseURL(ollamaURL), llm.WithEmbedModel(embedModel))
 }
 
-// guardLLMHost permits a loopback model host unconditionally and requires
-// egress permission for any other host. Redacted only admits the known
-// provider hosts, so an arbitrary remote model host needs open.
+// guardLLMHost permits a loopback model host unconditionally and requires the
+// open policy for any other host. The semantic and Ollama paths send full
+// profile text with no redaction, so a non-loopback host would leak names,
+// emails, and titles. Redacted's known-provider allowance is sound only on the
+// cloud path, which anonymizes candidates, so it must not apply here: only open,
+// where the operator accepts unrestricted egress, admits a remote host.
 func guardLLMHost(pol policy.Policy, raw string) error {
 	u, err := url.Parse(raw)
 	if err != nil {
-		return fmt.Errorf("%w: invalid ollama url %q: %v", ErrBadArgs, raw, err)
+		return fmt.Errorf("%w: invalid model url %q: %v", ErrBadArgs, raw, err)
 	}
-	switch u.Hostname() {
-	case "", "localhost", "127.0.0.1", "::1":
+	host := u.Hostname()
+	if u.Opaque != "" || host == "" {
+		return fmt.Errorf("%w: model url %q has no host", ErrBadArgs, raw)
+	}
+	if isLoopbackHost(host) {
 		return nil
 	}
-	if err := pol.AllowEgress(u.Hostname()); err != nil {
-		return fmt.Errorf("llm host %s: %w (a remote model host needs --policy open)", u.Hostname(), err)
+	if pol.Mode() != policy.Open {
+		return fmt.Errorf(
+			"%w: model host %s needs --policy open; it receives unredacted profiles",
+			policy.ErrEgressDenied, host)
 	}
 	return nil
 }

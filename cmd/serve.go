@@ -186,6 +186,12 @@ func loopbackAddr(addr string) bool {
 	if err != nil {
 		host = addr
 	}
+	return isLoopbackHost(host)
+}
+
+// isLoopbackHost reports whether host names the loopback interface: the literal
+// "localhost" or any loopback IP such as 127.0.0.1, 127.0.0.2, or ::1.
+func isLoopbackHost(host string) bool {
 	if host == "localhost" {
 		return true
 	}
