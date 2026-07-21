@@ -116,11 +116,14 @@ func knownProviderDest(dest string) bool {
 	}
 }
 
-// WithMode returns a copy at the requested mode. A locked policy cannot change
-// to a different mode and returns ErrLocked.
+// WithMode returns a copy at the requested mode, carrying over every other
+// field including the private-channel pin. A locked policy cannot change to a
+// different mode and returns ErrLocked.
 func (p Policy) WithMode(mode Mode) (Policy, error) {
 	if p.locked && mode != p.mode {
 		return p, fmt.Errorf("%w: pinned at %s", ErrLocked, p.mode)
 	}
-	return Policy{mode: mode, locked: p.locked}, nil
+	c := p
+	c.mode = mode
+	return c, nil
 }

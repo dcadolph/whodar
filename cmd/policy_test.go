@@ -20,6 +20,7 @@ func TestResolvePolicy(t *testing.T) {
 		lockedOpen     = `{"mode":"open","locked":true}`
 		unlockedRedact = `{"mode":"redacted","locked":false}`
 		unlockedOpen   = `{"mode":"open","locked":false}`
+		unlockedDeny   = `{"mode":"redacted","locked":false,"private_channels":"deny"}`
 	)
 	tests := []struct {
 		SystemBody     string // system policy body; empty means no system file
@@ -53,6 +54,11 @@ func TestResolvePolicy(t *testing.T) {
 		SystemBody: unlockedRedact, PolicyName: "strict", WantMode: policy.Redacted,
 	}, { // Test 9: A locked env file pins whatever it says when nothing outranks it.
 		EnvBody: lockedOpen, PolicyName: "strict", WantMode: policy.Open,
+	}, { // Test 10: An unlocked file's private_channels:deny is honored, mode from file.
+		EnvBody: unlockedDeny, PolicyName: "strict", WantMode: policy.Redacted, WantPrivateOff: true,
+	}, { // Test 11: A changed flag overrides the mode, but private_channels:deny still holds.
+		EnvBody: unlockedDeny, PolicyName: "open", FlagChanged: true, WantMode: policy.Open,
+		WantPrivateOff: true,
 	}}
 	for testNum, test := range tests {
 		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {

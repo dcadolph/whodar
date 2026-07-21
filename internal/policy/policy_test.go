@@ -45,12 +45,12 @@ func TestAllowEgress(t *testing.T) {
 		Dest string
 		Want error
 	}{
-		{Mode: Strict, Dest: "api.anthropic.com", Want: ErrEgressDenied},          // Test 0: Strict denies providers too.
-		{Mode: Redacted, Dest: "api.anthropic.com", Want: nil},                    // Test 1: Redacted permits Anthropic.
-		{Mode: Redacted, Dest: "api.openai.com", Want: nil},                       // Test 2: Redacted permits OpenAI.
-		{Mode: Redacted, Dest: "generativelanguage.googleapis.com", Want: nil},    // Test 3: Redacted permits Gemini.
-		{Mode: Redacted, Dest: "llm.corp.example", Want: ErrEgressDenied},         // Test 4: Redacted denies unknown hosts.
-		{Mode: Open, Dest: "llm.corp.example", Want: nil},                         // Test 5: Open permits anything.
+		{Mode: Strict, Dest: "api.anthropic.com", Want: ErrEgressDenied},       // Test 0: Strict denies providers too.
+		{Mode: Redacted, Dest: "api.anthropic.com", Want: nil},                 // Test 1: Redacted permits Anthropic.
+		{Mode: Redacted, Dest: "api.openai.com", Want: nil},                    // Test 2: Redacted permits OpenAI.
+		{Mode: Redacted, Dest: "generativelanguage.googleapis.com", Want: nil}, // Test 3: Redacted permits Gemini.
+		{Mode: Redacted, Dest: "llm.corp.example", Want: ErrEgressDenied},      // Test 4: Redacted denies unknown hosts.
+		{Mode: Open, Dest: "llm.corp.example", Want: nil},                      // Test 5: Open permits anything.
 	}
 	for testNum, test := range tests {
 		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
@@ -78,6 +78,23 @@ func TestWithModeLocked(t *testing.T) {
 	got, err := unlocked.WithMode(Open)
 	if err != nil || got.Mode() != Open {
 		t.Errorf("unlocked change: got %v err %v, want open nil", got.Mode(), err)
+	}
+}
+
+// TestWithModeKeepsFields verifies WithMode carries over the private-channel pin
+// rather than resetting it, so a mode change cannot silently re-enable ingest.
+func TestWithModeKeepsFields(t *testing.T) {
+	t.Parallel()
+	base := New(Redacted, false).WithoutPrivateChannels()
+	got, err := base.WithMode(Open)
+	if err != nil {
+		t.Fatalf("WithMode: %v", err)
+	}
+	if got.Mode() != Open {
+		t.Errorf("mode = %v, want open", got.Mode())
+	}
+	if got.AllowPrivateChannels() {
+		t.Error("WithMode dropped the private-channel pin")
 	}
 }
 

@@ -111,8 +111,17 @@ func (o *options) resolvePolicy(policyChanged bool, errOut io.Writer) error {
 	if err != nil {
 		return err
 	}
-	o.pol = policy.New(parsed, false)
-	return nil
+	// Start from the config so an unlocked file's private_channels pin survives,
+	// then swap in the resolved mode. The base is unlocked here, so WithMode
+	// only changes the mode.
+	base := policy.Default()
+	if found {
+		if base, err = cfg.Policy(); err != nil {
+			return fmt.Errorf("org policy: %w", err)
+		}
+	}
+	o.pol, err = base.WithMode(parsed)
+	return err
 }
 
 // defaultDataDir returns the default data directory under the user's home.
