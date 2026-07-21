@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dcadolph/whodar/internal/confluence"
+	"github.com/dcadolph/whodar/internal/util"
 )
 
 // ConfluenceOptions configures the Confluence connector.
@@ -149,7 +150,7 @@ func confluenceUserKey(u confluence.User) string {
 func confluencePersonRecord(u confluence.User, topics []string) Record {
 	rec := Record{Kind: KindPerson, Source: "confluence", Weight: 1, Topics: topics, Name: u.DisplayName}
 	if u.Email != "" {
-		rec.Email = strings.ToLower(u.Email)
+		rec.Email = util.NormalizeEmail(u.Email)
 	} else {
 		rec.PersonID = "confluence:" + u.AccountID
 	}

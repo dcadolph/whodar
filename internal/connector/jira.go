@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dcadolph/whodar/internal/jira"
+	"github.com/dcadolph/whodar/internal/util"
 )
 
 // JiraOptions configures the Jira connector.
@@ -165,7 +166,7 @@ func jiraUserKey(u jira.User) string {
 func jiraPersonRecord(u jira.User, topics []string) Record {
 	rec := Record{Kind: KindPerson, Source: "jira", Weight: 1, Topics: topics, Name: u.DisplayName}
 	if u.EmailAddress != "" {
-		rec.Email = strings.ToLower(u.EmailAddress)
+		rec.Email = util.NormalizeEmail(u.EmailAddress)
 	} else {
 		rec.PersonID = "jira:" + u.AccountID
 	}

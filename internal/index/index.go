@@ -750,9 +750,9 @@ func Load(path string) (*Index, error) {
 func personID(rec connector.Record) model.ID {
 	switch {
 	case rec.PersonID != "":
-		return model.ID(strings.ToLower(rec.PersonID))
+		return model.ID(strings.ToLower(strings.TrimSpace(rec.PersonID)))
 	case rec.Email != "":
-		return model.ID(strings.ToLower(rec.Email))
+		return model.ID(util.NormalizeEmail(rec.Email))
 	case rec.Name != "":
 		return model.ID(slug(rec.Name))
 	default:

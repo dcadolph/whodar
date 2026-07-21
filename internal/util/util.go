@@ -6,7 +6,15 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 )
+
+// NormalizeEmail returns email trimmed of surrounding whitespace and
+// lowercased. It is the canonical form of a person's merge key, so stray casing
+// or spacing never splits one human across records from different sources.
+func NormalizeEmail(email string) string {
+	return strings.ToLower(strings.TrimSpace(email))
+}
 
 // WriteFileAtomic writes data to path through a same-directory temporary file
 // and a rename, so a crash never leaves a partial or truncated file behind.
@@ -24,6 +32,20 @@ func WriteFileAtomic(path string, data []byte, perm fs.FileMode) error {
 	if err := os.Rename(name, path); err != nil {
 		_ = os.Remove(name)
 		return fmt.Errorf("atomic write: rename: %w", err)
+	}
+	return syncDir(filepath.Dir(path))
+}
+
+// syncDir fsyncs a directory so a rename into it survives a crash. A directory
+// that cannot be opened for sync, as on some platforms, is not an error.
+func syncDir(dir string) error {
+	d, err := os.Open(dir)
+	if err != nil {
+		return nil
+	}
+	defer func() { _ = d.Close() }()
+	if err := d.Sync(); err != nil {
+		return fmt.Errorf("atomic write: sync dir: %w", err)
 	}
 	return nil
 }

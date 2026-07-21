@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/dcadolph/whodar/internal/util"
 )
 
 // ErrNoCodeOwners indicates no CODEOWNERS file was found.
@@ -143,7 +145,7 @@ func ownerRecord(owner string, patterns []string) Record {
 	if after, ok := strings.CutPrefix(owner, "@"); ok {
 		rec.PersonID = "codeowners:" + strings.ToLower(after)
 	} else if strings.Contains(owner, "@") {
-		rec.Email = strings.ToLower(owner)
+		rec.Email = util.NormalizeEmail(owner)
 	} else {
 		rec.PersonID = "codeowners:" + strings.ToLower(owner)
 	}

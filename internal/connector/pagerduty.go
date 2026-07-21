@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/dcadolph/whodar/internal/pagerduty"
+	"github.com/dcadolph/whodar/internal/util"
 )
 
 // PagerDutyOptions configures the PagerDuty connector.
@@ -112,7 +113,7 @@ func pagerdutyUserKey(u pagerduty.User) string {
 func pagerdutyPersonRecord(u pagerduty.User, topics []string) Record {
 	rec := Record{Kind: KindPerson, Source: "pagerduty", Weight: 1, Topics: topics, Name: u.Name}
 	if u.Email != "" {
-		rec.Email = strings.ToLower(u.Email)
+		rec.Email = util.NormalizeEmail(u.Email)
 	} else {
 		rec.PersonID = "pagerduty:" + u.ID
 	}

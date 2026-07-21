@@ -2,8 +2,10 @@ package index
 
 import (
 	"strings"
+	"unicode"
 
 	"github.com/kljensen/snowball"
+	"golang.org/x/text/unicode/norm"
 )
 
 // stopwords are common words ignored during tokenization. They include the
@@ -21,11 +23,13 @@ var stopwords = map[string]bool{
 	"where": true, "when": true, "which": true, "why": true,
 }
 
-// tokenize lowercases text and splits it into searchable tokens, dropping
-// stopwords and tokens shorter than two characters.
+// tokenize lowercases and folds text, then splits it into searchable tokens,
+// dropping stopwords and tokens shorter than two bytes. Folding removes
+// diacritics so "josé" and "jose" share a token, and letters of any script are
+// kept so a non-ASCII name is not mangled or dropped.
 func tokenize(s string) []string {
-	fields := strings.FieldsFunc(strings.ToLower(s), func(r rune) bool {
-		return !isAlphaNum(r)
+	fields := strings.FieldsFunc(fold(strings.ToLower(s)), func(r rune) bool {
+		return !isWordRune(r)
 	})
 	out := fields[:0]
 	for _, f := range fields {
@@ -37,18 +41,36 @@ func tokenize(s string) []string {
 	return out
 }
 
-// isAlphaNum reports whether r is an ASCII letter or digit.
-func isAlphaNum(r rune) bool {
-	return r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9'
+// isWordRune reports whether r can be part of a token: a letter or digit from
+// any script. Folding removes diacritics before this runs, so accented letters
+// arrive as their base form.
+func isWordRune(r rune) bool {
+	return unicode.IsLetter(r) || unicode.IsDigit(r)
+}
+
+// fold removes diacritics by decomposing to NFKD and dropping the combining
+// marks, so "josé" folds to "jose". Letters from scripts without combining
+// marks, such as CJK, pass through unchanged. It is safe for concurrent use.
+func fold(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range norm.NFKD.String(s) {
+		if unicode.Is(unicode.Mn, r) {
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
 }
 
 // slug normalizes text into a lowercase identifier with single hyphens between
-// runs of alphanumerics. Unlike tokenize, it keeps every word.
+// runs of word runes. Diacritics fold so accented and unaccented spellings
+// produce the same slug. Unlike tokenize, it keeps every word.
 func slug(s string) string {
 	var b strings.Builder
 	hyphen := false
-	for _, r := range strings.ToLower(strings.TrimSpace(s)) {
-		if isAlphaNum(r) {
+	for _, r := range fold(strings.ToLower(strings.TrimSpace(s))) {
+		if isWordRune(r) {
 			b.WriteRune(r)
 			hyphen = false
 			continue
