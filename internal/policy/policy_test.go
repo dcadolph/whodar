@@ -2,6 +2,7 @@ package policy
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -35,21 +36,26 @@ func TestParseMode(t *testing.T) {
 	}
 }
 
-// TestAllowEgress verifies Strict denies and looser modes permit.
+// TestAllowEgress verifies Strict denies everything, Redacted permits only
+// known model providers, and Open permits any destination.
 func TestAllowEgress(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		Mode Mode
+		Dest string
 		Want error
 	}{
-		{Mode: Strict, Want: ErrEgressDenied}, // Test 0: Strict denies.
-		{Mode: Redacted, Want: nil},           // Test 1: Redacted permits.
-		{Mode: Open, Want: nil},               // Test 2: Open permits.
+		{Mode: Strict, Dest: "api.anthropic.com", Want: ErrEgressDenied},          // Test 0: Strict denies providers too.
+		{Mode: Redacted, Dest: "api.anthropic.com", Want: nil},                    // Test 1: Redacted permits Anthropic.
+		{Mode: Redacted, Dest: "api.openai.com", Want: nil},                       // Test 2: Redacted permits OpenAI.
+		{Mode: Redacted, Dest: "generativelanguage.googleapis.com", Want: nil},    // Test 3: Redacted permits Gemini.
+		{Mode: Redacted, Dest: "llm.corp.example", Want: ErrEgressDenied},         // Test 4: Redacted denies unknown hosts.
+		{Mode: Open, Dest: "llm.corp.example", Want: nil},                         // Test 5: Open permits anything.
 	}
 	for testNum, test := range tests {
-		t.Run(test.Mode.String(), func(t *testing.T) {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
 			t.Parallel()
-			err := New(test.Mode, false).AllowEgress("api.example.com", 128)
+			err := New(test.Mode, false).AllowEgress(test.Dest)
 			if !errors.Is(err, test.Want) {
 				t.Errorf("test %d: err = %v, want %v", testNum, err, test.Want)
 			}

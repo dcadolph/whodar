@@ -1,6 +1,7 @@
-// Package policy enforces data egress decisions. Every external call must pass
-// through a Policy before any data leaves the machine. The default mode is
-// Strict, which denies all egress.
+// Package policy decides what whodar may send to model providers. Strict keeps
+// answers fully local, Redacted permits redacted payloads to known provider
+// hosts only, and Open permits any destination. Indexing calls made with the
+// user's own credentials against sources the user names are outside its scope.
 package policy
 
 import (
@@ -87,15 +88,31 @@ func (p Policy) WithoutPrivateChannels() Policy {
 	return c
 }
 
-// AllowEgress reports whether sending nbytes to dest is permitted. Strict always
-// denies. Under Redacted and Open it permits; a Redacted caller is responsible
-// for redacting the payload before calling.
-func (p Policy) AllowEgress(dest string, nbytes int) error {
+// AllowEgress reports whether sending data to dest is permitted. Strict always
+// denies. Redacted permits only known model provider hosts, which must receive
+// redacted payloads. Open permits any destination.
+func (p Policy) AllowEgress(dest string) error {
 	switch p.mode {
-	case Open, Redacted:
+	case Open:
 		return nil
+	case Redacted:
+		if knownProviderDest(dest) {
+			return nil
+		}
+		return fmt.Errorf("%w: mode=%s dest=%s is not a known model provider", ErrEgressDenied, p.mode, dest)
 	default:
-		return fmt.Errorf("%w: mode=%s dest=%s bytes=%d", ErrEgressDenied, p.mode, dest, nbytes)
+		return fmt.Errorf("%w: mode=%s dest=%s", ErrEgressDenied, p.mode, dest)
+	}
+}
+
+// knownProviderDest reports whether dest is a known model provider API host:
+// Anthropic, OpenAI, or Google's Gemini endpoint.
+func knownProviderDest(dest string) bool {
+	switch dest {
+	case "api.anthropic.com", "api.openai.com", "generativelanguage.googleapis.com":
+		return true
+	default:
+		return false
 	}
 }
 
