@@ -2,8 +2,10 @@ package bot
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dcadolph/whodar/internal/model"
 	"github.com/dcadolph/whodar/internal/resolve"
@@ -78,6 +80,62 @@ func TestHandleReplies(t *testing.T) {
 	}
 	if !strings.Contains(rec.text, "Jane Roe") || !strings.Contains(rec.text, "#billing") {
 		t.Errorf("reply missing content:\n%s", rec.text)
+	}
+}
+
+// TestRateLimit verifies the per-user limit: the questions inside a window
+// are answered, crossing the limit warns exactly once, further questions are
+// dropped silently, and a new window resets everything.
+func TestRateLimit(t *testing.T) {
+	t.Parallel()
+	now := time.Unix(0, 0)
+	e := New(func(context.Context, string, string, int) (resolve.Answer, error) {
+		return sampleAnswer(), nil
+	}, "keyword", "UBOT", 5, WithEngineClock(func() time.Time { return now }))
+
+	for i := 0; i < rateMax; i++ {
+		if text, err := e.Answer(context.Background(), "U1", "billing"); err != nil || text == "" {
+			t.Fatalf("ask %d: text=%q err=%v, want an answer", i, text, err)
+		}
+	}
+	if text, _ := e.Answer(context.Background(), "U1", "billing"); text != rateWarning {
+		t.Errorf("over-limit text = %q, want the warning", text)
+	}
+	if text, _ := e.Answer(context.Background(), "U1", "billing"); text != "" {
+		t.Errorf("second over-limit text = %q, want silence", text)
+	}
+	if text, _ := e.Answer(context.Background(), "U2", "billing"); text == "" {
+		t.Error("another user should be unaffected")
+	}
+
+	now = now.Add(rateWindow)
+	if text, _ := e.Answer(context.Background(), "U1", "billing"); text == "" || text == rateWarning {
+		t.Errorf("new window text = %q, want a fresh answer", text)
+	}
+}
+
+// TestHandleErrorHidesInternals verifies a resolve failure sends the user a
+// generic apology and returns the real error for the transport to log.
+func TestHandleErrorHidesInternals(t *testing.T) {
+	t.Parallel()
+	askErr := errors.New("dial http://10.0.0.9:11434: connection refused")
+	e := New(func(context.Context, string, string, int) (resolve.Answer, error) {
+		return resolve.Answer{}, askErr
+	}, "keyword", "U1", 5)
+	rec := &recorder{}
+
+	err := e.Handle(context.Background(), Event{Text: "<@U1> billing", Channel: "C1"}, rec)
+	if !errors.Is(err, askErr) {
+		t.Errorf("err = %v, want the resolve error for the transport log", err)
+	}
+	if rec.calls != 1 {
+		t.Fatalf("calls = %d, want one apology reply", rec.calls)
+	}
+	if strings.Contains(rec.text, "10.0.0.9") || strings.Contains(rec.text, "connection refused") {
+		t.Errorf("reply leaked internals:\n%s", rec.text)
+	}
+	if !strings.Contains(rec.text, "Sorry") {
+		t.Errorf("reply = %q, want an apology", rec.text)
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -84,11 +85,11 @@ func (h *EventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ts := r.Header.Get("X-Slack-Request-Timestamp")
-	if !h.freshTimestamp(ts) {
+	if !freshTimestamp(h.now, h.maxSkew, ts) {
 		http.Error(w, "stale or missing timestamp", http.StatusBadRequest)
 		return
 	}
-	if !h.verify(r.Header.Get("X-Slack-Signature"), ts, body) {
+	if !verifySignature(h.signingSecret, r.Header.Get("X-Slack-Signature"), ts, body) {
 		http.Error(w, "bad signature", http.StatusUnauthorized)
 		return
 	}
@@ -112,6 +113,12 @@ func (h *EventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, outer.Challenge)
 	case "event_callback":
 		w.WriteHeader(http.StatusOK)
+		// A retry means the first delivery was already handled or is still
+		// in flight; processing it again would double-reply.
+		if retry := r.Header.Get("X-Slack-Retry-Num"); retry != "" && retry != "0" {
+			fmt.Fprintf(h.log, "whodar bot: skipping retry %s of an event\n", retry)
+			return
+		}
 		ev := outer.Event
 		go routeEvent(context.Background(), h.engine, h.replier, h.botUserID, ev, h.log)
 	default:
@@ -119,22 +126,24 @@ func (h *EventsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// freshTimestamp reports whether ts is a unix time within the allowed skew.
-func (h *EventsHandler) freshTimestamp(ts string) bool {
+// freshTimestamp reports whether ts is a unix time within skew of now. Both
+// Slack HTTP handlers share it.
+func freshTimestamp(now func() time.Time, skew time.Duration, ts string) bool {
 	n, err := strconv.ParseInt(ts, 10, 64)
 	if err != nil {
 		return false
 	}
-	delta := h.now().Unix() - n
+	delta := now().Unix() - n
 	if delta < 0 {
 		delta = -delta
 	}
-	return time.Duration(delta)*time.Second <= h.maxSkew
+	return time.Duration(delta)*time.Second <= skew
 }
 
-// verify checks the Slack request signature over the raw body.
-func (h *EventsHandler) verify(sig, ts string, body []byte) bool {
-	mac := hmac.New(sha256.New, []byte(h.signingSecret))
+// verifySignature checks the Slack request signature over the raw body. Both
+// Slack HTTP handlers share it.
+func verifySignature(secret, sig, ts string, body []byte) bool {
+	mac := hmac.New(sha256.New, []byte(secret))
 	_, _ = io.WriteString(mac, "v0:"+ts+":")
 	mac.Write(body)
 	expected := "v0=" + hex.EncodeToString(mac.Sum(nil))

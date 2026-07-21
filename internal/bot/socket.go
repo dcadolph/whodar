@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/coder/websocket"
 
@@ -27,14 +28,20 @@ type Dialer func(ctx context.Context, url string) (wsConn, error)
 
 // socketEnvelope is a Socket Mode frame.
 type socketEnvelope struct {
-	// Type is the frame type: hello, disconnect, or events_api.
+	// Type is the frame type: hello, disconnect, events_api, or
+	// slash_commands.
 	Type string `json:"type"`
 	// EnvelopeID identifies the frame for acknowledgment.
 	EnvelopeID string `json:"envelope_id"`
-	// Payload carries the event for events_api frames.
+	// Payload carries the event or slash command.
 	Payload struct {
-		// Event is the Slack event.
+		// Event is the Slack event, set on events_api frames.
 		Event slackEvent `json:"event"`
+		// Slash-command fields, set on slash_commands frames.
+		Command     string `json:"command"`
+		Text        string `json:"text"`
+		UserID      string `json:"user_id"`
+		ResponseURL string `json:"response_url"`
 	} `json:"payload"`
 }
 
@@ -58,9 +65,19 @@ type slackEvent struct {
 	ChannelType string `json:"channel_type"`
 }
 
+// Reconnect backoff bounds: failures back off exponentially from
+// initialBackoff to maxBackoff, and a session that stayed healthy for
+// steadyPeriod resets the backoff.
+const (
+	initialBackoff = time.Second
+	maxBackoff     = 30 * time.Second
+	steadyPeriod   = 30 * time.Second
+)
+
 // SocketRunner runs a Slack Socket Mode session: it opens a WebSocket with the
 // app-level token, reads event frames, acknowledges them, and dispatches
-// questions to the Engine. It reconnects until the context is canceled.
+// questions to the Engine. It reconnects with backoff until the context is
+// canceled.
 type SocketRunner struct {
 	// app is the app-level token client used to open connections.
 	app *slack.Client
@@ -68,6 +85,8 @@ type SocketRunner struct {
 	engine *Engine
 	// replier posts answers back to Slack.
 	replier Replier
+	// respond posts slash-command answers; nil ignores slash frames.
+	respond Responder
 	// botUserID is the bot's own user id, used to ignore its own messages.
 	botUserID string
 	// dial opens the WebSocket; overridable for tests.
@@ -97,6 +116,15 @@ func WithLog(w io.Writer) SocketOption {
 	}
 }
 
+// WithResponder enables slash-command answers through r.
+func WithResponder(r Responder) SocketOption {
+	return func(s *SocketRunner) {
+		if r != nil {
+			s.respond = r
+		}
+	}
+}
+
 // NewSocketRunner builds a SocketRunner. It panics on nil dependencies.
 func NewSocketRunner(app *slack.Client, engine *Engine, replier Replier, botUserID string, opts ...SocketOption) *SocketRunner {
 	if app == nil || engine == nil || replier == nil {
@@ -112,26 +140,54 @@ func NewSocketRunner(app *slack.Client, engine *Engine, replier Replier, botUser
 	return s
 }
 
-// Run opens connections and processes events until ctx is canceled. A dropped
-// connection is reopened.
+// Run opens connections and processes events until ctx is canceled. Failures
+// anywhere, including the very first connection, reconnect with exponential
+// backoff instead of exiting, so a laptop waking from sleep or a flapping
+// network self-heals.
 func (s *SocketRunner) Run(ctx context.Context) error {
+	backoff := initialBackoff
 	for {
 		if ctx.Err() != nil {
 			return nil
 		}
-		url, err := s.app.ConnectionsOpen(ctx)
-		if err != nil {
-			return fmt.Errorf("socket: open: %w", err)
-		}
-		conn, err := s.dial(ctx, url)
-		if err != nil {
-			return fmt.Errorf("socket: dial: %w", err)
-		}
-		err = s.session(ctx, conn)
+		start := time.Now()
+		err := s.connectAndServe(ctx)
 		if ctx.Err() != nil {
 			return nil
 		}
-		fmt.Fprintf(s.log, "whodar bot: reconnecting after: %v\n", err)
+		if time.Since(start) >= steadyPeriod {
+			backoff = initialBackoff
+		}
+		fmt.Fprintf(s.log, "whodar bot: reconnecting in %s after: %v\n", backoff, err)
+		if !sleepCtx(ctx, backoff) {
+			return nil
+		}
+		backoff = min(backoff*2, maxBackoff)
+	}
+}
+
+// connectAndServe opens one Socket Mode session and serves it to completion.
+func (s *SocketRunner) connectAndServe(ctx context.Context) error {
+	url, err := s.app.ConnectionsOpen(ctx)
+	if err != nil {
+		return fmt.Errorf("open: %w", err)
+	}
+	conn, err := s.dial(ctx, url)
+	if err != nil {
+		return fmt.Errorf("dial: %w", err)
+	}
+	return s.session(ctx, conn)
+}
+
+// sleepCtx waits for d, returning false when ctx ends first.
+func sleepCtx(ctx context.Context, d time.Duration) bool {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-t.C:
+		return true
+	case <-ctx.Done():
+		return false
 	}
 }
 
@@ -156,8 +212,18 @@ func (s *SocketRunner) session(ctx context.Context, conn wsConn) error {
 			if env.EnvelopeID != "" {
 				s.ack(ctx, conn, env.EnvelopeID)
 			}
-			if env.Type == "events_api" {
+			switch {
+			case env.Type == "events_api":
 				routeEvent(ctx, s.engine, s.replier, s.botUserID, env.Payload.Event, s.log)
+			case env.Type == "slash_commands" && s.respond != nil:
+				cmd := slashCommand{
+					Text:        env.Payload.Text,
+					UserID:      env.Payload.UserID,
+					ResponseURL: env.Payload.ResponseURL,
+				}
+				// A goroutine keeps a slow model from blocking the read
+				// loop; the answer arrives through the response URL.
+				go routeSlash(ctx, s.engine, s.respond, cmd, s.log)
 			}
 		}
 	}
@@ -173,8 +239,14 @@ func (s *SocketRunner) ack(ctx context.Context, conn wsConn, id string) {
 }
 
 // routeEvent answers a mention or direct message, ignoring the bot's own and
-// other bots' messages. It is shared by the socket and events transports.
+// other bots' messages. It is shared by the socket and events transports,
+// recovers panics, and bounds the work so a hung resolver cannot pin the bot.
 func routeEvent(ctx context.Context, e *Engine, r Replier, botUserID string, ev slackEvent, log io.Writer) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			fmt.Fprintf(log, "whodar bot: handler panic: %v\n", rec)
+		}
+	}()
 	if ev.BotID != "" || (botUserID != "" && ev.User == botUserID) {
 		return
 	}
@@ -187,7 +259,9 @@ func routeEvent(ctx context.Context, e *Engine, r Replier, botUserID string, ev 
 	if thread == "" && mention {
 		thread = ev.TS
 	}
-	event := Event{Text: ev.Text, Channel: ev.Channel, ThreadTS: thread}
+	ctx, cancel := context.WithTimeout(ctx, handleTimeout)
+	defer cancel()
+	event := Event{Text: ev.Text, Channel: ev.Channel, ThreadTS: thread, User: ev.User}
 	if err := e.Handle(ctx, event, r); err != nil {
 		fmt.Fprintf(log, "whodar bot: handle: %v\n", err)
 	}

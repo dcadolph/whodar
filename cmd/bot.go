@@ -111,7 +111,7 @@ Transports and their credentials:
 	f.StringVar(&embedModel, "embed-model", "", "Ollama embed model for semantic/llm mode.")
 	f.StringVar(&ollamaURL, "ollama-url", "http://localhost:11434", "Ollama base URL.")
 	f.StringVar(&provider, "provider", "ollama",
-		"LLM provider: ollama, anthropic, or openai. Cloud providers need --policy redacted or open.")
+		"LLM provider: ollama, anthropic, openai, or gemini. Cloud providers need --policy redacted or open.")
 	f.StringVar(&openaiURL, "openai-url", "",
 		"OpenAI-compatible base URL, e.g. a local LM Studio or vLLM server.")
 	f.StringVar(&fbStrength, "feedback", "normal",
@@ -130,7 +130,8 @@ func runSocketBot(cmd *cobra.Command, engine *bot.Engine, replier bot.Replier, b
 	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	runner := bot.NewSocketRunner(slack.New(appToken), engine, replier, botUserID, bot.WithLog(cmd.ErrOrStderr()))
+	runner := bot.NewSocketRunner(slack.New(appToken), engine, replier, botUserID,
+		bot.WithLog(cmd.ErrOrStderr()), bot.WithResponder(bot.ResponderFunc(slack.Respond)))
 	fmt.Fprintln(cmd.ErrOrStderr(), "whodar bot: connected over socket mode (Ctrl-C to stop)")
 	return runner.Run(ctx)
 }
@@ -142,8 +143,11 @@ func runEventsBot(cmd *cobra.Command, engine *bot.Engine, replier bot.Replier, b
 		return fmt.Errorf("%w: set %s for events transport", ErrBadArgs, slackSigningSecretEnv)
 	}
 	handler := bot.NewEventsHandler(engine, replier, botUserID, secret, bot.WithEventsLog(cmd.ErrOrStderr()))
+	slash := bot.NewSlashHandler(engine, bot.ResponderFunc(slack.Respond), secret,
+		bot.WithSlashLog(cmd.ErrOrStderr()))
 	mux := http.NewServeMux()
 	mux.Handle("/slack/events", handler)
+	mux.Handle("/slack/commands", slash)
 	srv := &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 5 * time.Second}
 
 	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)

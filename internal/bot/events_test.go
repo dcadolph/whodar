@@ -88,6 +88,29 @@ func TestEventsStaleTimestamp(t *testing.T) {
 	}
 }
 
+// TestEventsRetrySkipped verifies a Slack redelivery is acknowledged but not
+// answered again.
+func TestEventsRetrySkipped(t *testing.T) {
+	t.Parallel()
+	ch := make(chan string, 1)
+	h := newHandler(chanReplier{ch: ch})
+	body := `{"type":"event_callback","event":{"type":"app_mention",` +
+		`"text":"<@UBOT> billing","channel":"C1","user":"U2","ts":"5.5"}}`
+	req := signReq(t, body)
+	req.Header.Set("X-Slack-Retry-Num", "1")
+
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("code=%d, want 200", rec.Code)
+	}
+	select {
+	case txt := <-ch:
+		t.Fatalf("retry was answered again: %s", txt)
+	case <-time.After(150 * time.Millisecond):
+	}
+}
+
 // TestEventsCallbackDispatches verifies a signed event_callback is answered.
 func TestEventsCallbackDispatches(t *testing.T) {
 	t.Parallel()

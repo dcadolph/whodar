@@ -5,10 +5,30 @@ package bot
 
 import (
 	"context"
+	"errors"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/dcadolph/whodar/internal/resolve"
 )
+
+// Per-user rate limiting: rateMax questions per rateWindow. The bot answers
+// everyone in the workspace, so one looping user must not be able to burn
+// model spend or drown a channel.
+const (
+	// rateMax is the questions one user may ask per window.
+	rateMax = 10
+	// rateWindow is the counting window.
+	rateWindow = time.Minute
+)
+
+// rateWarning is sent once per window when a user goes over the limit.
+const rateWarning = "You are asking faster than I can answer. Give it a minute and try again."
+
+// sorryReply is sent when resolving fails; the real error goes to the
+// transport log, never the channel.
+const sorryReply = "Sorry, something went wrong answering that. Try again in a moment."
 
 // Event is a normalized inbound message for the bot to answer.
 type Event struct {
@@ -18,6 +38,8 @@ type Event struct {
 	Channel string
 	// ThreadTS is the thread timestamp to reply within, if any.
 	ThreadTS string
+	// User is the asking user's id, for per-user rate limiting.
+	User string
 }
 
 // Replier sends a reply to Slack.
@@ -29,6 +51,16 @@ type Replier interface {
 // AskFunc resolves a query in a mode, matching the CLI and web ask path.
 type AskFunc func(ctx context.Context, query, mode string, limit int) (resolve.Answer, error)
 
+// userWindow tracks one user's asks inside the current rate window.
+type userWindow struct {
+	// start opens the window.
+	start time.Time
+	// count is questions asked in the window.
+	count int
+	// warned marks that the over-limit notice was sent this window.
+	warned bool
+}
+
 // Engine answers events by resolving the query and formatting a Slack reply.
 type Engine struct {
 	// ask resolves queries.
@@ -39,11 +71,29 @@ type Engine struct {
 	limit int
 	// botUserID is the bot's own user id, stripped from inbound text.
 	botUserID string
+	// now returns the current time; tests pin it.
+	now func() time.Time
+	// mu guards windows.
+	mu sync.Mutex
+	// windows tracks per-user ask counts for rate limiting.
+	windows map[string]*userWindow
+}
+
+// EngineOption configures an Engine.
+type EngineOption func(*Engine)
+
+// WithEngineClock overrides the clock, for tests.
+func WithEngineClock(now func() time.Time) EngineOption {
+	return func(e *Engine) {
+		if now != nil {
+			e.now = now
+		}
+	}
 }
 
 // New returns an Engine. It panics if ask is nil, and applies sensible defaults
 // for an empty mode or non-positive limit.
-func New(ask AskFunc, defaultMode, botUserID string, limit int) *Engine {
+func New(ask AskFunc, defaultMode, botUserID string, limit int, opts ...EngineOption) *Engine {
 	if ask == nil {
 		panic("bot: New requires an Ask function")
 	}
@@ -53,21 +103,89 @@ func New(ask AskFunc, defaultMode, botUserID string, limit int) *Engine {
 	if limit <= 0 {
 		limit = 5
 	}
-	return &Engine{ask: ask, defaultMode: defaultMode, limit: limit, botUserID: botUserID}
+	e := &Engine{
+		ask: ask, defaultMode: defaultMode, limit: limit, botUserID: botUserID,
+		now: time.Now, windows: make(map[string]*userWindow),
+	}
+	for _, o := range opts {
+		o(e)
+	}
+	return e
 }
 
-// Handle answers ev and replies through r. An empty question is ignored. A
-// resolve error is reported back to the user rather than failing the transport.
-func (e *Engine) Handle(ctx context.Context, ev Event, r Replier) error {
-	query, mode := e.parse(ev.Text)
+// Answer resolves text asked by user and returns the reply. An empty reply
+// means there is nothing to say: an empty question, or a rate-limited user
+// already warned this window. A non-nil error reports a resolve failure the
+// reply already apologizes for, so the transport can log it.
+func (e *Engine) Answer(ctx context.Context, user, text string) (string, error) {
+	query, mode := e.parse(text)
 	if query == "" {
-		return nil
+		return "", nil
+	}
+	allowed, warn := e.allow(user)
+	if warn {
+		return rateWarning, nil
+	}
+	if !allowed {
+		return "", nil
 	}
 	ans, err := e.ask(ctx, query, mode, e.limit)
 	if err != nil {
-		return r.Reply(ctx, ev.Channel, ev.ThreadTS, "Sorry, I hit an error: "+err.Error())
+		return sorryReply, err
 	}
-	return r.Reply(ctx, ev.Channel, ev.ThreadTS, Format(query, ans))
+	return Format(query, ans), nil
+}
+
+// Handle answers ev and replies through r. An empty question is ignored, a
+// rate-limited user gets one warning per window, and a resolve error gets a
+// generic apology while the error itself is returned for the transport log.
+func (e *Engine) Handle(ctx context.Context, ev Event, r Replier) error {
+	text, err := e.Answer(ctx, ev.User, ev.Text)
+	if text == "" {
+		return err
+	}
+	replyErr := r.Reply(ctx, ev.Channel, ev.ThreadTS, text)
+	return errors.Join(err, replyErr)
+}
+
+// allow reports whether user may ask now, and whether they just crossed the
+// limit and deserve the one warning for this window. An empty user is never
+// limited.
+func (e *Engine) allow(user string) (allowed, warn bool) {
+	if user == "" {
+		return true, false
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	now := e.now()
+	e.pruneWindows(now)
+	w := e.windows[user]
+	if w == nil || now.Sub(w.start) >= rateWindow {
+		e.windows[user] = &userWindow{start: now, count: 1}
+		return true, false
+	}
+	if w.count < rateMax {
+		w.count++
+		return true, false
+	}
+	if !w.warned {
+		w.warned = true
+		return false, true
+	}
+	return false, false
+}
+
+// pruneWindows drops expired windows once the map grows past a workspace's
+// worth of users. Callers hold the lock.
+func (e *Engine) pruneWindows(now time.Time) {
+	if len(e.windows) < 512 {
+		return
+	}
+	for user, w := range e.windows {
+		if now.Sub(w.start) >= rateWindow {
+			delete(e.windows, user)
+		}
+	}
 }
 
 // parse strips the bot mention and a mode hint, returning the cleaned query and
