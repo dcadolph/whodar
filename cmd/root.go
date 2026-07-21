@@ -27,6 +27,10 @@ type options struct {
 	pretty bool
 	// pol is the resolved egress policy, set before any subcommand runs.
 	pol policy.Policy
+	// systemPolicyFile is the org-pinned policy path, defaultPolicyFile in production.
+	systemPolicyFile string
+	// envPolicyFile is the WHODAR_POLICY_FILE override, read once at startup.
+	envPolicyFile string
 }
 
 // indexPath returns the index file path under the data directory.
@@ -42,7 +46,9 @@ func (o *options) feedbackPath() string {
 
 // newRootCmd builds the root command, wires shared flags, and adds subcommands.
 func newRootCmd() *cobra.Command {
-	opts := &options{dataDir: defaultDataDir(), policyName: "strict"}
+	opts := &options{
+		dataDir: defaultDataDir(), policyName: "strict", systemPolicyFile: defaultPolicyFile,
+	}
 
 	root := &cobra.Command{
 		Use:           "whodar",
@@ -50,6 +56,7 @@ func newRootCmd() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			opts.envPolicyFile = os.Getenv(policyEnvVar)
 			return opts.resolvePolicy(cmd.Flags().Changed("policy"), cmd.ErrOrStderr())
 		},
 	}
@@ -61,17 +68,28 @@ func newRootCmd() *cobra.Command {
 
 	root.AddCommand(
 		newIndexCmd(opts), newAskCmd(opts), newServeCmd(opts), newBotCmd(opts),
-		newFeedbackCmd(opts), newDemoCmd(opts), newVersionCmd())
+		newFeedbackCmd(opts), newDemoCmd(opts), newMCPCmd(opts), newVersionCmd())
 	return root
 }
 
-// resolvePolicy sets o.pol from the org policy file and the user's flag. A
-// locked org policy wins and ignores the flag; otherwise the file supplies the
-// default mode and the flag may override it.
+// resolvePolicy sets o.pol from the org policy files and the user's flag. A
+// locked system policy always wins, even when WHODAR_POLICY_FILE names another
+// file, so the env var cannot unlock a pinned machine. Otherwise the env file
+// replaces the system file entirely, a locked file pins its mode over the
+// flag, and an unlocked file supplies the default the flag may override.
 func (o *options) resolvePolicy(policyChanged bool, errOut io.Writer) error {
-	cfg, found, err := policy.Load(policyFilePath())
+	cfg, found, err := policy.Load(o.systemPolicyFile)
 	if err != nil {
 		return err
+	}
+	systemLocked := found && cfg.Locked
+	if systemLocked && o.envPolicyFile != "" {
+		fmt.Fprintln(errOut, "whodar: "+policyEnvVar+" ignored; system policy is locked")
+	}
+	if !systemLocked && o.envPolicyFile != "" {
+		if cfg, found, err = policy.Load(o.envPolicyFile); err != nil {
+			return err
+		}
 	}
 	if found && cfg.Locked {
 		pol, err := cfg.Policy()
@@ -95,14 +113,6 @@ func (o *options) resolvePolicy(policyChanged bool, errOut io.Writer) error {
 	}
 	o.pol = policy.New(parsed, false)
 	return nil
-}
-
-// policyFilePath returns the org policy file path, preferring the environment.
-func policyFilePath() string {
-	if p := os.Getenv(policyEnvVar); p != "" {
-		return p
-	}
-	return defaultPolicyFile
 }
 
 // defaultDataDir returns the default data directory under the user's home.

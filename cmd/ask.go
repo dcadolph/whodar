@@ -20,6 +20,19 @@ const (
 	anthropicKeyEnv = "WHODAR_ANTHROPIC_KEY"
 	// openaiKeyEnv holds the OpenAI-compatible API key.
 	openaiKeyEnv = "WHODAR_OPENAI_KEY"
+	// geminiKeyEnv holds the Gemini API key.
+	geminiKeyEnv = "WHODAR_GEMINI_KEY"
+)
+
+// Gemini speaks the OpenAI-compatible protocol at Google's endpoint, so the
+// openai client serves it with a base URL and a Gemini model name.
+const (
+	// geminiHost is the egress destination checked against the policy.
+	geminiHost = "generativelanguage.googleapis.com"
+	// geminiBaseURL is Google's OpenAI-compatible API root.
+	geminiBaseURL = "https://generativelanguage.googleapis.com/v1beta/openai"
+	// defaultGeminiModel is used when --model is not set.
+	defaultGeminiModel = "gemini-2.5-flash"
 )
 
 // newAskCmd builds the ask command, which answers a question from the index.
@@ -77,7 +90,7 @@ Examples:
 	f.StringVar(&embedModel, "embed-model", "", "Ollama embed model for semantic/llm (default nomic-embed-text).")
 	f.StringVar(&ollamaURL, "ollama-url", "http://localhost:11434", "Ollama base URL.")
 	f.StringVar(&provider, "provider", "ollama",
-		"LLM provider: ollama, anthropic, or openai. Cloud providers need --policy redacted or open.")
+		"LLM provider: ollama, anthropic, openai, or gemini. Cloud providers need --policy redacted or open.")
 	f.StringVar(&openaiURL, "openai-url", "",
 		"OpenAI-compatible base URL, e.g. a local LM Studio or vLLM server.")
 	f.StringVar(&fbStrength, "feedback", "normal",
@@ -109,7 +122,7 @@ func pickResolver(ix *index.Index, opts *options, mode, model, embedModel, ollam
 			}
 			client := newOllama(model, embedModel, ollamaURL)
 			return resolve.NewLLM(ix, client, client), nil
-		case "anthropic", "openai":
+		case "anthropic", "openai", "gemini":
 			chat, err := cloudChatter(opts.pol, provider, model, openaiURL)
 			if err != nil {
 				return nil, err
@@ -119,21 +132,24 @@ func pickResolver(ix *index.Index, opts *options, mode, model, embedModel, ollam
 			}
 			return resolve.NewLLM(ix, chat, nil), nil
 		default:
-			return nil, fmt.Errorf("%w: provider %q (want ollama, anthropic, or openai)", ErrBadArgs, provider)
+			return nil, fmt.Errorf(
+				"%w: provider %q (want ollama, anthropic, openai, or gemini)", ErrBadArgs, provider)
 		}
 	default:
 		return nil, fmt.Errorf("%w: mode %q (want keyword, semantic, or llm)", ErrBadArgs, mode)
 	}
 }
 
-// cloudChatter builds a chat client for the anthropic or openai provider,
-// gated by the egress policy. Strict denies anything non-local; redacted and
-// open permit, with redaction applied by the resolver under redacted. A local
-// --openai-url, such as LM Studio, counts as local and needs no opt-in. Keys
-// come only from the environment.
+// cloudChatter builds a chat client for the anthropic, openai, or gemini
+// provider, gated by the egress policy. Strict denies anything non-local.
+// Redacted permits only the known provider hosts, with redaction applied by
+// the resolver. A local --openai-url, such as LM Studio, counts as local and
+// needs no opt-in; a remote one needs open. Keys come only from the
+// environment.
 func cloudChatter(pol policy.Policy, provider, model, openaiURL string) (resolve.Chatter, error) {
-	if provider == "anthropic" {
-		if err := pol.AllowEgress("api.anthropic.com", 0); err != nil {
+	switch provider {
+	case "anthropic":
+		if err := pol.AllowEgress("api.anthropic.com"); err != nil {
 			return nil, cloudDenied(provider, err)
 		}
 		key := os.Getenv(anthropicKeyEnv)
@@ -141,6 +157,18 @@ func cloudChatter(pol policy.Policy, provider, model, openaiURL string) (resolve
 			return nil, fmt.Errorf("%w: set %s", ErrBadArgs, anthropicKeyEnv)
 		}
 		return llm.NewAnthropic(key, llm.WithAnthropicModel(model)), nil
+	case "gemini":
+		if err := pol.AllowEgress(geminiHost); err != nil {
+			return nil, cloudDenied(provider, err)
+		}
+		key := os.Getenv(geminiKeyEnv)
+		if key == "" {
+			return nil, fmt.Errorf("%w: set %s", ErrBadArgs, geminiKeyEnv)
+		}
+		if model == "" {
+			model = defaultGeminiModel
+		}
+		return llm.NewOpenAI(key, llm.WithOpenAIModel(model), llm.WithOpenAIBaseURL(geminiBaseURL)), nil
 	}
 
 	key := os.Getenv(openaiKeyEnv)
@@ -154,7 +182,7 @@ func cloudChatter(pol policy.Policy, provider, model, openaiURL string) (resolve
 		}
 		clientOpts = append(clientOpts, llm.WithOpenAIBaseURL(openaiURL))
 	} else {
-		if err := pol.AllowEgress("api.openai.com", 0); err != nil {
+		if err := pol.AllowEgress("api.openai.com"); err != nil {
 			return nil, cloudDenied(provider, err)
 		}
 		if key == "" {
@@ -176,8 +204,9 @@ func newOllama(model, embedModel, ollamaURL string) *llm.Ollama {
 	return llm.New(model, llm.WithBaseURL(ollamaURL), llm.WithEmbedModel(embedModel))
 }
 
-// guardLLMHost permits a loopback Ollama address unconditionally and requires
-// egress permission for any other host.
+// guardLLMHost permits a loopback model host unconditionally and requires
+// egress permission for any other host. Redacted only admits the known
+// provider hosts, so an arbitrary remote model host needs open.
 func guardLLMHost(pol policy.Policy, raw string) error {
 	u, err := url.Parse(raw)
 	if err != nil {
@@ -187,8 +216,8 @@ func guardLLMHost(pol policy.Policy, raw string) error {
 	case "", "localhost", "127.0.0.1", "::1":
 		return nil
 	}
-	if err := pol.AllowEgress(u.Hostname(), 0); err != nil {
-		return fmt.Errorf("llm host %s: %w", u.Hostname(), err)
+	if err := pol.AllowEgress(u.Hostname()); err != nil {
+		return fmt.Errorf("llm host %s: %w (a remote model host needs --policy open)", u.Hostname(), err)
 	}
 	return nil
 }

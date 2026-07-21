@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"github.com/dcadolph/whodar/internal/connector"
 	"github.com/dcadolph/whodar/internal/index"
 	"github.com/dcadolph/whodar/internal/model"
+	"github.com/dcadolph/whodar/internal/util"
 )
 
 // slackTokenEnv is the environment variable holding the Slack bot token.
@@ -153,6 +155,9 @@ Start with the org chart, then merge everything else onto it:
 				ix.Add(recs)
 			} else {
 				ix.Build(recs)
+			}
+			if joined := ix.AutoJoin(); joined > 0 {
+				fmt.Fprintf(cmd.ErrOrStderr(), "auto-joined %d handle identities\n", joined)
 			}
 			ix.Canonicalize()
 
@@ -381,16 +386,14 @@ func printChangeList(w io.Writer, label string, items []string) {
 	fmt.Fprintln(w)
 }
 
-// writeChangesFile writes the changes as JSON to path.
-func writeChangesFile(path string, c index.Changes) (err error) {
-	f, err := os.Create(path)
+// writeChangesFile writes the changes as indented JSON to path atomically.
+func writeChangesFile(path string, c index.Changes) error {
+	raw, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {
 		return fmt.Errorf("changes file: %w", err)
 	}
-	defer func() {
-		if cerr := f.Close(); cerr != nil && err == nil {
-			err = fmt.Errorf("changes file: close: %w", cerr)
-		}
-	}()
-	return writeJSON(f, c, true)
+	if err := util.WriteFileAtomic(path, raw, 0o600); err != nil {
+		return fmt.Errorf("changes file: %w", err)
+	}
+	return nil
 }
