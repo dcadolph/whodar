@@ -6,8 +6,10 @@ package mcp
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 )
@@ -89,31 +91,63 @@ type request struct {
 	Params json.RawMessage `json:"params"`
 }
 
+// errLineTooLong marks a request that exceeded maxLine. The session rejects it
+// and keeps serving rather than tearing down over one oversized message.
+var errLineTooLong = errors.New("mcp: request too large")
+
 // Serve reads requests from r and writes responses to w until EOF. A client
 // closing its end of the pipe ends the session.
 func (s *Server) Serve(ctx context.Context, r io.Reader, w io.Writer) error {
-	scanner := bufio.NewScanner(r)
-	scanner.Buffer(make([]byte, 0, 64*1024), maxLine)
-	for scanner.Scan() {
-		line := scanner.Bytes()
-		if len(line) == 0 {
+	br := bufio.NewReaderSize(r, maxLine)
+	for {
+		line, err := readLine(br)
+		if errors.Is(err, errLineTooLong) {
+			s.writeError(w, nil, codeParseError, "request too large")
 			continue
 		}
-		var req request
-		if err := json.Unmarshal(line, &req); err != nil {
-			s.writeError(w, nil, codeParseError, "parse error")
-			continue
+		if err != nil && !errors.Is(err, io.EOF) {
+			return fmt.Errorf("mcp: read: %w", err)
 		}
-		if len(req.ID) == 0 || string(req.ID) == "null" {
-			// A notification: nothing to answer.
-			continue
+		if line = bytes.TrimRight(line, "\r\n"); len(line) > 0 {
+			s.handleLine(ctx, w, line)
 		}
-		s.dispatch(ctx, w, req)
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
 	}
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("mcp: read: %w", err)
+}
+
+// handleLine parses one request line and dispatches it, answering a malformed
+// line with a parse error and ignoring notifications.
+func (s *Server) handleLine(ctx context.Context, w io.Writer, line []byte) {
+	var req request
+	if err := json.Unmarshal(line, &req); err != nil {
+		s.writeError(w, nil, codeParseError, "parse error")
+		return
 	}
-	return nil
+	if len(req.ID) == 0 || string(req.ID) == "null" {
+		// A notification: nothing to answer.
+		return
+	}
+	s.dispatch(ctx, w, req)
+}
+
+// readLine reads one newline-terminated line. A line that overflows the
+// reader's buffer is drained to its end and reported as errLineTooLong, so the
+// caller can reject it and keep reading. The trailing newline is kept when
+// present; a partial final line returns with io.EOF.
+func readLine(br *bufio.Reader) ([]byte, error) {
+	line, err := br.ReadSlice('\n')
+	if !errors.Is(err, bufio.ErrBufferFull) {
+		return line, err
+	}
+	for errors.Is(err, bufio.ErrBufferFull) {
+		_, err = br.ReadSlice('\n')
+	}
+	if err != nil && !errors.Is(err, io.EOF) {
+		return nil, err
+	}
+	return nil, errLineTooLong
 }
 
 // dispatch answers one request.

@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -179,9 +180,10 @@ func GitHubServer() *httptest.Server {
 // JiraServer serves issue search in Jira Cloud's wire format.
 func JiraServer() *httptest.Server {
 	issue := func(key, summary string, assignee, reporter map[string]any, labels []string, project string, ago int) map[string]any {
+		projectKey, _, _ := strings.Cut(key, "-")
 		fields := map[string]any{
 			"summary": summary, "labels": labels,
-			"project": map[string]any{"key": key[:3], "name": project},
+			"project": map[string]any{"key": projectKey, "name": project},
 			"updated": jiraDaysAgo(ago),
 		}
 		if assignee != nil {

@@ -131,3 +131,39 @@ func TestToolErrorAndProtocolErrors(t *testing.T) {
 		t.Errorf("bad json code = %v, want parse error", parse["code"])
 	}
 }
+
+// TestServeRecoversFromOversizedLine verifies a request past the size limit is
+// rejected without ending the session and later requests still answer.
+func TestServeRecoversFromOversizedLine(t *testing.T) {
+	t.Parallel()
+	big := `{"jsonrpc":"2.0","id":1,"method":"ping","params":{"pad":"` +
+		strings.Repeat("x", 1<<20) + `"}}`
+	ping := `{"jsonrpc":"2.0","id":2,"method":"ping"}`
+
+	var out strings.Builder
+	if err := testServer().Serve(context.Background(),
+		strings.NewReader(big+"\n"+ping+"\n"), &out); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+
+	var sawTooLarge, sawPing bool
+	scanner := bufio.NewScanner(strings.NewReader(out.String()))
+	for scanner.Scan() {
+		var resp map[string]any
+		if err := json.Unmarshal(scanner.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response %q: %v", scanner.Text(), err)
+		}
+		if e, ok := resp["error"].(map[string]any); ok && e["code"].(float64) == codeParseError {
+			sawTooLarge = true
+		}
+		if id, ok := resp["id"].(float64); ok && id == 2 && resp["result"] != nil {
+			sawPing = true
+		}
+	}
+	if !sawTooLarge {
+		t.Error("want a parse error for the oversized request")
+	}
+	if !sawPing {
+		t.Error("want the session to answer the ping after the oversized request")
+	}
+}
