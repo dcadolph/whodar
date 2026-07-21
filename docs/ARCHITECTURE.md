@@ -37,8 +37,9 @@ machine. Redacted admits only known providers and only anonymized numbered
 candidates. An organization can pin the policy from a locked system file that
 user flags and environment variables cannot loosen.
 
-Frontends are thin and share the engine: a CLI, a localhost web UI, and a Slack
-bot over Socket Mode or the Events API.
+Frontends are thin and share the engine: a CLI, a localhost web UI, a Slack bot
+over Socket Mode or the Events API, and an MCP server over stdio for agent
+clients such as Claude Code and Claude Desktop.
 
 ## Adding a source
 

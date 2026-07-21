@@ -79,11 +79,11 @@ Answers a question from the index.
 | --------------- | --------- | --------------------------------------------------- |
 | `--mode`        | `keyword` | Resolver: `keyword`, `semantic`, or `llm`.          |
 | `--limit`       | `5`       | Maximum results per section.                        |
-| `--provider`    | `ollama`  | LLM provider: `ollama`, `anthropic`, or `openai`.   |
+| `--provider`    | `ollama`  | LLM provider: `ollama`, `anthropic`, `openai`, or `gemini`. |
 | `--model`       |           | Chat model for llm mode (defaults per provider).    |
 | `--embed-model` |           | Ollama embed model for semantic and llm modes.      |
 | `--ollama-url`  | localhost | Ollama base URL.                                    |
-| `--openai-url`  |           | OpenAI-compatible base URL, e.g. LM Studio or vLLM. |
+| `--openai-url`  |           | OpenAI-compatible base URL including the version path, e.g. `http://localhost:1234/v1`. |
 | `--feedback`    | `normal`  | How hard votes move ranking: `off`, `low`, `normal`, `high`. |
 
 Modes: `keyword` needs no model and always works. `semantic` matches on
@@ -132,13 +132,16 @@ Runs the local web UI over the same engine.
 
     whodar serve [--addr HOST:PORT] [--mode keyword|semantic|llm]
 
-| Flag            | Default          | What it does                          |
-| --------------- | ---------------- | ------------------------------------- |
-| `--addr`        | `127.0.0.1:8765` | Address to listen on.                 |
-| `--mode`        | `keyword`        | Default resolver.                     |
-| `--model`       |                  | Ollama chat model for llm mode.       |
-| `--embed-model` |                  | Ollama embed model.                   |
-| `--ollama-url`  | localhost        | Ollama base URL.                      |
+| Flag            | Default          | What it does                                                 |
+| --------------- | ---------------- | ------------------------------------------------------------ |
+| `--addr`        | `127.0.0.1:8765` | Address to listen on.                                        |
+| `--mode`        | `keyword`        | Default resolver.                                            |
+| `--provider`    | `ollama`         | LLM provider: `ollama`, `anthropic`, `openai`, or `gemini`.  |
+| `--model`       |                  | Ollama chat model for llm mode.                              |
+| `--embed-model` |                  | Ollama embed model.                                          |
+| `--ollama-url`  | localhost        | Ollama base URL.                                             |
+| `--openai-url`  |                  | OpenAI-compatible base URL including the version path.       |
+| `--feedback`    | `normal`         | How hard votes move ranking: `off`, `low`, `normal`, `high`. |
 
 Queries are shareable links: `/?q=who+owns+billing` runs on load. Every
 result has feedback buttons.
@@ -175,15 +178,18 @@ reconnects with backoff.
 
     whodar bot [--transport socket|events]
 
-| Flag            | Default          | What it does                                 |
-| --------------- | ---------------- | -------------------------------------------- |
-| `--transport`   | `socket`         | `socket` needs no public URL; `events` serves HTTP. |
-| `--addr`        | `127.0.0.1:8766` | Address for the events transport.            |
-| `--mode`        | `keyword`        | Default answer mode.                         |
-| `--limit`       | `5`              | Maximum results per section.                 |
-| `--model`       |                  | Ollama chat model for llm mode.              |
-| `--embed-model` |                  | Ollama embed model.                          |
-| `--ollama-url`  | localhost        | Ollama base URL.                             |
+| Flag            | Default          | What it does                                                 |
+| --------------- | ---------------- | ------------------------------------------------------------ |
+| `--transport`   | `socket`         | `socket` needs no public URL; `events` serves HTTP.          |
+| `--addr`        | `127.0.0.1:8766` | Address for the events transport.                            |
+| `--mode`        | `keyword`        | Default answer mode.                                         |
+| `--limit`       | `5`              | Maximum results per section.                                 |
+| `--provider`    | `ollama`         | LLM provider: `ollama`, `anthropic`, `openai`, or `gemini`.  |
+| `--model`       |                  | Ollama chat model for llm mode.                              |
+| `--embed-model` |                  | Ollama embed model.                                          |
+| `--ollama-url`  | localhost        | Ollama base URL.                                             |
+| `--openai-url`  |                  | OpenAI-compatible base URL including the version path.       |
+| `--feedback`    | `normal`         | How hard votes move ranking: `off`, `low`, `normal`, `high`. |
 
 ## Environment variables
 
@@ -253,7 +259,8 @@ The egress policy decides what whodar may send to a model. `strict` (default)
 permits nothing beyond a local model server; non-local `--ollama-url` and
 `--openai-url` values and the cloud providers count as egress and are refused.
 `redacted` permits only the known provider hosts (`api.anthropic.com`,
-`api.openai.com`) and strips identifiers: the question goes out as typed,
+`api.openai.com`, `generativelanguage.googleapis.com`) and strips identifiers:
+the question goes out as typed,
 people leave as numbered roles (title, team, matched terms), channels leave as
 numbered matched terms with no names or topics, the model returns numbers, and
 the summary is written locally. `open` sends full candidate detail to any
