@@ -14,9 +14,6 @@ import (
 	"github.com/dcadolph/whodar/internal/util"
 )
 
-// ErrNoRepos indicates no repositories were given to the GitHub connector.
-var ErrNoRepos = errors.New("github: no repositories (use repos or an org)")
-
 // maxTopicWeight caps how many times one topic counts for a person, so a heavy
 // contributor outranks a one-off without a single topic dominating the score.
 const maxTopicWeight = 4

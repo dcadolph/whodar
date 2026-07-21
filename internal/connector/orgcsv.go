@@ -10,12 +10,6 @@ import (
 	"strings"
 )
 
-// ErrNoHeader indicates the CSV had no header row.
-var ErrNoHeader = errors.New("org csv: missing header row")
-
-// ErrNoColumns indicates required columns were absent from the header.
-var ErrNoColumns = errors.New("org csv: required columns missing")
-
 // OrgCSV is a Source that reads an organization chart from a CSV file. The
 // header row is matched case-insensitively against known column names, so
 // column order and exact spelling do not matter.
@@ -24,6 +18,8 @@ type OrgCSV struct {
 	Path string
 	// TopicSep splits the topics column into individual topics; default ";".
 	TopicSep string
+	// Log receives warnings about skipped rows; nil discards them.
+	Log io.Writer
 }
 
 // NewOrgCSV returns an OrgCSV reading the file at path with default settings.
@@ -61,9 +57,15 @@ type columns struct {
 
 // parse reads CSV rows from r and converts them into records.
 func (o *OrgCSV) parse(ctx context.Context, r io.Reader) ([]Record, error) {
+	logw := o.Log
+	if logw == nil {
+		logw = io.Discard
+	}
+
 	cr := csv.NewReader(r)
 	cr.FieldsPerRecord = -1
 	cr.TrimLeadingSpace = true
+	cr.LazyQuotes = true
 
 	header, err := cr.Read()
 	if errors.Is(err, io.EOF) {
@@ -93,6 +95,11 @@ func (o *OrgCSV) parse(ctx context.Context, r io.Reader) ([]Record, error) {
 			break
 		}
 		if err != nil {
+			var pe *csv.ParseError
+			if errors.As(err, &pe) {
+				fmt.Fprintf(logw, "org csv: skipping malformed row: %v\n", err)
+				continue
+			}
 			return nil, fmt.Errorf("org csv: read row: %w", err)
 		}
 
@@ -141,8 +148,11 @@ func mapColumns(header []string) columns {
 	return c
 }
 
-// normalizeHeader lowercases a header and strips spaces and separators.
+// normalizeHeader lowercases a header and strips a leading UTF-8 BOM, spaces,
+// and separators. TrimSpace does not remove the BOM, so a CSV exported by Excel
+// or Windows would otherwise lose its first column.
 func normalizeHeader(h string) string {
+	h = strings.TrimPrefix(h, "\ufeff")
 	h = strings.ToLower(strings.TrimSpace(h))
 	h = strings.ReplaceAll(h, " ", "")
 	h = strings.ReplaceAll(h, "_", "")

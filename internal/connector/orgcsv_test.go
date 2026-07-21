@@ -67,3 +67,31 @@ func TestOrgCSVParse(t *testing.T) {
 		})
 	}
 }
+
+// TestOrgCSVStripsBOM verifies a leading UTF-8 BOM does not hide the first
+// column, which Excel and Windows exports commonly prepend.
+func TestOrgCSVStripsBOM(t *testing.T) {
+	t.Parallel()
+	in := "\ufeffName,Email\nJane Roe,jane@x.com\n"
+	got, err := (&OrgCSV{}).parse(context.Background(), strings.NewReader(in))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if len(got) != 1 || got[0].Name != "Jane Roe" || got[0].Email != "jane@x.com" {
+		t.Errorf("records = %+v, want the Name column resolved past the BOM", got)
+	}
+}
+
+// TestOrgCSVLazyQuotes verifies a stray quote in a field no longer aborts the
+// parse, so later rows still load.
+func TestOrgCSVLazyQuotes(t *testing.T) {
+	t.Parallel()
+	in := "Name,Email\nJ\"D Roe,jd@x.com\nBob,bob@x.com\n"
+	got, err := (&OrgCSV{}).parse(context.Background(), strings.NewReader(in))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if len(got) != 2 {
+		t.Errorf("rows = %d (%+v), want both rows despite the stray quote", len(got), got)
+	}
+}

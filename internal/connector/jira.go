@@ -110,15 +110,21 @@ func (j *Jira) Fetch(ctx context.Context) ([]Record, error) {
 	return records, nil
 }
 
-// jiraTime parses Jira's ISO 8601 timestamp, such as
-// "2026-07-05T12:34:56.789-0500", returning the zero time when it does not
-// parse.
+// jiraTime parses a Jira timestamp, returning the zero time when none of the
+// accepted layouts match. Jira Cloud sends its own ISO 8601 form with a
+// colon-less zone, such as "2026-07-05T12:34:56.789-0500", but some deployments
+// and fixtures use RFC 3339 with a "Z" zone or without fractional seconds.
 func jiraTime(s string) time.Time {
-	t, err := time.Parse("2006-01-02T15:04:05.999-0700", s)
-	if err != nil {
-		return time.Time{}
+	for _, layout := range []string{
+		"2006-01-02T15:04:05.999-0700",
+		time.RFC3339Nano,
+		time.RFC3339,
+	} {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t
+		}
 	}
-	return t
+	return time.Time{}
 }
 
 // jql returns the query: an explicit JQL, or a project scope, or all issues.

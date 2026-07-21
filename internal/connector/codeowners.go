@@ -3,7 +3,6 @@ package connector
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -12,9 +11,6 @@ import (
 
 	"github.com/dcadolph/whodar/internal/util"
 )
-
-// ErrNoCodeOwners indicates no CODEOWNERS file was found.
-var ErrNoCodeOwners = errors.New("codeowners: no CODEOWNERS file found")
 
 // codeStop are path segments and file extensions too generic to be topics.
 var codeStop = map[string]bool{
@@ -111,10 +107,13 @@ func parseCodeOwners(ctx context.Context, r io.Reader) ([]Record, error) {
 			continue
 		}
 		fields := strings.Fields(line)
-		if len(fields) < 2 {
+		if len(fields) < 1 || isSectionHeader(fields[0]) {
 			continue
 		}
 		for _, owner := range fields[1:] {
+			if !strings.Contains(owner, "@") {
+				continue
+			}
 			if patterns[owner] == nil {
 				order = append(order, owner)
 			}
@@ -132,8 +131,16 @@ func parseCodeOwners(ctx context.Context, r io.Reader) ([]Record, error) {
 	return records, nil
 }
 
-// ownerRecord builds a record for an owner. An email owner joins other sources
-// by email; an @handle or @org/team becomes its own contact entry.
+// isSectionHeader reports whether a first field opens a CODEOWNERS section, such
+// as "[Docs]" or the optional "^[Reviewers]". Section lines carry no path
+// pattern, so their tokens must never be mined as owners or topics.
+func isSectionHeader(field string) bool {
+	return strings.HasPrefix(field, "[") || strings.HasPrefix(field, "^[")
+}
+
+// ownerRecord builds a record for an owner. Owners always carry an "@": an
+// email owner joins other sources by email, while an @handle or @org/team
+// becomes its own contact entry.
 func ownerRecord(owner string, patterns []string) Record {
 	rec := Record{
 		Kind:   KindPerson,
@@ -144,10 +151,8 @@ func ownerRecord(owner string, patterns []string) Record {
 	}
 	if after, ok := strings.CutPrefix(owner, "@"); ok {
 		rec.PersonID = "codeowners:" + strings.ToLower(after)
-	} else if strings.Contains(owner, "@") {
-		rec.Email = util.NormalizeEmail(owner)
 	} else {
-		rec.PersonID = "codeowners:" + strings.ToLower(owner)
+		rec.Email = util.NormalizeEmail(owner)
 	}
 	return rec
 }

@@ -96,8 +96,21 @@ func (c *Confluence) Fetch(ctx context.Context) ([]Record, error) {
 
 	for _, page := range pages {
 		tokens := pageTopics(page)
-		for _, u := range page.Authors() {
-			bump(u, tokens, page.Version.When)
+		creator, editor := page.History.CreatedBy, page.Version.By
+		// Credit the creator at creation time and the last editor at edit time,
+		// so an old page edited yesterday does not make its author look recently
+		// active. A person who did both is credited once, at their later action.
+		editorIsCreator := creator != nil && editor != nil &&
+			confluenceUserKey(*creator) == confluenceUserKey(*editor)
+		if creator != nil {
+			when := page.History.CreatedAt
+			if editorIsCreator && page.Version.When.After(when) {
+				when = page.Version.When
+			}
+			bump(creator, tokens, when)
+		}
+		if editor != nil && !editorIsCreator {
+			bump(editor, tokens, page.Version.When)
 		}
 	}
 

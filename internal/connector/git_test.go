@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -107,7 +108,89 @@ func TestGitHistoryErrors(t *testing.T) {
 		t.Errorf("no paths error = %v, want ErrNoRepoPaths", err)
 	}
 	dir := t.TempDir()
-	if _, err := NewGitHistory(GitOptions{Paths: []string{dir}}).Fetch(context.Background()); err == nil {
-		t.Error("want an error for a directory that is not a repository")
+	var log strings.Builder
+	recs, err := NewGitHistory(GitOptions{Paths: []string{dir}, Log: &log}).Fetch(context.Background())
+	if err != nil {
+		t.Errorf("Fetch = %v, want a non-repository directory skipped without error", err)
+	}
+	if len(recs) != 0 {
+		t.Errorf("records = %+v, want none from a non-repository directory", recs)
+	}
+	if !strings.Contains(log.String(), "skipping") {
+		t.Errorf("log = %q, want a skip warning", log.String())
+	}
+}
+
+// TestGitHistoryMailmap verifies a .mailmap merges one person's two commit
+// emails into a single record under the canonical identity.
+func TestGitHistoryMailmap(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	repo, err := git.PlainInit(dir, false)
+	if err != nil {
+		t.Fatalf("init: %v", err)
+	}
+	wt, err := repo.Worktree()
+	if err != nil {
+		t.Fatalf("worktree: %v", err)
+	}
+	commit := func(rel, name, email string, when time.Time) {
+		t.Helper()
+		full := filepath.Join(dir, rel)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatalf("mkdir: %v", err)
+		}
+		if err := os.WriteFile(full, []byte("x"), 0o600); err != nil {
+			t.Fatalf("write: %v", err)
+		}
+		if _, err := wt.Add(rel); err != nil {
+			t.Fatalf("add: %v", err)
+		}
+		sig := &object.Signature{Name: name, Email: email, When: when}
+		if _, err := wt.Commit("c", &git.CommitOptions{Author: sig, Committer: sig}); err != nil {
+			t.Fatalf("commit: %v", err)
+		}
+	}
+
+	now := time.Now()
+	commit("infra/vpc.tf", "Alice P", "alice@personal.com", now.AddDate(0, 0, -20))
+	commit("infra/main.tf", "Alice Smith", "alice@corp.com", now.AddDate(0, 0, -5))
+	mm := "Alice Smith <alice@corp.com> <alice@personal.com>\n"
+	if err := os.WriteFile(filepath.Join(dir, ".mailmap"), []byte(mm), 0o600); err != nil {
+		t.Fatalf("write mailmap: %v", err)
+	}
+
+	recs, err := NewGitHistory(GitOptions{Paths: []string{dir}}).Fetch(context.Background())
+	if err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	if len(recs) != 1 {
+		t.Fatalf("records = %d (%+v), want 1 merged author", len(recs), recs)
+	}
+	if recs[0].Email != "alice@corp.com" || recs[0].Name != "Alice Smith" {
+		t.Errorf("record = %+v, want canonical alice@corp.com / Alice Smith", recs[0])
+	}
+	if !slices.Contains(recs[0].Topics, "terraform") {
+		t.Errorf("topics = %v, want terraform from both commits", recs[0].Topics)
+	}
+}
+
+// TestGitHistorySkipsBadRepo verifies a bad path is logged and skipped while
+// good repositories still contribute records.
+func TestGitHistorySkipsBadRepo(t *testing.T) {
+	t.Parallel()
+	good := newFixtureRepo(t)
+	bad := t.TempDir()
+	var log strings.Builder
+	recs, err := NewGitHistory(GitOptions{Paths: []string{bad, good}, Log: &log}).
+		Fetch(context.Background())
+	if err != nil {
+		t.Fatalf("Fetch = %v, want the bad path skipped without error", err)
+	}
+	if len(recs) == 0 {
+		t.Error("want records from the good repository")
+	}
+	if !strings.Contains(log.String(), "skipping") {
+		t.Errorf("log = %q, want a skip warning for the bad path", log.String())
 	}
 }

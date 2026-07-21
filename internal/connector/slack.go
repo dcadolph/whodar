@@ -114,9 +114,9 @@ func (s *Slack) Fetch(ctx context.Context) ([]Record, error) {
 		}
 		msgs, err := s.client.History(ctx, ch.ID, oldest, s.opts.MaxMessages)
 		if errors.Is(err, slack.ErrAPI) {
-			// A channel the token cannot read, commonly not_in_channel on a
-			// public channel the bot was never invited to, must not cost the
-			// whole run.
+			// Any per-channel API error, such as not_in_channel on a public
+			// channel the bot was never invited to, is skipped so one
+			// unreadable channel does not cost the whole run.
 			skipped++
 			fmt.Fprintf(s.opts.Log, "slack: skipping #%s: %v\n", ch.Name, err)
 			continue

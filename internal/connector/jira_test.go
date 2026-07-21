@@ -2,6 +2,7 @@ package connector
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -57,5 +58,30 @@ func TestJiraFetch(t *testing.T) {
 	}
 	if !byKey["jira:b1"].Time.IsZero() {
 		t.Errorf("bob time = %v, want zero for an issue without a date", byKey["jira:b1"].Time)
+	}
+}
+
+// TestJiraTime verifies the Jira colon-less zone form and RFC 3339 variants all
+// parse, and that an unparseable string yields the zero time.
+func TestJiraTime(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		In       string
+		WantZero bool
+	}{
+		{In: "2026-07-05T12:34:56.789-0500"},
+		{In: "2026-07-05T12:34:56Z"},
+		{In: "2026-07-05T12:34:56.789Z"},
+		{In: "2026-07-05T12:34:56+05:00"},
+		{In: "not a time", WantZero: true},
+		{In: "", WantZero: true},
+	}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			if got := jiraTime(test.In).IsZero(); got != test.WantZero {
+				t.Errorf("jiraTime(%q) zero=%v, want %v", test.In, got, test.WantZero)
+			}
+		})
 	}
 }

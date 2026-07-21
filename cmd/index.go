@@ -102,7 +102,9 @@ Start with the org chart, then merge everything else onto it:
 				if file == "" {
 					return fmt.Errorf("%w: --file is required for org-csv", ErrBadArgs)
 				}
-				recs, err = connector.NewOrgCSV(file).Fetch(cmd.Context())
+				oc := connector.NewOrgCSV(file)
+				oc.Log = cmd.ErrOrStderr()
+				recs, err = oc.Fetch(cmd.Context())
 			case "slack":
 				recs, err = fetchSlack(cmd, opts, slackArgs{includePrivate, sinceDays, maxMessages})
 			case "codeowners":

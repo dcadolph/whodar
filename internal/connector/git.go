@@ -20,10 +20,11 @@ const (
 	defaultGitSinceDays = 365
 	// defaultMaxCommits caps commits read per repository.
 	defaultMaxCommits = 2000
+	// maxRootCommitFiles bounds the files a parentless commit may credit. A root
+	// commit diffs against the empty tree, so a wholesale import would otherwise
+	// credit its committer with every path in the repository.
+	maxRootCommitFiles = 100
 )
-
-// ErrNoRepoPaths indicates no repository paths were given to the git connector.
-var ErrNoRepoPaths = errors.New("git: no repository paths")
 
 // GitOptions configures the git history connector.
 type GitOptions struct {
@@ -78,9 +79,13 @@ func (g *GitHistory) Fetch(ctx context.Context) ([]Record, error) {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		read, err := g.readRepo(path, counts, names, latest)
+		read, err := g.readRepo(ctx, path, counts, names, latest)
 		if err != nil {
-			return nil, err
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				return nil, err
+			}
+			fmt.Fprintf(g.opts.Log, "git: skipping %s: %v\n", path, err)
+			continue
 		}
 		fmt.Fprintf(g.opts.Log, "git: %s: %d commits\n", path, read)
 	}
@@ -101,8 +106,11 @@ func (g *GitHistory) Fetch(ctx context.Context) ([]Record, error) {
 }
 
 // readRepo walks one repository's log, accumulating per-author topic counts,
-// display names, and latest activity. It returns the number of commits read.
+// display names, and latest activity. Authors are canonicalized through the
+// repository's .mailmap so one person's several emails merge. It returns the
+// number of commits read.
 func (g *GitHistory) readRepo(
+	ctx context.Context,
 	path string,
 	counts map[string]map[string]int,
 	names map[string]string,
@@ -112,6 +120,7 @@ func (g *GitHistory) readRepo(
 	if err != nil {
 		return 0, fmt.Errorf("git: open %s: %w", path, err)
 	}
+	mm := loadMailmap(path)
 	since := time.Now().AddDate(0, 0, -g.opts.SinceDays)
 	iter, err := repo.Log(&git.LogOptions{Since: &since})
 	if err != nil {
@@ -124,20 +133,32 @@ func (g *GitHistory) readRepo(
 		if read >= g.opts.MaxCommits {
 			return storer.ErrStop
 		}
-		email := strings.ToLower(strings.TrimSpace(c.Author.Email))
-		if email == "" || c.NumParents() > 1 || isBotAuthor(c.Author.Name, email) {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		name, email := c.Author.Name, c.Author.Email
+		if mm != nil {
+			name, email = mm.resolve(name, email)
+		}
+		email = strings.ToLower(strings.TrimSpace(email))
+		if email == "" || c.NumParents() > 1 || isBotAuthor(name, email) {
 			return nil
 		}
 		stats, err := c.Stats()
 		if err != nil {
+			fmt.Fprintf(g.opts.Log, "git: %s: stats for %s: %v\n", path, c.Hash, err)
+			return nil
+		}
+		if c.NumParents() == 0 && len(stats) > maxRootCommitFiles {
 			return nil
 		}
 		read++
-		if c.Author.When.After(latest[email]) {
+		newer := c.Author.When.After(latest[email])
+		if newer {
 			latest[email] = c.Author.When
 		}
-		if c.Author.Name != "" {
-			names[email] = c.Author.Name
+		if name != "" && (newer || names[email] == "") {
+			names[email] = name
 		}
 		m := counts[email]
 		if m == nil {

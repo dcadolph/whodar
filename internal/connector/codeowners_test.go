@@ -50,3 +50,26 @@ func TestCodeOwnersMissing(t *testing.T) {
 		t.Fatalf("err = %v, want ErrNoCodeOwners", err)
 	}
 }
+
+// TestParseCodeOwnersSkipsSections verifies section headers and non-owner tokens
+// never become phantom owners.
+func TestParseCodeOwnersSkipsSections(t *testing.T) {
+	t.Parallel()
+	in := "[Optional Reviewers]\n" +
+		"^[Security]\n" +
+		"*.go @jane\n" +
+		"[Docs] @docs-team\n"
+
+	recs, err := parseCodeOwners(context.Background(), strings.NewReader(in))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	for _, r := range recs {
+		if strings.Contains(r.Name, "]") || strings.Contains(r.PersonID, "]") {
+			t.Errorf("phantom owner leaked from a section header: %+v", r)
+		}
+	}
+	if len(recs) != 1 || recs[0].Name != "@jane" {
+		t.Errorf("records = %+v, want only @jane", recs)
+	}
+}
