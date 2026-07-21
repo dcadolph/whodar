@@ -6,15 +6,17 @@ import (
 	"github.com/dcadolph/whodar/internal/resolve"
 )
 
-// Format renders an answer as Slack mrkdwn.
+// Format renders an answer as Slack mrkdwn. Every value drawn from the query or
+// the graph is escaped, so text like <!channel> or <@Uxxx> renders as literal
+// characters rather than a workspace-wide broadcast or a mention.
 func Format(query string, ans resolve.Answer) string {
 	if len(ans.People) == 0 && len(ans.Channels) == 0 {
-		return "No matches for *" + query + "*. Try different words."
+		return "No matches for *" + escapeMrkdwn(query) + "*. Try different words."
 	}
 
 	var b strings.Builder
 	if ans.Summary != "" {
-		b.WriteString(ans.Summary)
+		b.WriteString(escapeMrkdwn(ans.Summary))
 		b.WriteString("\n\n")
 	}
 
@@ -25,12 +27,12 @@ func Format(query string, ans resolve.Answer) string {
 			if name == "" {
 				name = m.Person.Email
 			}
-			line := "• " + name
+			line := "• " + escapeMrkdwn(name)
 			if m.Person.Title != "" {
-				line += " - " + m.Person.Title
+				line += " - " + escapeMrkdwn(m.Person.Title)
 			}
 			if m.Team != nil && m.Team.Name != "" {
-				line += " (" + m.Team.Name + ")"
+				line += " (" + escapeMrkdwn(m.Team.Name) + ")"
 			}
 			if label := resolve.ConfidenceLabel(m.Confidence); label != "" {
 				line += " · " + label + " match"
@@ -46,9 +48,9 @@ func Format(query string, ans resolve.Answer) string {
 		}
 		b.WriteString("*Channels*\n")
 		for _, c := range ans.Channels {
-			line := "• #" + c.Channel.Name
+			line := "• #" + escapeMrkdwn(c.Channel.Name)
 			if c.Channel.Topic != "" {
-				line += " - " + c.Channel.Topic
+				line += " - " + escapeMrkdwn(c.Channel.Topic)
 			}
 			b.WriteString(line)
 			b.WriteString("\n")
@@ -56,4 +58,14 @@ func Format(query string, ans resolve.Answer) string {
 	}
 
 	return strings.TrimRight(b.String(), "\n")
+}
+
+// escapeMrkdwn escapes the three characters Slack treats as mrkdwn control
+// characters. The ampersand is replaced first, so the entities the other two
+// introduce are not escaped again.
+func escapeMrkdwn(s string) string {
+	s = strings.ReplaceAll(s, "&", "&amp;")
+	s = strings.ReplaceAll(s, "<", "&lt;")
+	s = strings.ReplaceAll(s, ">", "&gt;")
+	return s
 }
