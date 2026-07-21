@@ -88,11 +88,12 @@ email, or channel that is not in the candidate list. Reply only as JSON of the f
 If no candidate is relevant, return empty arrays and say so in the summary.`
 
 // redactedSystem is the system prompt for the redacted path: candidates are
-// numbered and carry no personal identifiers, and the model replies with
-// candidate numbers only.
+// numbered and carry no identifiers, people are roles, channels are only the
+// query terms they matched, and the model replies with candidate numbers.
 const redactedSystem = `You help an employee find who to talk to and which channel to ask in.
-You are given a question and a numbered list of candidate roles and channels retrieved from
-an internal index. Candidates are anonymized: rank them only by their role, team, and topics.
+You are given a question and a numbered list of candidates retrieved from an internal index.
+Candidates are anonymized: rank people only by their role, team, and matched terms, and rank
+channels only by which question terms they matched and how.
 Reply only as JSON of the form:
 {"people":["<candidate number, best first>"],"channels":["<channel number, best first>"]}.
 If no candidate is relevant, return empty arrays.`
@@ -124,10 +125,11 @@ func NewLLM(ix *index.Index, chat Chatter, embedder Embedder) *LLM {
 	return &LLM{ix: ix, chat: chat, embedder: embedder}
 }
 
-// NewRedactedLLM returns an LLM resolver that never sends names, emails, or
-// message text to the model: candidates go out as numbered roles, and the
-// written summary is composed locally. Use it with cloud providers under the
-// redacted policy.
+// NewRedactedLLM returns an LLM resolver that never sends names, emails,
+// channel names, channel topics, or message text to the model: people go out
+// as numbered roles, channels as numbered matched-term entries, and the
+// written summary is composed locally. The question itself still goes to the
+// model verbatim. Use it with cloud providers under the redacted policy.
 func NewRedactedLLM(ix *index.Index, chat Chatter, embedder Embedder) *LLM {
 	l := NewLLM(ix, chat, embedder)
 	l.redact = true
@@ -241,9 +243,11 @@ func buildPrompt(query string, people []model.Match, channels []model.ChannelMat
 	return b.String()
 }
 
-// buildRedactedPrompt renders the question and candidates without personal
-// identifiers: each person is a numbered role with title, team, and matched
-// topics; channels keep their name and topic but not their members.
+// buildRedactedPrompt renders the question and candidates without identifiers
+// from the index: each person is a numbered role with title, team, and matched
+// terms; each channel is a number with only the query terms it matched, never
+// its name, topic, or members. The matched terms come from the user's own
+// question, so nothing indexed leaves beyond titles and team names.
 func buildRedactedPrompt(query string, people []model.Match, channels []model.ChannelMatch) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Question: %s\n\nCandidate people:\n", query)
@@ -263,7 +267,11 @@ func buildRedactedPrompt(query string, people []model.Match, channels []model.Ch
 		b.WriteString("(none)\n")
 	}
 	for i, c := range channels {
-		fmt.Fprintf(&b, "%d. #%s - topic: %s\n", i+1, c.Channel.Name, c.Channel.Topic)
+		matched := strings.Join(c.Reasons, ", ")
+		if matched == "" {
+			matched = "(no detail)"
+		}
+		fmt.Fprintf(&b, "%d. matched %s\n", i+1, matched)
 	}
 	return b.String()
 }

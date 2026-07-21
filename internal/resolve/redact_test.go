@@ -7,6 +7,7 @@ import (
 
 	"github.com/dcadolph/whodar/internal/connector"
 	"github.com/dcadolph/whodar/internal/index"
+	"github.com/dcadolph/whodar/internal/model"
 )
 
 // captureChatter records what would leave the machine and replies with a
@@ -26,18 +27,20 @@ func (c *captureChatter) Chat(_ context.Context, system, user string) (string, e
 	return c.reply, nil
 }
 
-// redactIndex builds two people whose order the model will flip.
+// redactIndex builds two people whose order the model will flip: Alice the
+// clear topic owner retrieves first, Bob the passing mentioner second.
 func redactIndex() *index.Index {
 	ix := index.New()
 	ix.Build([]connector.Record{{
 		Kind: connector.KindPerson, Email: "alice@corp.com", Name: "Alice Smith",
 		Title: "Staff Engineer", Team: "Payments", Topics: []string{"billing"},
-		Text: "wrote the billing retry handler", Source: "org-csv",
+		Source: "org-csv",
 	}, {
 		Kind: connector.KindPerson, Email: "bob@corp.com", Name: "Bob Jones",
-		Title: "Engineer", Team: "Payments", Topics: []string{"billing"}, Source: "org-csv",
+		Title: "Engineer", Team: "Payments", Text: "answered billing once in passing",
+		Source: "org-csv",
 	}, {
-		Kind: connector.KindChannel, Name: "payments", Title: "billing questions",
+		Kind: connector.KindChannel, Name: "pay-help", Title: "billing questions",
 		Members: []string{"alice@corp.com"}, Source: "slack",
 	}})
 	return ix
@@ -54,7 +57,7 @@ func TestRedactedLLMSendsNoIdentifiers(t *testing.T) {
 	}
 
 	sent := strings.ToLower(chat.system + "\n" + chat.user)
-	for _, leak := range []string{"alice", "bob", "@corp.com", "smith", "jones"} {
+	for _, leak := range []string{"alice", "bob", "@corp.com", "smith", "jones", "pay-help", "questions"} {
 		if strings.Contains(sent, leak) {
 			t.Errorf("prompt leaked %q:\n%s", leak, chat.user)
 		}
@@ -66,10 +69,30 @@ func TestRedactedLLMSendsNoIdentifiers(t *testing.T) {
 	if len(ans.People) != 2 || ans.People[0].Person.Email != "bob@corp.com" {
 		t.Errorf("people order top = %v, want the model's number ranking applied", ans.People[0].Person.ID)
 	}
-	if len(ans.Channels) != 1 || ans.Channels[0].Channel.Name != "payments" {
+	if len(ans.Channels) != 1 || ans.Channels[0].Channel.Name != "pay-help" {
 		t.Errorf("channels = %+v", ans.Channels)
 	}
 	if !strings.Contains(ans.Summary, "Bob Jones") {
 		t.Errorf("summary = %q, want a locally written name", ans.Summary)
+	}
+}
+
+// TestBuildRedactedPromptOmitsChannelData verifies channel names and topics
+// stay out of the redacted prompt even when they carry sensitive tokens.
+func TestBuildRedactedPromptOmitsChannelData(t *testing.T) {
+	t.Parallel()
+	channels := []model.ChannelMatch{{
+		Channel: &model.Channel{ID: "acme-deal", Name: "acme-deal", Topic: "jane's acquisition room"},
+		Reasons: []string{"billing (topic)"},
+	}}
+
+	got := buildRedactedPrompt("billing", nil, channels)
+	for _, leak := range []string{"acme", "jane", "acquisition"} {
+		if strings.Contains(strings.ToLower(got), leak) {
+			t.Errorf("prompt leaked %q:\n%s", leak, got)
+		}
+	}
+	if !strings.Contains(got, "1. matched billing (topic)") {
+		t.Errorf("prompt missing numbered matched terms:\n%s", got)
 	}
 }

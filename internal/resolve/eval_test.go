@@ -26,8 +26,8 @@ func evalOrg() []connector.Record {
 			Members: members, Source: "eval",
 		}
 	}
-	return []connector.Record{
-		person("jane@corp.com", "Jane Roe", "Staff Engineer", "Payments",
+	records := []connector.Record{
+		person("angela@corp.com", "Angela Malone", "Staff Engineer", "Payments",
 			[]string{"billing", "payments", "retries", "idempotency"},
 			"shipped a kubernetes job once for a migration"),
 		person("bob@corp.com", "Bob Smith", "Senior Engineer", "Data Platform",
@@ -45,11 +45,26 @@ func evalOrg() []connector.Record {
 			[]string{"oncall", "incidents", "pagerduty", "escalation"}, ""),
 		person("heidi@corp.com", "Heidi Cho", "Search Engineer", "Search",
 			[]string{"elasticsearch", "indexing", "relevance", "search"}, ""),
-		channel("payments", "billing and payments questions", "jane@corp.com"),
+		channel("payments", "billing and payments questions", "angela@corp.com"),
 		channel("data-platform", "kafka and streaming", "bob@corp.com"),
 		channel("infra", "kubernetes deploys and oncall", "carol@corp.com", "grace@corp.com"),
 		channel("security", "auth login and sso", "dan@corp.com"),
 	}
+
+	// Leo is the adversarial loudmouth: no kafka ownership, but constant kafka
+	// chatter across many channels plus plenty of unrelated talk, the way a
+	// prolific poster accumulates free-text weight. The explicit owner must
+	// outrank him anyway.
+	records = append(records,
+		person("leo@corp.com", "Leo Vox", "Developer Advocate", "Community", nil, ""))
+	for range 8 {
+		records = append(records, connector.Record{
+			Kind: connector.KindPerson, Email: "leo@corp.com", Source: "eval",
+			Text: "kafka kafka kafka kafka meetup talk demo slides workshop blog conference " +
+				"video newsletter roadmap booth podcast interview livestream community swag",
+		})
+	}
+	return records
 }
 
 // buildEvalIndex builds a keyword index over the synthetic organization.
@@ -92,7 +107,7 @@ func TestKeywordRankingQuality(t *testing.T) {
 		WantPerson  string
 		WantChannel string
 	}{{ // Test 0: Explicit topic beats an incidental text mention by another person.
-		Query: "who do I talk to about billing retries", WantPerson: "jane@corp.com", WantChannel: "payments",
+		Query: "who do I talk to about billing retries", WantPerson: "angela@corp.com", WantChannel: "payments",
 	}, { // Test 1: Streaming pipeline owner.
 		Query: "kafka streaming pipelines", WantPerson: "bob@corp.com", WantChannel: "data-platform",
 	}, { // Test 2: Infra owner wins over a payments distractor in Carol's text.
@@ -107,6 +122,14 @@ func TestKeywordRankingQuality(t *testing.T) {
 		Query: "oncall incident escalation", WantPerson: "grace@corp.com", WantChannel: "infra",
 	}, { // Test 7: Search owner.
 		Query: "elasticsearch search relevance", WantPerson: "heidi@corp.com",
+	}, { // Test 8: The topic owner beats the loudmouth on a bare single-term query.
+		Query: "kafka", WantPerson: "bob@corp.com", WantChannel: "data-platform",
+	}, { // Test 9: The tagline phrasing does not change the winner or dilute it.
+		Query: "who knows kafka", WantPerson: "bob@corp.com", WantChannel: "data-platform",
+	}, { // Test 10: An inflected query still finds the topic owner through stems.
+		Query: "billing retry", WantPerson: "angela@corp.com", WantChannel: "payments",
+	}, { // Test 11: A typo still finds the topic owner through fuzzy matching.
+		Query: "who knows terrafrom", WantPerson: "carol@corp.com",
 	}}
 
 	ix := buildEvalIndex()
