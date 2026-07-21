@@ -13,8 +13,10 @@ import (
 
 // OpenAI-compatible API defaults.
 const (
-	// openaiBaseURL is the OpenAI endpoint; any compatible server works.
-	openaiBaseURL = "https://api.openai.com"
+	// openaiBaseURL is the OpenAI endpoint; any compatible server works. The
+	// base carries the API version so a provider whose version path differs,
+	// such as Gemini's OpenAI-compatible endpoint, sets its own base.
+	openaiBaseURL = "https://api.openai.com/v1"
 	// openaiDefaultModel is used when no model is configured.
 	openaiDefaultModel = "gpt-4o"
 )
@@ -96,11 +98,6 @@ type openaiResponse struct {
 		// Message is the assistant turn.
 		Message openaiMessage `json:"message"`
 	} `json:"choices"`
-	// Error carries the API error on non-2xx responses.
-	Error struct {
-		// Message describes the error.
-		Message string `json:"message"`
-	} `json:"error"`
 }
 
 // Chat sends the system and user prompts and returns the text reply.
@@ -116,7 +113,7 @@ func (o *OpenAI) Chat(ctx context.Context, system, user string) (string, error) 
 		return "", fmt.Errorf("llm: openai encode: %w", err)
 	}
 	req, err := http.NewRequestWithContext(
-		ctx, http.MethodPost, o.baseURL+"/v1/chat/completions", bytes.NewReader(body))
+		ctx, http.MethodPost, o.baseURL+"/chat/completions", bytes.NewReader(body))
 	if err != nil {
 		return "", fmt.Errorf("llm: openai request: %w", err)
 	}
@@ -135,13 +132,13 @@ func (o *OpenAI) Chat(ctx context.Context, system, user string) (string, error) 
 	if err != nil {
 		return "", fmt.Errorf("llm: openai read body: %w", err)
 	}
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("llm: %w: openai status %d: %s",
+			ErrModel, resp.StatusCode, apiErrorMessage(raw))
+	}
 	var out openaiResponse
 	if err := json.Unmarshal(raw, &out); err != nil {
 		return "", fmt.Errorf("llm: %w: openai decode: %w", ErrModel, err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("llm: %w: openai status %d: %s",
-			ErrModel, resp.StatusCode, strings.TrimSpace(out.Error.Message))
 	}
 	if len(out.Choices) == 0 || strings.TrimSpace(out.Choices[0].Message.Content) == "" {
 		return "", fmt.Errorf("llm: %w: openai returned no text", ErrModel)

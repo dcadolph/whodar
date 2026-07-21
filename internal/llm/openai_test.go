@@ -31,7 +31,7 @@ func TestOpenAIChat(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 
-	c := NewOpenAI("sk-test", WithOpenAIBaseURL(srv.URL))
+	c := NewOpenAI("sk-test", WithOpenAIBaseURL(srv.URL+"/v1"))
 	got, err := c.Chat(context.Background(), "system prompt", "user prompt")
 	if err != nil {
 		t.Fatalf("Chat: %v", err)

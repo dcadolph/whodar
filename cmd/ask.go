@@ -92,7 +92,7 @@ Examples:
 	f.StringVar(&provider, "provider", "ollama",
 		"LLM provider: ollama, anthropic, openai, or gemini. Cloud providers need --policy redacted or open.")
 	f.StringVar(&openaiURL, "openai-url", "",
-		"OpenAI-compatible base URL, e.g. a local LM Studio or vLLM server.")
+		"OpenAI-compatible base URL including the version path, e.g. http://localhost:1234/v1.")
 	f.StringVar(&fbStrength, "feedback", "normal",
 		"How hard votes move ranking: off, low, normal, or high.")
 	return cmd

@@ -108,11 +108,6 @@ type anthropicResponse struct {
 	} `json:"content"`
 	// StopReason says why generation ended; "refusal" means declined.
 	StopReason string `json:"stop_reason"`
-	// Error carries the API error on non-2xx responses.
-	Error struct {
-		// Message describes the error.
-		Message string `json:"message"`
-	} `json:"error"`
 }
 
 // Chat sends the system and user prompts to Claude and returns the text reply.
@@ -145,13 +140,13 @@ func (a *Anthropic) Chat(ctx context.Context, system, user string) (string, erro
 	if err != nil {
 		return "", fmt.Errorf("llm: anthropic read body: %w", err)
 	}
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("llm: %w: anthropic status %d: %s",
+			ErrModel, resp.StatusCode, apiErrorMessage(raw))
+	}
 	var out anthropicResponse
 	if err := json.Unmarshal(raw, &out); err != nil {
 		return "", fmt.Errorf("llm: %w: anthropic decode: %w", ErrModel, err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("llm: %w: anthropic status %d: %s",
-			ErrModel, resp.StatusCode, strings.TrimSpace(out.Error.Message))
 	}
 	if out.StopReason == "refusal" {
 		return "", fmt.Errorf("llm: %w: anthropic declined the request", ErrModel)

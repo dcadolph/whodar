@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -20,12 +19,6 @@ const defaultBaseURL = "http://localhost:11434"
 
 // defaultModel is used when no model is given.
 const defaultModel = "llama3.1"
-
-// ErrEmptyResponse indicates the model returned no content.
-var ErrEmptyResponse = errors.New("llm: empty response")
-
-// ErrModel indicates the Ollama server is unreachable or reported an error.
-var ErrModel = errors.New("llm: model error")
 
 // Doer performs an HTTP request. *http.Client satisfies it; tests inject a stub.
 type Doer interface {
