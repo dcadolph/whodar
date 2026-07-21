@@ -132,6 +132,87 @@ func TestFeedbackAPI(t *testing.T) {
 	}
 }
 
+// TestUnauthorizedGetsSecurityHeaders verifies the 401 for a missing token
+// still carries the hardening headers and a JSON content type, since
+// securityHeaders wraps outermost.
+func TestUnauthorizedGetsSecurityHeaders(t *testing.T) {
+	t.Parallel()
+	ask := func(_ context.Context, _, _, _ string, _ int) (resolve.Answer, error) {
+		return resolve.Answer{}, nil
+	}
+	h, err := Handler(Config{Ask: ask, Version: "test", AuthToken: "secret"})
+	if err != nil {
+		t.Fatalf("Handler: %v", err)
+	}
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/ask?q=x", nil))
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", rec.Code)
+	}
+	if got := rec.Header().Get("X-Content-Type-Options"); got != "nosniff" {
+		t.Errorf("X-Content-Type-Options = %q, want nosniff on a 401", got)
+	}
+	if got := rec.Header().Get("X-Frame-Options"); got != "DENY" {
+		t.Errorf("X-Frame-Options = %q, want DENY on a 401", got)
+	}
+	if got := rec.Header().Get("Content-Security-Policy"); got != "default-src 'self'" {
+		t.Errorf("Content-Security-Policy = %q, want default-src 'self' on a 401", got)
+	}
+	if got := rec.Header().Get("Content-Type"); got != "application/json" {
+		t.Errorf("Content-Type = %q, want application/json on a 401", got)
+	}
+}
+
+// TestSameOrigin verifies the CSRF origin check matches host and web scheme and
+// rejects opaque or foreign origins.
+func TestSameOrigin(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		Origin     string
+		Host       string
+		WantResult bool
+	}{
+		{Origin: "http://whodar.local", Host: "whodar.local", WantResult: true},
+		{Origin: "https://whodar.local:8765", Host: "whodar.local:8765", WantResult: true},
+		{Origin: "http://evil.example", Host: "whodar.local", WantResult: false},
+		{Origin: "null", Host: "whodar.local", WantResult: false},
+		{Origin: "file://whodar.local", Host: "whodar.local", WantResult: false},
+	}
+	for testNum, test := range tests {
+		t.Run(fmt.Sprintf("test %d", testNum), func(t *testing.T) {
+			t.Parallel()
+			if got := sameOrigin(test.Origin, test.Host); got != test.WantResult {
+				t.Errorf("sameOrigin(%q, %q) = %v, want %v",
+					test.Origin, test.Host, got, test.WantResult)
+			}
+		})
+	}
+}
+
+// TestFeedbackTooLarge verifies an oversized feedback body is rejected with 413
+// rather than being read into memory.
+func TestFeedbackTooLarge(t *testing.T) {
+	t.Parallel()
+	ask := func(_ context.Context, _, _, _ string, _ int) (resolve.Answer, error) {
+		return resolve.Answer{}, nil
+	}
+	h, err := Handler(Config{
+		Ask:      ask,
+		Feedback: func(feedback.Entry) error { return nil },
+		Version:  "test",
+	})
+	if err != nil {
+		t.Fatalf("Handler: %v", err)
+	}
+	big := `{"query":"q","person":"jane@x.com","vote":"helpful","comment":"` +
+		strings.Repeat("a", 128<<10) + `"}`
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/feedback", strings.NewReader(big)))
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Errorf("status = %d, want 413 for an oversized body", rec.Code)
+	}
+}
+
 // TestFeedbackAPIDisabled verifies the endpoint is absent without a callback.
 func TestFeedbackAPIDisabled(t *testing.T) {
 	t.Parallel()

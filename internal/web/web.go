@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"io"
 	"io/fs"
 	"net/http"
 	"net/url"
@@ -74,12 +75,15 @@ type Config struct {
 	Version string
 	// AuthToken, when set, requires the token on every request: a bearer
 	// header, a token query parameter, or the cookie a prior visit set.
-	AuthToken string
+	AuthToken string `json:"-"`
 	// Directory is the browsable inventory served at /api/directory; nil
 	// disables the directory API.
 	Directory *resolve.Directory
 	// Modes reports answer-mode readiness at /api/modes; nil disables it.
 	Modes ModesFunc
+	// Log receives server-side error detail kept out of client responses; nil
+	// discards it.
+	Log io.Writer
 }
 
 // Handler returns the whodar web handler: an index page, embedded assets, and a
@@ -97,11 +101,16 @@ func Handler(cfg Config) (http.Handler, error) {
 		return nil, fmt.Errorf("web: static assets: %w", err)
 	}
 
+	logw := cfg.Log
+	if logw == nil {
+		logw = io.Discard
+	}
+
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(static))))
-	mux.HandleFunc("/api/ask", askHandler(cfg.Ask))
+	mux.HandleFunc("/api/ask", askHandler(cfg.Ask, logw))
 	if cfg.Feedback != nil {
-		mux.HandleFunc("/api/feedback", feedbackHandler(cfg.Feedback))
+		mux.HandleFunc("/api/feedback", feedbackHandler(cfg.Feedback, logw))
 	}
 	if cfg.Person != nil {
 		mux.HandleFunc("/api/person", personHandler(cfg.Person))
@@ -114,18 +123,23 @@ func Handler(cfg Config) (http.Handler, error) {
 	}
 	mux.HandleFunc("/", indexHandler(tmpl, cfg.Version))
 
-	h := securityHeaders(mux)
+	// securityHeaders wraps outermost so hardening headers reach even the 401
+	// that requireToken writes for a missing or wrong token.
+	h := http.Handler(mux)
 	if cfg.AuthToken != "" {
 		h = requireToken(cfg.AuthToken, h)
 	}
-	return h, nil
+	return securityHeaders(h), nil
 }
 
 // securityHeaders sets response headers that harden every page and API reply.
+// The content security policy is default-src 'self' because the UI loads only
+// same-origin assets and calls only same-origin APIs.
 func securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'")
 		next.ServeHTTP(w, r)
 	})
 }
@@ -146,7 +160,7 @@ func requireToken(token string, next http.Handler) http.Handler {
 		if r.URL.Query().Get("token") != "" {
 			http.SetCookie(w, &http.Cookie{
 				Name: authCookie, Value: token, Path: "/",
-				HttpOnly: true, SameSite: http.SameSiteStrictMode,
+				HttpOnly: true, Secure: r.TLS != nil, SameSite: http.SameSiteStrictMode,
 			})
 		}
 		next.ServeHTTP(w, r)
@@ -191,7 +205,10 @@ func indexHandler(tmpl *template.Template, version string) http.HandlerFunc {
 
 // askHandler answers queries as JSON. It reads q, mode, and limit from the query
 // string and returns the same shape the CLI emits.
-func askHandler(ask AskFunc) http.HandlerFunc {
+func askHandler(ask AskFunc, logw io.Writer) http.HandlerFunc {
+	if ask == nil {
+		panic("web: askHandler requires an Ask function")
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
@@ -221,7 +238,8 @@ func askHandler(ask AskFunc) http.HandlerFunc {
 						"`ollama pull llama3.1`, and ask again. Keyword mode always works.")
 				return
 			}
-			writeError(w, http.StatusBadGateway, err.Error())
+			fmt.Fprintf(logw, "web: ask %q: %v\n", query, err)
+			writeError(w, http.StatusBadGateway, "the answer service is unavailable")
 			return
 		}
 		_ = json.NewEncoder(w).Encode(ans.View(query))
@@ -231,6 +249,9 @@ func askHandler(ask AskFunc) http.HandlerFunc {
 // personHandler returns the full profile for the person named by the id query
 // parameter.
 func personHandler(person PersonFunc) http.HandlerFunc {
+	if person == nil {
+		panic("web: personHandler requires a Person function")
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		id := strings.TrimSpace(r.URL.Query().Get("id"))
@@ -250,6 +271,9 @@ func personHandler(person PersonFunc) http.HandlerFunc {
 // modesHandler reports each answer mode's readiness so the UI can guide the
 // user before they ask.
 func modesHandler(modes ModesFunc) http.HandlerFunc {
+	if modes == nil {
+		panic("web: modesHandler requires a Modes function")
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(modes(r.Context()))
@@ -259,6 +283,9 @@ func modesHandler(modes ModesFunc) http.HandlerFunc {
 // directoryHandler serves the precomputed directory of people, channels,
 // teams, and topics for the browse views.
 func directoryHandler(dir *resolve.Directory) http.HandlerFunc {
+	if dir == nil {
+		panic("web: directoryHandler requires a Directory")
+	}
 	return func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(dir)
@@ -269,7 +296,13 @@ func directoryHandler(dir *resolve.Directory) http.HandlerFunc {
 // body naming the query, the person or channel, and the vote direction. A
 // cross-origin POST is rejected so another site the operator has open cannot
 // cast votes through their browser.
-func feedbackHandler(record FeedbackFunc) http.HandlerFunc {
+func feedbackHandler(record FeedbackFunc, logw io.Writer) http.HandlerFunc {
+	if record == nil {
+		panic("web: feedbackHandler requires a Feedback function")
+	}
+	// maxFeedbackBytes bounds a feedback body so a large POST cannot exhaust
+	// memory; a well-formed vote is well under this.
+	const maxFeedbackBytes = 64 << 10
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if r.Method != http.MethodPost {
@@ -280,6 +313,7 @@ func feedbackHandler(record FeedbackFunc) http.HandlerFunc {
 			writeError(w, http.StatusForbidden, "cross-origin feedback rejected")
 			return
 		}
+		r.Body = http.MaxBytesReader(w, r.Body, maxFeedbackBytes)
 		var body struct {
 			// Query is the question the vote is about.
 			Query string `json:"query"`
@@ -293,6 +327,11 @@ func feedbackHandler(record FeedbackFunc) http.HandlerFunc {
 			Comment string `json:"comment"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			var tooLarge *http.MaxBytesError
+			if errors.As(err, &tooLarge) {
+				writeError(w, http.StatusRequestEntityTooLarge, "feedback too large")
+				return
+			}
 			writeError(w, http.StatusBadRequest, "invalid JSON")
 			return
 		}
@@ -314,24 +353,33 @@ func feedbackHandler(record FeedbackFunc) http.HandlerFunc {
 			return
 		}
 		if err := record(entry); err != nil {
-			writeError(w, http.StatusInternalServerError, err.Error())
+			fmt.Fprintf(logw, "web: record feedback: %v\n", err)
+			writeError(w, http.StatusInternalServerError, "could not record feedback")
 			return
 		}
 		_ = json.NewEncoder(w).Encode(map[string]string{"status": "recorded"})
 	}
 }
 
-// sameOrigin reports whether the Origin header names this server.
+// sameOrigin reports whether the Origin header names this server: a web scheme
+// and a host matching the request's. The scheme check rejects an opaque origin,
+// such as "null" or a file URL, that carries no host of its own.
 func sameOrigin(origin, host string) bool {
 	u, err := url.Parse(origin)
 	if err != nil {
 		return false
 	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return false
+	}
 	return u.Host == host
 }
 
-// writeError writes a JSON error response with the given status.
+// writeError writes a JSON error response with the given status. It sets the
+// content type itself so error paths that never reached a handler, like the
+// 401 for a missing token, still declare JSON.
 func writeError(w http.ResponseWriter, status int, msg string) {
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
