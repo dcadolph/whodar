@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -323,9 +324,9 @@ type confluenceArgs struct {
 // fetchConfluence builds Confluence records. The URL and credentials fall back
 // to the Jira environment variables, since both use the same Atlassian site.
 func fetchConfluence(cmd *cobra.Command, a confluenceArgs) ([]connector.Record, error) {
-	site := firstNonEmpty(os.Getenv(confluenceURLEnv), os.Getenv(jiraURLEnv))
-	email := firstNonEmpty(os.Getenv(confluenceEmailEnv), os.Getenv(jiraEmailEnv))
-	token := firstNonEmpty(os.Getenv(confluenceTokenEnv), os.Getenv(jiraTokenEnv))
+	site := cmp.Or(os.Getenv(confluenceURLEnv), os.Getenv(jiraURLEnv))
+	email := cmp.Or(os.Getenv(confluenceEmailEnv), os.Getenv(jiraEmailEnv))
+	token := cmp.Or(os.Getenv(confluenceTokenEnv), os.Getenv(jiraTokenEnv))
 	if site == "" || email == "" || token == "" {
 		return nil, fmt.Errorf("%w: set WHODAR_CONFLUENCE_URL, EMAIL, and TOKEN (or the Jira ones)", ErrBadArgs)
 	}
@@ -343,16 +344,6 @@ func fetchPagerDuty(cmd *cobra.Command) ([]connector.Record, error) {
 	}
 	src := connector.NewPagerDuty(token, connector.PagerDutyOptions{Log: cmd.ErrOrStderr()})
 	return src.Fetch(cmd.Context())
-}
-
-// firstNonEmpty returns the first non-empty string.
-func firstNonEmpty(vals ...string) string {
-	for _, v := range vals {
-		if v != "" {
-			return v
-		}
-	}
-	return ""
 }
 
 // reportChanges prints a one-line summary and capped lists of who and what
