@@ -29,22 +29,41 @@ archives:
 checksum:
   name_template: checksums.txt
 
-dockers_v2:
-  - images:
-      - "ghcr.io/dcadolph/whodar"
-    tags:
-      - "{{ .Version }}"
-      - "latest"
-    platforms:
-      - "linux/amd64"
-      - "linux/arm64"
+dockers:
+  - image_templates:
+      - "ghcr.io/dcadolph/whodar:{{ .Version }}-amd64"
     dockerfile: Dockerfile.release
-    labels:
-      org.opencontainers.image.title: "{{ .ProjectName }}"
-      org.opencontainers.image.version: "{{ .Version }}"
-      org.opencontainers.image.revision: "{{ .FullCommit }}"
-      org.opencontainers.image.source: "https://github.com/dcadolph/whodar"
-      org.opencontainers.image.licenses: "AGPL-3.0-or-later"
+    use: buildx
+    goarch: amd64
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.title={{ .ProjectName }}"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      - "--label=org.opencontainers.image.source=https://github.com/dcadolph/whodar"
+      - "--label=org.opencontainers.image.licenses=AGPL-3.0-or-later"
+  - image_templates:
+      - "ghcr.io/dcadolph/whodar:{{ .Version }}-arm64"
+    dockerfile: Dockerfile.release
+    use: buildx
+    goarch: arm64
+    build_flag_templates:
+      - "--platform=linux/arm64"
+      - "--label=org.opencontainers.image.title={{ .ProjectName }}"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      - "--label=org.opencontainers.image.source=https://github.com/dcadolph/whodar"
+      - "--label=org.opencontainers.image.licenses=AGPL-3.0-or-later"
+
+docker_manifests:
+  - name_template: "ghcr.io/dcadolph/whodar:{{ .Version }}"
+    image_templates:
+      - "ghcr.io/dcadolph/whodar:{{ .Version }}-amd64"
+      - "ghcr.io/dcadolph/whodar:{{ .Version }}-arm64"
+  - name_template: "ghcr.io/dcadolph/whodar:latest"
+    image_templates:
+      - "ghcr.io/dcadolph/whodar:{{ .Version }}-amd64"
+      - "ghcr.io/dcadolph/whodar:{{ .Version }}-arm64"
 
 homebrew_casks:
   - name: whodar
