@@ -26,14 +26,14 @@ func TestFullPipeline(t *testing.T) {
 	t.Parallel()
 	ix := buildFullIndex(t)
 
-	// One node per human: nine people, no bots, no source-id duplicates.
-	if got := len(ix.Graph.People); got != 9 {
+	// One node per human: twelve people, no bots, no source-id duplicates.
+	if got := len(ix.Graph.People); got != 12 {
 		ids := make([]model.ID, 0, got)
 		for id := range ix.Graph.People {
 			ids = append(ids, id)
 		}
 		slices.Sort(ids)
-		t.Fatalf("people = %d, want 9: %v", got, ids)
+		t.Fatalf("people = %d, want 12: %v", got, ids)
 	}
 	for id := range ix.Graph.People {
 		if p := string(id); p == "github:eve-dev" || p == "github:buildbot[bot]" {
@@ -55,7 +55,7 @@ func TestFullPipeline(t *testing.T) {
 		Query      string
 		WantPerson model.ID
 	}{
-		{"billing retries", "jane@corp.com"},
+		{"billing retries", "angela@corp.com"},
 		{"kafka streaming", "bob@corp.com"},
 		{"sso login", "dan@corp.com"},
 		{"react frontend", "eve@corp.com"},
@@ -87,8 +87,8 @@ func TestFullPipeline(t *testing.T) {
 	if len(channels) == 0 || channels[0].Channel.Name != "payments" {
 		t.Fatalf("channels top = %+v, want payments", channels)
 	}
-	if !slices.Contains(channels[0].Channel.Members, model.ID("jane@corp.com")) {
-		t.Errorf("payments members = %v, want jane", channels[0].Channel.Members)
+	if !slices.Contains(channels[0].Channel.Members, model.ID("angela@corp.com")) {
+		t.Errorf("payments members = %v, want angela", channels[0].Channel.Members)
 	}
 
 	// Feedback tunes but does not bury: votes for Victor keep Carol first.

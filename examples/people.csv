@@ -1,8 +1,8 @@
 name,email,title,team,org,manager,topics
-Jane Roe,jane.roe@example.com,Staff Engineer,Billing Platform,Payments,pat.poe@example.com,retries;idempotency;dunning
-Carol Roe,carol.roe@example.com,Software Engineer,Billing Platform,Payments,pat.poe@example.com,invoicing;refunds
-Pat Poe,pat.poe@example.com,Engineering Manager,Billing Platform,Payments,,roadmap;hiring;billing
-John Doe,john.doe@example.com,Senior SRE,Core Infra,Platform,kim.doe@example.com,kafka;kubernetes;oncall
-Kim Doe,kim.doe@example.com,Infrastructure Lead,Core Infra,Platform,,terraform;networking;reliability
-Sam Roe,sam.roe@example.com,Data Engineer,Analytics,Data,,etl;warehouse;dbt
-Lee Doe,lee.doe@example.com,Security Engineer,AppSec,Security,,authz;secrets;threat-modeling
+Angela Malone,angela.malone@example.com,Staff Engineer,Payments,Engineering,oscar.scott@example.com,billing;retries;dunning
+Oscar Scott,oscar.scott@example.com,Engineering Manager,Payments,Engineering,,billing;roadmap;hiring
+Kevin Novak,kevin.novak@example.com,Software Engineer,Payments,Engineering,oscar.scott@example.com,retries;idempotency
+Pam Vance,pam.vance@example.com,Support Lead,Payments,Engineering,oscar.scott@example.com,billing;support;refunds
+Bob Smith,bob.smith@example.com,Senior Engineer,Data Platform,Engineering,,kafka;streaming;pipelines
+Carol Lee,carol.lee@example.com,Site Reliability Engineer,Infrastructure,Engineering,,terraform;kubernetes;deploys
+Dan Park,dan.park@example.com,Security Engineer,Security,Engineering,,oauth;sso;authz

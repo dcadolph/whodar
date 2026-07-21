@@ -29,7 +29,10 @@ func newDemoCmd(opts *options) *cobra.Command {
 simulation covers all eight sources, so identity joins, recency, confidence,
 and feedback all behave as they would on real data. Nothing is fetched from
 the network and no credentials are needed. Sample data only; it is discarded
-when the demo stops.`,
+when the demo stops.
+
+To try cloud AI on the sample data, export a provider key (such as
+WHODAR_ANTHROPIC_KEY) and add --policy redacted.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			dir, err := os.MkdirTemp("", "whodar-demo-*")
 			if err != nil {

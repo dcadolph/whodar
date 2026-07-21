@@ -26,15 +26,19 @@ import (
 	"github.com/dcadolph/whodar/internal/slack"
 )
 
-// The simulated cast. Jane, Bob, Carol, Dan, Eve, Frank, Grace, and Heidi are
-// current staff; Victor owned terraform two years ago and must lose to Carol
-// on recency. Eve's GitHub account exposes no email, so only an alias joins
-// her; bots must be skipped everywhere.
+// The simulated cast. The Payments team is Angela, Oscar, Kevin, and Pam;
+// Bob, Carol, Dan, Eve, Frank, Grace, and Heidi round out the rest of the
+// company. Victor owned terraform two years ago and must lose to Carol on
+// recency. Eve's GitHub account exposes no email, so only an alias joins her;
+// bots must be skipped everywhere.
 
 // OrgCSV returns the org chart in the org-csv source format.
 func OrgCSV() string {
 	return `name,email,title,team,topics
-Jane Roe,jane@corp.com,Staff Engineer,Payments,billing;payments
+Angela Malone,angela@corp.com,Staff Engineer,Payments,billing;retries
+Oscar Scott,oscar@corp.com,Engineering Manager,Payments,billing;roadmap
+Kevin Novak,kevin@corp.com,Software Engineer,Payments,retries
+Pam Vance,pam@corp.com,Support Lead,Payments,billing;support
 Bob Smith,bob@corp.com,Senior Engineer,Data Platform,kafka;streaming
 Carol Lee,carol@corp.com,Site Reliability Engineer,Infrastructure,deploys
 Victor Old,victor@corp.com,Systems Engineer,Infrastructure,
@@ -60,11 +64,12 @@ func Aliases() string {
 // first history call returns HTTP 429 so the client's retry path runs.
 func SlackServer() *httptest.Server {
 	users := []map[string]any{
-		slackUser("U1", "Jane Roe", "jane@corp.com", "Staff Engineer"),
+		slackUser("U1", "Angela Malone", "angela@corp.com", "Staff Engineer"),
 		slackUser("U2", "Bob Smith", "bob@corp.com", "Senior Engineer"),
 		slackUser("U3", "Carol Lee", "carol@corp.com", "Site Reliability Engineer"),
 		slackUser("U4", "Dan Park", "dan@corp.com", "Security Engineer"),
 		slackUser("U5", "Grace Kim", "grace@corp.com", "Site Reliability Engineer"),
+		slackUser("U6", "Oscar Scott", "oscar@corp.com", "Engineering Manager"),
 	}
 	channels := []map[string]any{
 		slackChannel("C1", "payments", "billing and payment questions"),
@@ -76,6 +81,7 @@ func SlackServer() *httptest.Server {
 		"C1": {
 			slackMessage("U1", "billing retry backoff is fixed, dunning next", daysAgo(2)),
 			slackMessage("U1", "payments reconciliation ran clean", daysAgo(1)),
+			slackMessage("U6", "billing roadmap review is on for next week", daysAgo(3)),
 		},
 		"C2": {
 			slackMessage("U2", "kafka consumer lag is back to zero", daysAgo(3)),
@@ -113,9 +119,9 @@ func SlackServer() *httptest.Server {
 	return httptest.NewServer(mux)
 }
 
-// GitHubServer serves two repositories in GitHub's wire format: Jane's
-// billing service and Eve's web app. Jane's profile exposes her email; Eve's
-// does not, so she stays a github: identity until an alias joins her.
+// GitHubServer serves two repositories in GitHub's wire format: Angela's
+// billing service and Eve's web app. Angela's profile exposes her email;
+// Eve's does not, so she stays a github: identity until an alias joins her.
 func GitHubServer() *httptest.Server {
 	mux := http.NewServeMux()
 	repo := func(name, desc string, topics []string) map[string]any {
@@ -130,7 +136,7 @@ func GitHubServer() *httptest.Server {
 		writeJSON(w, repo("webapp", "Customer facing web application", []string{"frontend"}))
 	})
 	mux.HandleFunc("/repos/corp/billing-service/contributors", func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, []map[string]any{{"login": "jane", "contributions": 40}})
+		writeJSON(w, []map[string]any{{"login": "amalone", "contributions": 40}})
 	})
 	mux.HandleFunc("/repos/corp/webapp/contributors", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, []map[string]any{
@@ -140,7 +146,7 @@ func GitHubServer() *httptest.Server {
 	})
 	mux.HandleFunc("/repos/corp/billing-service/pulls", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, []map[string]any{{
-			"title": "Fix billing retry backoff", "user": map[string]any{"login": "jane"},
+			"title": "Fix billing retry backoff", "user": map[string]any{"login": "amalone"},
 			"labels": []map[string]any{{"name": "billing"}}, "updated_at": isoDaysAgo(2),
 		}})
 	})
@@ -155,8 +161,8 @@ func GitHubServer() *httptest.Server {
 			writeJSON(w, []map[string]any{})
 		})
 	}
-	mux.HandleFunc("/users/jane", func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, map[string]any{"login": "jane", "name": "Jane Roe", "email": "jane@corp.com"})
+	mux.HandleFunc("/users/amalone", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, map[string]any{"login": "amalone", "name": "Angela Malone", "email": "angela@corp.com"})
 	})
 	mux.HandleFunc("/users/eve-dev", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, map[string]any{"login": "eve-dev", "name": "Eve Ng"})
@@ -245,7 +251,7 @@ func PagerDutyServer() *httptest.Server {
 	})
 	mux.HandleFunc("/oncalls", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, map[string]any{"more": false, "oncalls": []map[string]any{
-			{"user": map[string]any{"id": "P1", "name": "Jane Roe", "email": "jane@corp.com"},
+			{"user": map[string]any{"id": "P1", "name": "Angela Malone", "email": "angela@corp.com"},
 				"escalation_policy": map[string]any{"id": "EP1"}},
 			{"user": map[string]any{"id": "P2", "name": "Grace Kim", "email": "grace@corp.com"},
 				"escalation_policy": map[string]any{"id": "EP2"}},
@@ -384,6 +390,7 @@ func BuildIndex(dir string) (*index.Index, error) {
 		}
 		ix.Add(recs)
 	}
+	ix.AutoJoin()
 	ix.Canonicalize()
 	return ix, nil
 }
