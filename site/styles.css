@@ -268,11 +268,11 @@ h1 .sig { color: var(--signal); text-shadow: 0 0 28px rgba(52, 229, 197, 0.4); }
 
 /* Sections */
 .section { padding: 96px 24px; }
-.sec-head { max-width: 680px; margin: 0 0 54px; }
+.sec-head { max-width: 1080px; margin: 0 0 54px; }
 .sec-eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--signal); display: block; margin-bottom: 16px; }
 .sec-eyebrow .n { color: var(--muted); }
-.sec-head h2 { font-family: var(--disp); font-weight: 800; letter-spacing: -0.015em; font-size: clamp(28px, 4.2vw, 44px); line-height: 1.16; text-wrap: balance; }
-.sec-head p { margin-top: 16px; font-size: 17px; color: var(--muted); max-width: 62ch; }
+.sec-head h2 { font-family: var(--disp); font-weight: 800; letter-spacing: -0.015em; font-size: clamp(28px, 4.2vw, 44px); line-height: 1.16; }
+.sec-head p { margin-top: 16px; font-size: 17px; color: var(--muted); max-width: 80ch; }
 
 /* Cards */
 .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
