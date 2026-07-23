@@ -20,8 +20,10 @@ Three things hold for all of them:
   first source, when you want a clean index. People join across every source by
   email, so one human stays one entry.
 - **Credentials are read only from the environment, never a flag.** Nothing is
-  logged, and nothing is written to disk. The index itself lives at
-  `~/.whodar/index.json`, readable only by you, and is never uploaded.
+  logged, and no token is written to disk. The index itself lives at
+  `~/.whodar/index.json`, created readable only by you (mode `0600`), and is never
+  uploaded. Everything whodar learns about your coworkers stays on your machine,
+  so you can wire it into work tools and keep that data private.
 - **Verify the same way every time.** After any index, run a `whodar ask` and look
   for the people you expect. `whodar serve` opens the same data in a browser.
 
@@ -31,8 +33,26 @@ A good order is org chart first, then everything else merged on top:
     whodar index --source slack --merge
     whodar index --source github --github-org your-org --merge
 
-> Coming soon: `whodar connect <tool>` will walk you through each of these
-> interactively, so you will not have to remember scopes or flags.
+## The guided way: `whodar connect`
+
+Rather be walked through it? `whodar connect` is an interactive wizard that does
+everything on this page for you, one source at a time. It explains the source,
+shows how to create the credential, reads the token without echoing it, validates
+it against the API before indexing, runs the first index, and prints the `export`
+line to save.
+
+    whodar connect            # menu of every source, marked configured or not
+    whodar connect slack      # set up one source
+    whodar connect --status   # report what is configured, without prompting
+
+connect keeps the same privacy promise as everything else. The token you type is
+held in memory for that one run, never written to disk and never logged. connect
+prints the `export` line for you to add to your shell profile; it never edits your
+dotfiles for you. It needs a terminal, so scripts and CI keep using `whodar index`
+directly.
+
+The rest of this page is the reference connect automates, and the copy-paste path
+for when you would rather not use the wizard.
 
 ## No credentials needed
 

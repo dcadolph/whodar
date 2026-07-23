@@ -75,6 +75,13 @@ func NewSlackWithClient(client *slack.Client, opts SlackOptions) *Slack {
 	return &Slack{client: client, opts: opts.withDefaults()}
 }
 
+// Ping verifies the token with a cheap auth.test call, so a wizard can confirm
+// credentials before committing to a full index.
+func (s *Slack) Ping(ctx context.Context) error {
+	_, err := s.client.AuthTest(ctx)
+	return err
+}
+
 // Fetch reads users, channels, and bounded history, returning person and
 // channel records. Person identity joins other sources by email.
 func (s *Slack) Fetch(ctx context.Context) ([]Record, error) {

@@ -67,7 +67,7 @@ func newRootCmd() *cobra.Command {
 	pf.BoolVar(&opts.pretty, "pretty", false, "Indent JSON output.")
 
 	root.AddCommand(
-		newIndexCmd(opts), newAskCmd(opts), newServeCmd(opts), newBotCmd(opts),
+		newIndexCmd(opts), newConnectCmd(opts), newAskCmd(opts), newServeCmd(opts), newBotCmd(opts),
 		newFeedbackCmd(opts), newDemoCmd(opts), newMCPCmd(opts), newVersionCmd())
 	return root
 }

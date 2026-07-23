@@ -158,6 +158,33 @@ func (c *Client) OnCalls(ctx context.Context) ([]OnCall, error) {
 	return all, nil
 }
 
+// Ping verifies the token by requesting a single user, the cheapest read-only
+// call that proves the token is valid. It returns nil when the token is
+// accepted, a *httputil.StatusError for a non-200 status such as 401 for a bad
+// token, or the transport error when the API is unreachable.
+func (c *Client) Ping(ctx context.Context) error {
+	endpoint := c.baseURL + "/users?limit=1"
+	resp, _, err := httputil.Do(ctx, c.http, c.maxRetries, nil, func() (*http.Request, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+		if err != nil {
+			return nil, fmt.Errorf("new request: %w", err)
+		}
+		req.Header.Set("Authorization", "Token token="+c.token)
+		req.Header.Set("Accept", "application/vnd.pagerduty+json;version=2")
+		return req, nil
+	})
+	if errors.Is(err, httputil.ErrRateLimited) {
+		return fmt.Errorf("pagerduty ping: %w", ErrRateLimited)
+	}
+	if err != nil {
+		return fmt.Errorf("pagerduty ping: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return &httputil.StatusError{Code: resp.StatusCode}
+	}
+	return nil
+}
+
 // get performs a GET request and decodes the JSON body into out, retrying on
 // HTTP 429 up to maxRetries.
 func (c *Client) get(ctx context.Context, path string, params url.Values, out any) error {

@@ -66,6 +66,10 @@ You should see a ranked list of people, each with a score and the reason it
 matched, such as "retries (topic)" or "billing (team)". That is the whole loop:
 index a source, then ask.
 
+Adding the rest of your tools is the same loop. For a guided setup that validates
+the credential and runs the first index, run `whodar connect`; the sections below
+are the manual path.
+
 ## Index your own org chart
 
 whodar reads a CSV with a header row. Column order does not matter and the

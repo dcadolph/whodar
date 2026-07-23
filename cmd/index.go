@@ -137,62 +137,10 @@ Start with the org chart, then merge everything else onto it:
 				return err
 			}
 
-			var prev *model.Graph
-			if old, lerr := index.Load(opts.indexPath()); lerr == nil {
-				prev = old.Graph
-			}
-
-			ix := index.New()
-			if merge {
-				if base, lerr := index.Load(opts.indexPath()); lerr == nil {
-					ix = base
-				}
-			}
-			ix.SetHalfLife(time.Duration(halfLifeDays) * 24 * time.Hour)
-			if aliasesFile != "" {
-				if err := ix.LoadAliases(aliasesFile); err != nil {
-					return err
-				}
-			}
-			if merge {
-				ix.Add(recs)
-			} else {
-				ix.Build(recs)
-			}
-			if joined := ix.AutoJoin(); joined > 0 {
-				fmt.Fprintf(cmd.ErrOrStderr(), "auto-joined %d handle identities\n", joined)
-			}
-			ix.Canonicalize()
-
-			if embed {
-				if err := guardLLMHost(opts.pol, ollamaURL); err != nil {
-					return err
-				}
-				fmt.Fprintf(cmd.ErrOrStderr(),
-					"embedding %d people and %d channels via Ollama...\n",
-					len(ix.Graph.People), len(ix.Graph.Channels))
-				if err := ix.Embed(cmd.Context(), newOllama("", embedModel, ollamaURL)); err != nil {
-					return fmt.Errorf("embed: %w", err)
-				}
-			}
-
-			changes := index.Diff(prev, ix.Graph)
-			if err := ix.Save(opts.indexPath()); err != nil {
-				return err
-			}
-
-			out := cmd.ErrOrStderr()
-			fmt.Fprintf(out,
-				"indexed %d people, %d channels, %d teams, %d topics into %s\n",
-				len(ix.Graph.People), len(ix.Graph.Channels), len(ix.Graph.Teams),
-				len(ix.Graph.Topics), opts.indexPath())
-			reportChanges(out, changes)
-			if changesFile != "" {
-				if err := writeChangesFile(changesFile, changes); err != nil {
-					return err
-				}
-			}
-			return nil
+			return indexRecords(cmd, opts, recs, indexParams{
+				merge: merge, halfLifeDays: halfLifeDays, aliasesFile: aliasesFile,
+				embed: embed, embedModel: embedModel, ollamaURL: ollamaURL, changesFile: changesFile,
+			})
 		},
 	}
 	f := cmd.Flags()
@@ -225,6 +173,89 @@ Start with the org chart, then merge everything else onto it:
 	f.StringVar(&confluenceCQL, "confluence-cql", "", "Confluence CQL query (overrides --confluence-space).")
 	f.IntVar(&maxPages, "max-pages", 2000, "Cap Confluence pages read.")
 	return cmd
+}
+
+// indexParams holds the index-build knobs shared by the index and connect
+// commands: how records fold into the existing graph and how the result decays,
+// embeds, and reports.
+type indexParams struct {
+	// merge adds records onto the existing index instead of replacing it.
+	merge bool
+	// halfLifeDays halves a dated record's weight after this many days; 0 disables decay.
+	halfLifeDays int
+	// aliasesFile joins one person across sources by canonical id when set.
+	aliasesFile string
+	// embed generates embeddings via Ollama when true.
+	embed bool
+	// embedModel names the Ollama embedding model; empty uses the default.
+	embedModel string
+	// ollamaURL is the Ollama base URL for embedding.
+	ollamaURL string
+	// changesFile writes the index diff as JSON to this path when set.
+	changesFile string
+}
+
+// indexRecords folds recs into the on-disk index and reports what changed. It
+// loads the previous graph for the diff, builds or merges, auto-joins handle
+// identities, canonicalizes, optionally embeds, then saves atomically. The index
+// and connect commands share it so ingest lives in one place.
+func indexRecords(cmd *cobra.Command, opts *options, recs []connector.Record, p indexParams) error {
+	var prev *model.Graph
+	if old, lerr := index.Load(opts.indexPath()); lerr == nil {
+		prev = old.Graph
+	}
+
+	ix := index.New()
+	if p.merge {
+		if base, lerr := index.Load(opts.indexPath()); lerr == nil {
+			ix = base
+		}
+	}
+	ix.SetHalfLife(time.Duration(p.halfLifeDays) * 24 * time.Hour)
+	if p.aliasesFile != "" {
+		if err := ix.LoadAliases(p.aliasesFile); err != nil {
+			return err
+		}
+	}
+	if p.merge {
+		ix.Add(recs)
+	} else {
+		ix.Build(recs)
+	}
+	if joined := ix.AutoJoin(); joined > 0 {
+		fmt.Fprintf(cmd.ErrOrStderr(), "auto-joined %d handle identities\n", joined)
+	}
+	ix.Canonicalize()
+
+	if p.embed {
+		if err := guardLLMHost(opts.pol, p.ollamaURL); err != nil {
+			return err
+		}
+		fmt.Fprintf(cmd.ErrOrStderr(),
+			"embedding %d people and %d channels via Ollama...\n",
+			len(ix.Graph.People), len(ix.Graph.Channels))
+		if err := ix.Embed(cmd.Context(), newOllama("", p.embedModel, p.ollamaURL)); err != nil {
+			return fmt.Errorf("embed: %w", err)
+		}
+	}
+
+	changes := index.Diff(prev, ix.Graph)
+	if err := ix.Save(opts.indexPath()); err != nil {
+		return err
+	}
+
+	out := cmd.ErrOrStderr()
+	fmt.Fprintf(out,
+		"indexed %d people, %d channels, %d teams, %d topics into %s\n",
+		len(ix.Graph.People), len(ix.Graph.Channels), len(ix.Graph.Teams),
+		len(ix.Graph.Topics), opts.indexPath())
+	reportChanges(out, changes)
+	if p.changesFile != "" {
+		if err := writeChangesFile(p.changesFile, changes); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // slackArgs holds the Slack-specific index flags.

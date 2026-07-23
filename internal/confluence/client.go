@@ -183,6 +183,37 @@ func (c *Client) Pages(ctx context.Context, cql string, max int) ([]Page, error)
 	return all, nil
 }
 
+// currentUserPath is the Confluence Cloud current-user endpoint used to
+// validate credentials.
+const currentUserPath = "/wiki/rest/api/user/current"
+
+// Ping verifies the credentials with the current-user endpoint, the cheapest
+// read-only call that proves the site, email, and token line up. It returns nil
+// when they are accepted, a *httputil.StatusError for a non-200 status such as
+// 401 for bad credentials, or the transport error when the site is unreachable.
+func (c *Client) Ping(ctx context.Context) error {
+	endpoint := c.baseURL + currentUserPath
+	resp, _, err := httputil.Do(ctx, c.http, c.maxRetries, nil, func() (*http.Request, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+		if err != nil {
+			return nil, fmt.Errorf("new request: %w", err)
+		}
+		req.Header.Set("Authorization", c.auth)
+		req.Header.Set("Accept", "application/json")
+		return req, nil
+	})
+	if errors.Is(err, httputil.ErrRateLimited) {
+		return fmt.Errorf("confluence ping: %w", ErrRateLimited)
+	}
+	if err != nil {
+		return fmt.Errorf("confluence ping: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return &httputil.StatusError{Code: resp.StatusCode}
+	}
+	return nil
+}
+
 // get performs a GET request and decodes the JSON body into out, retrying on
 // HTTP 429 up to maxRetries.
 func (c *Client) get(ctx context.Context, path string, params url.Values, out any) error {

@@ -76,6 +76,12 @@ func NewGitHubWithClient(client *github.Client, opts GitHubOptions) *GitHub {
 	return &GitHub{client: client, opts: opts.withDefaults()}
 }
 
+// Ping verifies the token with a cheap authenticated request, so a wizard can
+// confirm credentials before committing to a full index.
+func (g *GitHub) Ping(ctx context.Context) error {
+	return g.client.Ping(ctx)
+}
+
 // Fetch reads each repository and returns person records weighted by topic.
 func (g *GitHub) Fetch(ctx context.Context) ([]Record, error) {
 	repos, err := g.repoList(ctx)

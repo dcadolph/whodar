@@ -58,6 +58,12 @@ func NewConfluenceWithClient(client *confluence.Client, opts ConfluenceOptions) 
 	return &Confluence{client: client, opts: opts.withDefaults()}
 }
 
+// Ping verifies the credentials with a cheap current-user call, so a wizard can
+// confirm the site, email, and token before committing to a full index.
+func (c *Confluence) Ping(ctx context.Context) error {
+	return c.client.Ping(ctx)
+}
+
 // Fetch searches pages and returns one record per person, weighted by topic.
 func (c *Confluence) Fetch(ctx context.Context) ([]Record, error) {
 	query := c.cql()

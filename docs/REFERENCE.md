@@ -69,6 +69,23 @@ Builds or extends the index from one source per run.
 | `--git-since-days`  | `365`     | git        | History window in days.                          |
 | `--max-commits`     | `2000`    | git        | Commit cap per repository.                       |
 
+## whodar connect
+
+Sets up a source interactively: it explains the source, shows how to create the
+credential, reads and validates it, runs the first index, and prints the `export`
+line to save. Credentials are validated in memory and never written to disk.
+connect needs a terminal; scripts use `whodar index`.
+
+    whodar connect [source]
+
+| Flag       | Default | What it does                                            |
+| ---------- | ------- | ------------------------------------------------------- |
+| `--status` | off     | Report which sources are configured, without prompting. |
+
+With no argument it shows a menu of every source, marked configured or not. With a
+source (`org-csv`, `codeowners`, `git`, `slack`, `github`, `jira`, `confluence`, or
+`pagerduty`) it sets up just that one.
+
 ## whodar ask
 
 Answers a question from the index.

@@ -193,6 +193,32 @@ func (c *Client) Account(ctx context.Context, login string) (Account, error) {
 	return a, err
 }
 
+// Ping verifies the token with the authenticated-user endpoint, the cheapest
+// read-only call that proves the token is valid. It returns nil when the token
+// is accepted, a *httputil.StatusError for a non-200 status such as 401 for a
+// bad token, or the transport error when the API is unreachable.
+func (c *Client) Ping(ctx context.Context) error {
+	resp, _, err := httputil.Do(ctx, c.http, c.maxRetries, githubRetryable, func() (*http.Request, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/user", nil)
+		if err != nil {
+			return nil, fmt.Errorf("new request: %w", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+c.token)
+		req.Header.Set("Accept", "application/vnd.github+json")
+		return req, nil
+	})
+	if errors.Is(err, httputil.ErrRateLimited) {
+		return fmt.Errorf("github ping: %w", ErrRateLimited)
+	}
+	if err != nil {
+		return fmt.Errorf("github ping: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return &httputil.StatusError{Code: resp.StatusCode}
+	}
+	return nil
+}
+
 // FileContents returns the decoded contents of a file, or ErrNotFound if it is
 // absent.
 func (c *Client) FileContents(ctx context.Context, owner, repo, path string) ([]byte, error) {

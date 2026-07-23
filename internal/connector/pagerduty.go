@@ -47,6 +47,12 @@ func NewPagerDutyWithClient(client *pagerduty.Client, opts PagerDutyOptions) *Pa
 	return &PagerDuty{client: client, opts: opts.withDefaults()}
 }
 
+// Ping verifies the token with a cheap read-only call, so a wizard can confirm
+// credentials before committing to a full index.
+func (p *PagerDuty) Ping(ctx context.Context) error {
+	return p.client.Ping(ctx)
+}
+
 // Fetch reads services and on-call assignments, returning one record per person
 // weighted by the topics of the services they are on call for.
 func (p *PagerDuty) Fetch(ctx context.Context) ([]Record, error) {

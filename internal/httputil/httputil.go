@@ -18,6 +18,19 @@ import (
 // Callers detect it to translate into their own package sentinel.
 var ErrRateLimited = errors.New("httputil: rate limited")
 
+// StatusError reports an unexpected HTTP status from an API call. A cheap
+// credential check returns it so a caller can map a specific status, such as
+// 401 for a bad token, to a specific fix instead of a generic failure.
+type StatusError struct {
+	// Code is the HTTP status code the server returned.
+	Code int
+}
+
+// Error describes the unexpected status.
+func (e *StatusError) Error() string {
+	return fmt.Sprintf("unexpected status %d", e.Code)
+}
+
 // maxResponseBytes bounds a response body read so a hostile or broken server
 // cannot exhaust memory. It sits far above any real API page.
 const maxResponseBytes = 64 << 20

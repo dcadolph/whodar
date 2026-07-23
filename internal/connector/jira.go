@@ -58,6 +58,12 @@ func NewJiraWithClient(client *jira.Client, opts JiraOptions) *Jira {
 	return &Jira{client: client, opts: opts.withDefaults()}
 }
 
+// Ping verifies the credentials with a cheap current-user call, so a wizard can
+// confirm the site, email, and token before committing to a full index.
+func (j *Jira) Ping(ctx context.Context) error {
+	return j.client.Ping(ctx)
+}
+
 // Fetch searches issues and returns one record per person, weighted by topic.
 func (j *Jira) Fetch(ctx context.Context) ([]Record, error) {
 	query := j.jql()
