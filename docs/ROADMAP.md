@@ -28,6 +28,30 @@ sources by email or an alias file, so one person stays one entry across them.
 
 - Result deep links: open a channel or a profile directly from an answer.
 
+## Hosted tier
+
+Everything above assumes the self-hosted binary, which stays the default and the
+whole point: your data never leaves your walls. Alongside it, a separate hosted
+tier would offer a fully managed whodar you add to Slack in one click, for teams
+that want zero setup and are fine with a service running it for them.
+
+This is a distribution model, not a feature of the binary. A one-click,
+directory-listed Slack app needs a public server to run the OAuth install,
+receive Events API callbacks, and hold each workspace's token and index. Socket
+Mode, the no-public-URL path the self-hosted bot uses, cannot be listed in the
+Slack Marketplace, so the hosted tier means a server in the loop by design.
+
+That server changes the privacy posture, so the tier is explicitly opt-in and
+kept apart from the self-hosted promise. The self-hosted tool does not change: no
+account, no vendor, nothing sent out for review. The hosted tier is a choice for
+a different buyer, and the two never blur into one story.
+
+Building it is real service work, not a small toggle: a public install and OAuth
+flow, per-workspace token and index storage, an Events API endpoint, Slack app
+review, billing, and on-call. It also needs a clear data-handling posture, since
+a hosted whodar processes the people graph on infrastructure the customer does
+not own. Scoped as its own track so the self-hosted core stays small and private.
+
 ## Personal digest
 
 A second way to ask: "what did I miss that matters to me." Instead of a topic
