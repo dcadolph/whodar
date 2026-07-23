@@ -198,7 +198,7 @@ h1 .sig { color: var(--signal); text-shadow: 0 0 28px rgba(52, 229, 197, 0.4); }
 .sysbar .sep { color: var(--line-2); }
 
 /* What it is: is / isn't panels */
-.isnt { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 900px; margin: 0 auto; }
+.isnt { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 900px; margin: 0; }
 .is-col { padding: 24px 22px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); }
 .is-h { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; }
 .is-list { list-style: none; display: grid; gap: 13px; }
@@ -209,7 +209,7 @@ h1 .sig { color: var(--signal); text-shadow: 0 0 28px rgba(52, 229, 197, 0.4); }
 .is-list.no li::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='17' height='17' fill='none' stroke='%237e8da6' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='4.5' y1='4.5' x2='13.5' y2='13.5'/%3E%3Cline x1='13.5' y1='4.5' x2='4.5' y2='13.5'/%3E%3C/svg%3E"); }
 @media (max-width: 720px) { .isnt { grid-template-columns: 1fr; } }
 
-.soon { max-width: 900px; margin: 18px auto 0; padding: 18px 22px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); display: flex; gap: 18px; align-items: baseline; flex-wrap: wrap; }
+.soon { max-width: 900px; margin: 18px 0 0; padding: 18px 22px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); display: flex; gap: 18px; align-items: baseline; flex-wrap: wrap; }
 .soon .lbl { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--signal); display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
 .soon .lbl::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--signal); box-shadow: 0 0 8px var(--signal); }
 .soon p { flex: 1; min-width: 260px; margin: 0; font-size: 14px; line-height: 1.5; color: var(--muted); }
@@ -217,9 +217,9 @@ h1 .sig { color: var(--signal); text-shadow: 0 0 28px rgba(52, 229, 197, 0.4); }
 @media (max-width: 720px) { .soon { gap: 10px; } }
 
 /* Product shots */
-.shots { display: flex; flex-direction: column; align-items: center; gap: 42px; }
-.shot-group { width: 100%; display: flex; flex-direction: column; align-items: center; }
-.shot-cap { font-family: var(--mono); font-size: 13px; color: var(--muted); text-align: center; margin-bottom: 15px; max-width: 58ch; }
+.shots { display: flex; flex-direction: column; align-items: flex-start; gap: 42px; }
+.shot-group { width: 100%; display: flex; flex-direction: column; align-items: flex-start; }
+.shot-cap { font-family: var(--mono); font-size: 13px; color: var(--muted); text-align: left; margin-bottom: 15px; max-width: 58ch; }
 .shot-cap b { color: var(--signal); font-weight: 500; }
 .shot { position: relative; width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid var(--line-2); background: var(--panel); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), 0 0 60px rgba(52, 229, 197, 0.07); }
 .shot.web { max-width: 920px; }
@@ -269,15 +269,10 @@ h1 .sig { color: var(--signal); text-shadow: 0 0 28px rgba(52, 229, 197, 0.4); }
 /* Sections */
 .section { padding: 96px 24px; }
 .sec-head { max-width: 680px; margin: 0 0 54px; }
-.sec-head.mid { text-align: center; margin-inline: auto; }
 .sec-eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--signal); display: block; margin-bottom: 16px; }
 .sec-eyebrow .n { color: var(--muted); }
 .sec-head h2 { font-family: var(--disp); font-weight: 800; letter-spacing: -0.015em; font-size: clamp(28px, 4.2vw, 44px); line-height: 1.16; text-wrap: balance; }
 .sec-head p { margin-top: 16px; font-size: 17px; color: var(--muted); max-width: 62ch; }
-.sec-head.mid p { margin-inline: auto; }
-/* Ranking and install headers left-align to the left-aligned content below them. */
-#modes .sec-head.mid, #start .sec-head.mid { text-align: left; margin-inline: 0; }
-#modes .sec-head.mid p, #start .sec-head.mid p { margin-inline: 0; }
 
 /* Cards */
 .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
