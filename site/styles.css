@@ -275,6 +275,9 @@ h1 .sig { color: var(--signal); text-shadow: 0 0 28px rgba(52, 229, 197, 0.4); }
 .sec-head h2 { font-family: var(--disp); font-weight: 800; letter-spacing: -0.015em; font-size: clamp(28px, 4.2vw, 44px); line-height: 1.16; text-wrap: balance; }
 .sec-head p { margin-top: 16px; font-size: 17px; color: var(--muted); max-width: 62ch; }
 .sec-head.mid p { margin-inline: auto; }
+/* Ranking and install headers left-align to the left-aligned content below them. */
+#modes .sec-head.mid, #start .sec-head.mid { text-align: left; margin-inline: 0; }
+#modes .sec-head.mid p, #start .sec-head.mid p { margin-inline: 0; }
 
 /* Cards */
 .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
