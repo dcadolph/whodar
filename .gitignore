@@ -2,6 +2,8 @@
 /whodar
 /bin/
 /dist/
+# Compiled site docs generator, built by `go -C site/gen build`.
+/site/gen/gen
 
 # Go
 *.test
