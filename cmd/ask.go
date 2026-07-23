@@ -63,9 +63,9 @@ Examples:
   whodar ask --mode llm "where do I ask about kafka"`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ix, err := index.Load(opts.indexPath())
+			ix, err := opts.loadIndex(cmd)
 			if err != nil {
-				return fmt.Errorf("%w: run `whodar index` first: %w", ErrNoIndex, err)
+				return noIndexError(err)
 			}
 			applyFeedback(ix, opts, cmd.ErrOrStderr())
 			if err := applyFeedbackStrength(ix, fbStrength); err != nil {

@@ -20,6 +20,7 @@ import (
 	"github.com/dcadolph/whodar/internal/identity"
 	"github.com/dcadolph/whodar/internal/model"
 	"github.com/dcadolph/whodar/internal/util"
+	"github.com/dcadolph/whodar/internal/vault"
 )
 
 // DefaultHalfLife is the age at which a dated record's weight halves.
@@ -745,10 +746,41 @@ type snapshot struct {
 	Aliases map[model.ID]model.ID `json:"aliases,omitempty"`
 }
 
-// Save writes the index to path as compact JSON readable only by the owner,
-// creating parent directories as needed. The write goes through a temporary
-// file and a rename so a crash cannot truncate an existing index.
-func (ix *Index) Save(path string) error {
+// Option configures Load and Save. With no option the index is read and written
+// as plain JSON; WithCodec injects an at-rest codec so the file is encrypted.
+type Option func(*ioConfig)
+
+// ioConfig holds the resolved options for one Load or Save.
+type ioConfig struct {
+	// codec transforms the bytes at rest; Plain by default.
+	codec vault.Codec
+}
+
+// newIOConfig applies opts over the plain-JSON default.
+func newIOConfig(opts []Option) ioConfig {
+	cfg := ioConfig{codec: vault.Plain{}}
+	for _, o := range opts {
+		o(&cfg)
+	}
+	return cfg
+}
+
+// WithCodec sets the at-rest codec for a Load or Save. A nil codec is ignored,
+// leaving the plain-JSON default.
+func WithCodec(c vault.Codec) Option {
+	return func(cfg *ioConfig) {
+		if c != nil {
+			cfg.codec = c
+		}
+	}
+}
+
+// Save writes the index to path readable only by the owner (mode 0600), creating
+// parent directories as needed. It is compact JSON, or its encrypted form when
+// WithCodec is set. The write goes through a temporary file and a rename so a
+// crash cannot truncate an existing index.
+func (ix *Index) Save(path string, opts ...Option) error {
+	cfg := newIOConfig(opts)
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return fmt.Errorf("index: mkdir: %w", err)
 	}
@@ -766,22 +798,31 @@ func (ix *Index) Save(path string) error {
 	if err != nil {
 		return fmt.Errorf("index: encode: %w", err)
 	}
-	if err := util.WriteFileAtomic(path, raw, 0o600); err != nil {
+	enc, err := cfg.codec.Encode(raw)
+	if err != nil {
+		return fmt.Errorf("index: encrypt: %w", err)
+	}
+	if err := util.WriteFileAtomic(path, enc, 0o600); err != nil {
 		return fmt.Errorf("index: write: %w", err)
 	}
 	return nil
 }
 
-// Load reads an index previously written by Save.
-func Load(path string) (*Index, error) {
-	f, err := os.Open(path)
+// Load reads an index previously written by Save, decrypting it when WithCodec
+// supplies the key. It returns vault.ErrEncrypted when the file is encrypted but
+// no codec is given, so a caller can prompt for a passphrase.
+func Load(path string, opts ...Option) (*Index, error) {
+	cfg := newIOConfig(opts)
+	stored, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("index: open: %w", err)
 	}
-	defer func() { _ = f.Close() }()
-
+	raw, err := cfg.codec.Decode(stored)
+	if err != nil {
+		return nil, fmt.Errorf("index: %w", err)
+	}
 	var snap snapshot
-	if err := json.NewDecoder(f).Decode(&snap); err != nil {
+	if err := json.Unmarshal(raw, &snap); err != nil {
 		return nil, fmt.Errorf("index: decode: %w", err)
 	}
 	ix := &Index{

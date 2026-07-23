@@ -41,9 +41,9 @@ gets ranked candidates with reasons and does its own reading.
 Answers flow to whichever agent you wire this into, and to that agent's
 model. Wiring it in is the opt-in.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			ix, err := index.Load(opts.indexPath())
+			ix, err := opts.loadIndex(cmd)
 			if err != nil {
-				return fmt.Errorf("%w: run `whodar index` first: %w", ErrNoIndex, err)
+				return noIndexError(err)
 			}
 			applyFeedback(ix, opts, cmd.ErrOrStderr())
 

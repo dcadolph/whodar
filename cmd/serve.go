@@ -68,9 +68,9 @@ Binding beyond localhost requires WHODAR_SERVE_TOKEN; every request must then
 carry the token as a bearer header or a token query parameter, which sets a
 session cookie. Put TLS in front of it for anything beyond a trusted network.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			ix, err := index.Load(opts.indexPath())
+			ix, err := opts.loadIndex(cmd)
 			if err != nil {
-				return fmt.Errorf("%w: run `whodar index` first: %w", ErrNoIndex, err)
+				return noIndexError(err)
 			}
 			store := applyFeedback(ix, opts, cmd.ErrOrStderr())
 			return serveWeb(cmd, opts, ix, store, cfg)

@@ -11,7 +11,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/dcadolph/whodar/internal/bot"
-	"github.com/dcadolph/whodar/internal/index"
 	"github.com/dcadolph/whodar/internal/resolve"
 	"github.com/dcadolph/whodar/internal/slack"
 )
@@ -64,9 +63,9 @@ Transports and their credentials:
 			if botToken == "" {
 				return fmt.Errorf("%w: set %s", ErrBadArgs, slackTokenEnv)
 			}
-			ix, err := index.Load(opts.indexPath())
+			ix, err := opts.loadIndex(cmd)
 			if err != nil {
-				return fmt.Errorf("%w: run `whodar index` first: %w", ErrNoIndex, err)
+				return noIndexError(err)
 			}
 			applyFeedback(ix, opts, cmd.ErrOrStderr())
 			if err := applyFeedbackStrength(ix, fbStrength); err != nil {

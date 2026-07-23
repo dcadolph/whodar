@@ -3,8 +3,10 @@ package cmd
 import (
 	"cmp"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"strings"
 	"time"
@@ -200,16 +202,22 @@ type indexParams struct {
 // identities, canonicalizes, optionally embeds, then saves atomically. The index
 // and connect commands share it so ingest lives in one place.
 func indexRecords(cmd *cobra.Command, opts *options, recs []connector.Record, p indexParams) error {
+	// Load any existing index once. A missing file is a first run; any other
+	// error, including an encrypted index with no key, aborts so re-indexing
+	// never overwrites an index it could not read.
+	existing, err := opts.loadIndex(cmd)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+
 	var prev *model.Graph
-	if old, lerr := index.Load(opts.indexPath()); lerr == nil {
-		prev = old.Graph
+	if existing != nil {
+		prev = existing.Graph
 	}
 
 	ix := index.New()
-	if p.merge {
-		if base, lerr := index.Load(opts.indexPath()); lerr == nil {
-			ix = base
-		}
+	if p.merge && existing != nil {
+		ix = existing
 	}
 	ix.SetHalfLife(time.Duration(p.halfLifeDays) * 24 * time.Hour)
 	if p.aliasesFile != "" {
@@ -240,7 +248,7 @@ func indexRecords(cmd *cobra.Command, opts *options, recs []connector.Record, p 
 	}
 
 	changes := index.Diff(prev, ix.Graph)
-	if err := ix.Save(opts.indexPath()); err != nil {
+	if err := opts.saveIndex(ix); err != nil {
 		return err
 	}
 

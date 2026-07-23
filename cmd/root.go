@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/dcadolph/whodar/internal/policy"
+	"github.com/dcadolph/whodar/internal/vault"
 )
 
 // policyEnvVar names the environment variable pointing to an org policy file.
@@ -31,6 +32,11 @@ type options struct {
 	systemPolicyFile string
 	// envPolicyFile is the WHODAR_POLICY_FILE override, read once at startup.
 	envPolicyFile string
+	// codecCache is the resolved at-rest codec, nil for plain JSON. It is set
+	// once, lazily, so a passphrase entered during a load is reused for the save.
+	codecCache vault.Codec
+	// codecResolved reports whether codecCache has been resolved.
+	codecResolved bool
 }
 
 // indexPath returns the index file path under the data directory.
@@ -68,7 +74,7 @@ func newRootCmd() *cobra.Command {
 
 	root.AddCommand(
 		newIndexCmd(opts), newConnectCmd(opts), newAskCmd(opts), newServeCmd(opts), newBotCmd(opts),
-		newFeedbackCmd(opts), newDemoCmd(opts), newMCPCmd(opts), newVersionCmd())
+		newFeedbackCmd(opts), newDemoCmd(opts), newMCPCmd(opts), newVaultCmd(opts), newVersionCmd())
 	return root
 }
 
