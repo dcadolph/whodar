@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Deploying · whodar docs</title>
+	<meta name="description" content="Run the web app and the Slack bot as long-running services.">
+	<meta property="og:title" content="Deploying · whodar">
+	<meta property="og:description" content="Run the web app and the Slack bot as long-running services.">
+	<meta property="og:type" content="article">
+	<link rel="canonical" href="https://whodar.dev/docs/deploy">
+	
+	<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Ccircle cx='24' cy='24' r='20' fill='none' stroke='%2314233a' stroke-width='3'/%3E%3Ccircle cx='24' cy='19.5' r='3.6' fill='%2314233a'/%3E%3Cpath d='M18 31 C18 25 30 25 30 31 Z' fill='%2314233a'/%3E%3Cline x1='37.5' y1='10.5' x2='28' y2='16.5' stroke='%2334e5c5' stroke-width='3.4' stroke-linecap='round'/%3E%3C/svg%3E">
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+	<link rel="stylesheet" href="/styles.css?v=4">
+	<link rel="stylesheet" href="/docs.css?v=1">
+
+</head>
+<body class="docs">
+	
+	<div class="bg" aria-hidden="true"></div>
+	<div class="bg-grid" aria-hidden="true"></div>
+
+	<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+		<defs>
+			<symbol id="radar" viewBox="0 0 48 48">
+				<circle class="ring" cx="24" cy="24" r="20" fill="none" stroke-width="3"/>
+				<circle class="person" cx="24" cy="19.5" r="3.6"/>
+				<path class="person" d="M18 31 C18 25 30 25 30 31 Z"/>
+				<line class="beam" x1="37.5" y1="10.5" x2="28" y2="16.5" stroke-width="3.4" stroke-linecap="round"/>
+			</symbol>
+		</defs>
+	</svg>
+
+	<header class="nav scrolled" id="nav">
+		<div class="wrap nav-inner">
+			<div class="menu" id="menu">
+				<button class="menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false" aria-controls="menu-drawer">
+					<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+				</button>
+				<div class="menu-drawer" id="menu-drawer" hidden>
+					<a class="mi" href="/docs/">
+						<svg class="mi-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/></svg>
+						<span><b>Docs</b><em>Guides and reference</em></span>
+					</a>
+					<a class="mi" href="https://github.com/dcadolph/whodar" target="_blank" rel="noopener">
+						<svg class="mi-ic octo" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+						<span><b>GitHub</b><em>Source, issues, releases</em></span>
+					</a>
+					<a class="mi" href="mailto:hello@switchtender.com">
+						<svg class="mi-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+						<span><b>Say hello</b><em>hello@switchtender.com</em></span>
+					</a>
+				</div>
+			</div>
+			<a class="brand" href="/" aria-label="whodar · know who knows">
+				<svg class="brand-mark mark" aria-hidden="true"><use href="#radar"/></svg>
+				<span class="brand-lockup"><span class="brand-word">who<b>dar</b></span><span class="brand-tag">know who knows</span></span>
+			</a>
+			<nav class="nav-links">
+				<a href="/#surfaces">Surfaces</a>
+				<a href="/#how">Pipeline</a>
+				<a href="/#privacy">Privacy</a>
+				<a href="/#modes">Ranking</a>
+				<a href="/docs/" class="on">Docs</a>
+				<a href="/#start">Install</a>
+			</nav>
+			<div class="nav-cta">
+				<a class="gh" href="https://github.com/dcadolph/whodar" target="_blank" rel="noopener" aria-label="whodar on GitHub">
+					<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+				</a>
+				<a class="btn" href="/#start">Get started</a>
+			</div>
+			<button class="nav-toggle" id="nav-toggle" aria-label="Menu">
+				<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="7" x2="21" y2="7"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="17" x2="21" y2="17"/></svg>
+			</button>
+		</div>
+	</header>
+
+	<main class="wrap doc-main">
+		<aside class="doc-side">
+			<div class="doc-side-h"><a href="/docs/">Documentation</a></div>
+			<nav><a href="/docs/getting-started">Getting started</a><a href="/docs/connect">Connect your tools</a><a href="/docs/reference">Reference</a><a href="/docs/architecture">Architecture</a><a href="/docs/deploy" class="on" aria-current="page">Deploying</a><a href="/docs/digest">Personal digest</a><a href="/docs/roadmap">Roadmap</a><a href="/docs/contributing">Contributing</a></nav>
+		</aside>
+		<article class="doc">
+<h1 id="deploying-whodar">Deploying whodar</h1>
+<p>whodar is a single binary. The web UI and the Slack bot are long-running; the CLI
+and indexing are one-shot. Build the index first, then run a frontend against it.</p>
+<h2 id="docker">Docker</h2>
+<p>Build the image:</p>
+<pre><code>docker build -t whodar .
+</code></pre>
+<p>The image serves the web UI by default. Serving beyond localhost requires
+WHODAR_SERVE_TOKEN: the server refuses to start without it, and every request
+must carry the token as an Authorization bearer header or a token query
+parameter, which sets a session cookie for the browser. Generate a long random
+value, for example <code>openssl rand -hex 24</code>.</p>
+<p>Mount a data directory that holds a prebuilt index, or run the index command
+against the same volume first:</p>
+<pre><code>docker run --rm -p 8765:8765 -v whodar-data:/data \
+  -e WHODAR_SERVE_TOKEN=change-me \
+  whodar serve --addr 0.0.0.0:8765 --data-dir /data
+</code></pre>
+<p>Then open http://host:8765/?token=change-me once; the session cookie carries
+the rest. The token gates access, not transport: put TLS in front of the
+container for anything beyond a trusted network.</p>
+<p>For the Slack bot, run the bot subcommand instead and pass the tokens as
+environment variables.</p>
+<h2 id="systemd-slack-bot">systemd (Slack bot)</h2>
+<p>Install the binary at /usr/local/bin/whodar and build the index into
+/var/lib/whodar. Put the tokens in /etc/whodar/bot.env with mode 0600:</p>
+<pre><code>WHODAR_SLACK_TOKEN=xoxb-...
+WHODAR_SLACK_APP_TOKEN=xapp-...
+</code></pre>
+<p>Install the unit from deploy/whodar-bot.service, then enable it:</p>
+<pre><code>systemctl enable --now whodar-bot
+</code></pre>
+<p>The unit runs as a dedicated user, restarts on failure, and restricts filesystem
+access to the data directory.</p>
+<h2 id="organization-policy">Organization policy</h2>
+<p>To lock a managed deployment to strict egress, place a locked policy at
+/etc/whodar/policy.json. See docs/GETTING_STARTED.md for the format.</p>
+
+			<div class="doc-foot">
+				<a class="dpn prev" href="/docs/architecture"><span>← Previous</span><b>Architecture</b></a>
+				<a class="dpn next" href="/docs/digest"><span>Next →</span><b>Personal digest</b></a>
+			</div>
+		</article>
+	</main>
+	
+	<footer class="footer">
+		<div class="wrap footer-inner">
+			<a class="brand" href="/" aria-label="whodar · know who knows">
+				<svg class="brand-mark mark" aria-hidden="true"><use href="#radar"/></svg>
+				<span class="brand-lockup"><span class="brand-word">who<b>dar</b></span><span class="brand-tag">know who knows</span></span>
+			</a>
+			<nav>
+				<a href="/docs/">Docs</a>
+				<a href="https://github.com/dcadolph/whodar">GitHub</a>
+				<a href="/docs/reference">Reference</a>
+				<a href="https://github.com/dcadolph/whodar/releases">Releases</a>
+				<a href="mailto:hello@switchtender.com">Contact</a>
+			</nav>
+			<span class="foot-note">Open source under the GNU AGPL v3.0. Copyright 2026 dcadolph.</span>
+		</div>
+	</footer>
+	<script src="/app.js?v=4"></script>
+
+</body>
+</html>

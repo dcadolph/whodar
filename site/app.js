@@ -13,6 +13,24 @@
 	}
 })();
 
+// Top-left menu drawer: contact and docs. Toggles on click, closes on an
+// outside click or Escape.
+(function () {
+	var btn = document.getElementById("menu-btn");
+	var drawer = document.getElementById("menu-drawer");
+	if (!btn || !drawer) return;
+	function close() { drawer.hidden = true; btn.setAttribute("aria-expanded", "false"); }
+	function open() { drawer.hidden = false; btn.setAttribute("aria-expanded", "true"); }
+	btn.addEventListener("click", function (e) {
+		e.stopPropagation();
+		if (drawer.hidden) { open(); } else { close(); }
+	});
+	document.addEventListener("click", function (e) {
+		if (!drawer.hidden && !drawer.contains(e.target)) { close(); }
+	});
+	document.addEventListener("keydown", function (e) { if (e.key === "Escape") { close(); } });
+})();
+
 // Reveal on scroll.
 (function () {
 	var els = document.querySelectorAll(".reveal");

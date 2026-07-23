@@ -1,0 +1,133 @@
+/* Docs pages: a reading layout that matches the whodar landing aesthetic. It
+   loads after styles.css and reuses its tokens, so only doc-specific rules live
+   here. */
+
+body.docs { min-height: 100vh; }
+/* Reading pages keep a solid nav at all scroll positions, not just once scrolled. */
+body.docs .nav { background: rgba(5, 10, 18, 0.86); backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
+
+.doc-main {
+	padding-top: 104px;
+	padding-bottom: 96px;
+	display: grid;
+	grid-template-columns: 236px minmax(0, 1fr);
+	gap: 56px;
+	align-items: start;
+}
+
+/* Sidebar: every doc, current one marked, sticky beside the article. */
+.doc-side { position: sticky; top: 94px; }
+.doc-side-h {
+	font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em;
+	text-transform: uppercase; color: var(--muted); margin-bottom: 14px;
+}
+.doc-side-h a { color: var(--muted); transition: color 0.15s; }
+.doc-side-h a:hover { color: var(--text); }
+.doc-side nav { display: grid; gap: 1px; border-left: 1px solid var(--line); }
+.doc-side nav a {
+	font-size: 13.5px; color: var(--muted); padding: 7px 0 7px 16px;
+	margin-left: -1px; border-left: 2px solid transparent;
+	transition: color 0.15s, border-color 0.15s;
+}
+.doc-side nav a:hover { color: var(--text); }
+.doc-side nav a.on { color: var(--signal); border-left-color: var(--signal); }
+
+/* Article. */
+.doc { max-width: 768px; min-width: 0; font-size: 16px; line-height: 1.72; color: #c4d0de; }
+.doc > :first-child { margin-top: 0; }
+.doc h1 {
+	font-family: var(--disp); font-weight: 800; font-size: clamp(30px, 4vw, 42px);
+	line-height: 1.14; letter-spacing: -0.015em; color: var(--text); margin: 0 0 10px;
+}
+.doc h2 {
+	font-family: var(--disp); font-weight: 700; font-size: 25px; color: var(--text);
+	margin: 48px 0 15px; padding-bottom: 10px; border-bottom: 1px solid var(--line);
+	letter-spacing: -0.01em; scroll-margin-top: 92px;
+}
+.doc h3 { font-size: 18.5px; font-weight: 700; color: var(--text); margin: 30px 0 10px; scroll-margin-top: 92px; }
+.doc h4 { font-size: 15px; font-weight: 700; color: var(--text); margin: 24px 0 8px; }
+.doc p { margin: 0 0 16px; }
+.doc a { color: var(--signal); border-bottom: 1px solid var(--signal-dim); transition: border-color 0.15s; }
+.doc a:hover { border-bottom-color: var(--signal); }
+.doc strong { color: var(--text); font-weight: 600; }
+.doc em { color: var(--text); }
+.doc ul, .doc ol { margin: 0 0 16px; padding-left: 22px; }
+.doc li { margin: 6px 0; }
+.doc li::marker { color: var(--muted); }
+
+/* Inline code and fenced blocks. */
+.doc code {
+	font-family: var(--mono); font-size: 0.86em; background: var(--panel-2);
+	border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; color: #b7e8dd;
+}
+.doc pre {
+	background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+	padding: 16px 18px; overflow-x: auto; margin: 0 0 18px;
+}
+.doc pre code { background: none; border: 0; padding: 0; font-size: 13px; color: #cdd8e6; line-height: 1.65; }
+
+/* Tables scroll inside their own box on narrow screens. */
+.doc table {
+	display: block; width: 100%; border-collapse: collapse; overflow-x: auto;
+	margin: 0 0 18px; font-size: 14px;
+}
+.doc th, .doc td { text-align: left; padding: 9px 14px; border: 1px solid var(--line); vertical-align: top; }
+.doc th {
+	background: var(--panel-2); color: var(--text); font-weight: 600;
+	font-family: var(--mono); font-size: 12px; letter-spacing: 0.02em; white-space: nowrap;
+}
+.doc td { color: var(--muted); }
+.doc td code { font-size: 0.82em; }
+
+.doc blockquote {
+	margin: 0 0 18px; padding: 6px 0 6px 18px; border-left: 3px solid var(--signal-dim); color: var(--muted);
+}
+.doc blockquote p { margin: 4px 0; }
+.doc hr { border: 0; border-top: 1px solid var(--line); margin: 34px 0; }
+
+/* Prev/next between docs. */
+.doc-foot {
+	display: flex; justify-content: space-between; gap: 16px;
+	margin-top: 54px; padding-top: 24px; border-top: 1px solid var(--line);
+}
+.dpn {
+	display: flex; flex-direction: column; gap: 3px; padding: 12px 16px;
+	border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
+	max-width: 47%; transition: border-color 0.15s, transform 0.15s;
+}
+.dpn:hover { border-color: var(--line-2); transform: translateY(-1px); }
+.dpn.next { text-align: right; margin-left: auto; align-items: flex-end; }
+.dpn span { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.dpn b { color: var(--text); font-size: 14px; }
+
+/* Docs index: hero plus a card per document. */
+.doc-index { padding-top: 118px; padding-bottom: 96px; }
+.doc-index-head { max-width: 680px; margin-bottom: 42px; }
+.doc-index-head .sec-eyebrow { display: block; margin-bottom: 16px; }
+.doc-index-head h1 {
+	font-family: var(--disp); font-weight: 800; font-size: clamp(30px, 4.4vw, 46px);
+	letter-spacing: -0.015em; line-height: 1.12; margin: 0 0 12px; color: var(--text);
+}
+.doc-index-head p { color: var(--muted); font-size: 17px; }
+.doc-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(276px, 1fr)); gap: 16px; }
+.doc-card {
+	display: flex; flex-direction: column; gap: 8px; padding: 22px;
+	border: 1px solid var(--line); border-radius: 12px; background: var(--panel);
+	transition: border-color 0.15s, transform 0.15s;
+}
+.doc-card:hover { border-color: var(--line-2); transform: translateY(-2px); }
+.doc-card h3 { font-size: 17px; color: var(--text); font-weight: 700; }
+.doc-card p { font-size: 14px; color: var(--muted); flex: 1; line-height: 1.5; }
+.doc-card-go { font-family: var(--mono); font-size: 12px; color: var(--signal); letter-spacing: 0.04em; }
+
+@media (max-width: 860px) {
+	.doc-main { grid-template-columns: 1fr; gap: 22px; padding-top: 88px; }
+	.doc-side { position: static; top: auto; border-bottom: 1px solid var(--line); padding-bottom: 14px; }
+	.doc-side nav {
+		grid-auto-flow: column; grid-auto-columns: max-content;
+		overflow-x: auto; border-left: 0; gap: 2px; padding-bottom: 4px;
+	}
+	.doc-side nav a { border-left: 0; border-bottom: 2px solid transparent; padding: 6px 12px; white-space: nowrap; }
+	.doc-side nav a.on { border-left: 0; border-bottom-color: var(--signal); }
+	.doc-index { padding-top: 96px; }
+}

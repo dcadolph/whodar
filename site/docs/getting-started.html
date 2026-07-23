@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Getting started · whodar docs</title>
+	<meta name="description" content="From nothing to a working setup: install, index a source, and ask.">
+	<meta property="og:title" content="Getting started · whodar">
+	<meta property="og:description" content="From nothing to a working setup: install, index a source, and ask.">
+	<meta property="og:type" content="article">
+	<link rel="canonical" href="https://whodar.dev/docs/getting-started">
+	
+	<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Ccircle cx='24' cy='24' r='20' fill='none' stroke='%2314233a' stroke-width='3'/%3E%3Ccircle cx='24' cy='19.5' r='3.6' fill='%2314233a'/%3E%3Cpath d='M18 31 C18 25 30 25 30 31 Z' fill='%2314233a'/%3E%3Cline x1='37.5' y1='10.5' x2='28' y2='16.5' stroke='%2334e5c5' stroke-width='3.4' stroke-linecap='round'/%3E%3C/svg%3E">
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+	<link rel="stylesheet" href="/styles.css?v=4">
+	<link rel="stylesheet" href="/docs.css?v=1">
+
+</head>
+<body class="docs">
+	
+	<div class="bg" aria-hidden="true"></div>
+	<div class="bg-grid" aria-hidden="true"></div>
+
+	<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+		<defs>
+			<symbol id="radar" viewBox="0 0 48 48">
+				<circle class="ring" cx="24" cy="24" r="20" fill="none" stroke-width="3"/>
+				<circle class="person" cx="24" cy="19.5" r="3.6"/>
+				<path class="person" d="M18 31 C18 25 30 25 30 31 Z"/>
+				<line class="beam" x1="37.5" y1="10.5" x2="28" y2="16.5" stroke-width="3.4" stroke-linecap="round"/>
+			</symbol>
+		</defs>
+	</svg>
+
+	<header class="nav scrolled" id="nav">
+		<div class="wrap nav-inner">
+			<div class="menu" id="menu">
+				<button class="menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false" aria-controls="menu-drawer">
+					<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+				</button>
+				<div class="menu-drawer" id="menu-drawer" hidden>
+					<a class="mi" href="/docs/">
+						<svg class="mi-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/></svg>
+						<span><b>Docs</b><em>Guides and reference</em></span>
+					</a>
+					<a class="mi" href="https://github.com/dcadolph/whodar" target="_blank" rel="noopener">
+						<svg class="mi-ic octo" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+						<span><b>GitHub</b><em>Source, issues, releases</em></span>
+					</a>
+					<a class="mi" href="mailto:hello@switchtender.com">
+						<svg class="mi-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+						<span><b>Say hello</b><em>hello@switchtender.com</em></span>
+					</a>
+				</div>
+			</div>
+			<a class="brand" href="/" aria-label="whodar · know who knows">
+				<svg class="brand-mark mark" aria-hidden="true"><use href="#radar"/></svg>
+				<span class="brand-lockup"><span class="brand-word">who<b>dar</b></span><span class="brand-tag">know who knows</span></span>
+			</a>
+			<nav class="nav-links">
+				<a href="/#surfaces">Surfaces</a>
+				<a href="/#how">Pipeline</a>
+				<a href="/#privacy">Privacy</a>
+				<a href="/#modes">Ranking</a>
+				<a href="/docs/" class="on">Docs</a>
+				<a href="/#start">Install</a>
+			</nav>
+			<div class="nav-cta">
+				<a class="gh" href="https://github.com/dcadolph/whodar" target="_blank" rel="noopener" aria-label="whodar on GitHub">
+					<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+				</a>
+				<a class="btn" href="/#start">Get started</a>
+			</div>
+			<button class="nav-toggle" id="nav-toggle" aria-label="Menu">
+				<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="7" x2="21" y2="7"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="17" x2="21" y2="17"/></svg>
+			</button>
+		</div>
+	</header>
+
+	<main class="wrap doc-main">
+		<aside class="doc-side">
+			<div class="doc-side-h"><a href="/docs/">Documentation</a></div>
+			<nav><a href="/docs/getting-started" class="on" aria-current="page">Getting started</a><a href="/docs/connect">Connect your tools</a><a href="/docs/reference">Reference</a><a href="/docs/architecture">Architecture</a><a href="/docs/deploy">Deploying</a><a href="/docs/digest">Personal digest</a><a href="/docs/roadmap">Roadmap</a><a href="/docs/contributing">Contributing</a></nav>
+		</aside>
+		<article class="doc">
+<h1 id="getting-started-with-whodar">Getting started with whodar</h1>
+<p>This guide takes you from nothing to a working setup: build the tool, index a
+source, and ask &quot;who do I talk to about X&quot; from the terminal or a browser.</p>
+<p>In a hurry to wire in one tool? <a href="/docs/connect">CONNECT.md</a> has a short copy-paste
+recipe for each source (Slack, GitHub, Jira, Confluence, PagerDuty, git), with
+the exact credential to create and how to verify it worked. This guide is the
+fuller walkthrough with the concepts behind it.</p>
+<h2 id="what-whodar-does">What whodar does</h2>
+<p>You give whodar your work data (an org chart, a Slack workspace) and it builds a
+local, searchable map of who knows what and which channel to ask in. You then
+ask a plain-language question and get a ranked list of people and channels, with
+a short reason for each. It works without any model. If you have a local model
+through Ollama, it can also write a one-line recommendation.</p>
+<p>Everything stays on your machine by default. Nothing is uploaded unless you
+explicitly change the policy.</p>
+<h2 id="requirements">Requirements</h2>
+<ul>
+<li>Go 1.26 or newer to build from source.</li>
+<li>Optional: a Slack bot token if you want to index Slack.</li>
+<li>Optional: Ollama if you want the LLM answer mode.</li>
+</ul>
+<h2 id="install">Install</h2>
+<p>Install with Homebrew:</p>
+<pre><code>brew tap dcadolph/whodar
+brew install whodar
+</code></pre>
+<p>Or build from source, which needs Go 1.26 or newer:</p>
+<pre><code>git clone https://github.com/dcadolph/whodar.git
+cd whodar
+go build -o whodar .
+mkdir -p ~/bin &amp;&amp; mv whodar ~/bin/
+</code></pre>
+<p>Check it runs:</p>
+<pre><code>whodar version
+</code></pre>
+<p>The examples below use <code>whodar</code>. From a source checkout without installing, use
+<code>go run .</code> from the repository instead.</p>
+<h2 id="try-it-in-sixty-seconds">Try it in sixty seconds</h2>
+<p>The fastest look is the demo: a simulated company indexed across all eight
+sources and served in the web UI, no credentials needed.</p>
+<pre><code>whodar demo
+</code></pre>
+<p>It opens a browser on an answered question. Click a name for details, try
+&quot;who owns terraform&quot;, vote on a result. Sample data only; it is discarded
+when the demo stops.</p>
+<p>For the command-line loop, the repository ships a small example org chart:</p>
+<pre><code>whodar index --source org-csv --file examples/people.csv
+whodar ask --pretty &quot;who do I talk to about billing retries&quot;
+</code></pre>
+<p>You should see a ranked list of people, each with a score and the reason it
+matched, such as &quot;retries (topic)&quot; or &quot;billing (team)&quot;. That is the whole loop:
+index a source, then ask.</p>
+<p>Adding the rest of your tools is the same loop. For a guided setup that validates
+the credential and runs the first index, run <code>whodar connect</code>; the sections below
+are the manual path.</p>
+<h2 id="index-your-own-org-chart">Index your own org chart</h2>
+<p>whodar reads a CSV with a header row. Column order does not matter and the
+header names are matched loosely, so &quot;Job Title&quot; and &quot;role&quot; both map to title.
+Recognized columns:</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Also accepts</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>name</td>
+<td>full name, employee, person</td>
+<td>Display name</td>
+</tr>
+<tr>
+<td>email</td>
+<td>mail, email address</td>
+<td>Used to merge with other sources</td>
+</tr>
+<tr>
+<td>title</td>
+<td>job title, role</td>
+<td>Job title</td>
+</tr>
+<tr>
+<td>team</td>
+<td>department, dept, group</td>
+<td>Team name</td>
+</tr>
+<tr>
+<td>org</td>
+<td>organization, division, business unit</td>
+<td>Organization name</td>
+</tr>
+<tr>
+<td>manager</td>
+<td>manager email, reports to</td>
+<td>Manager identifier</td>
+</tr>
+<tr>
+<td>topics</td>
+<td>skills, tags, expertise</td>
+<td>Semicolon-separated topics</td>
+</tr>
+</tbody>
+</table>
+<p>A row needs at least a name or an email. Topics are split on semicolons by
+default. A minimal file looks like this:</p>
+<pre><code>name,email,title,team,topics
+Angela Malone,angela@corp.com,Staff Engineer,Payments,billing;retries
+</code></pre>
+<p>Index it:</p>
+<pre><code>whodar index --source org-csv --file /path/to/your/people.csv
+</code></pre>
+<h2 id="index-slack">Index Slack</h2>
+<p>Slack is the strongest source, because it shows which channels exist, what they
+are about, and who is active on each topic.</p>
+<h3 id="create-a-slack-app-and-token">Create a Slack app and token</h3>
+<ol>
+<li>
+<p>Go to <a href="https://api.slack.com/apps">https://api.slack.com/apps</a> and choose Create New App, then From
+scratch. Pick your workspace.</p>
+</li>
+<li>
+<p>Open OAuth and Permissions. Under Bot Token Scopes add: <code>channels:read</code>,
+<code>channels:history</code>, <code>users:read</code>, and <code>users:read.email</code>. To index private
+channels as well, also add <code>groups:read</code> and <code>groups:history</code>.</p>
+</li>
+<li>
+<p>Install the app to the workspace and copy the Bot User OAuth Token. It starts
+with <code>xoxb-</code>.</p>
+</li>
+<li>
+<p>Export it. whodar reads the token only from the environment, never a flag:</p>
+<pre><code>export WHODAR_SLACK_TOKEN=xoxb-your-token
+</code></pre>
+</li>
+</ol>
+<h3 id="run-the-index">Run the index</h3>
+<pre><code>whodar index --source slack
+</code></pre>
+<p>By default this reads public channels and the last 180 days of history, capped
+at 5000 messages per channel. A bot can only read the history of channels it
+has joined, so invite it (<code>/invite @whodar</code>) to the channels that matter;
+unreadable channels are skipped with a warning, not fatal. Tune the depth:</p>
+<pre><code>whodar index --source slack --since-days 90 --max-messages 2000
+</code></pre>
+<p>To include private channels the token can read:</p>
+<pre><code>whodar index --source slack --include-private
+</code></pre>
+<h3 id="what-gets-stored">What gets stored</h3>
+<p>Message text is tokenized and kept in the local index only, alongside who posted
+about what. The token itself is never written to disk and never logged. Nothing
+is sent to any third party.</p>
+<h2 id="ask-questions">Ask questions</h2>
+<pre><code>whodar ask &quot;who owns billing retries&quot;
+</code></pre>
+<p>Output is JSON on stdout, so you can pipe it into other tools. Add <code>--pretty</code> to
+read it yourself. Useful flags:</p>
+<ul>
+<li><code>--limit N</code> caps results per section (default 5).</li>
+<li><code>--mode keyword</code> (default) ranks with no model.</li>
+<li><code>--mode llm</code> adds a local model. See the next section.</li>
+</ul>
+<p>The answer has two sections. People are who to talk to. Channels are where to
+ask, each with its most active members for that topic.</p>
+<p>Each keyword-mode result carries a <code>confidence</code> from zero to one: how much of
+the question matched, scaled by how strong the match is. An explicit topic
+counts as proof, a job title slightly less, a passing mention in chat half.
+The web UI and the Slack bot show it as strong, moderate, or weak, so a
+least-bad answer never dresses up as a sure one.</p>
+<h2 id="confirm-or-correct-answers">Confirm or correct answers</h2>
+<p>When an answer is right, say so; when it is wrong, say that too. Votes adjust
+future rankings for that question and its close variants:</p>
+<pre><code>whodar feedback record &quot;billing retries&quot; --person alice@corp.com --helpful
+whodar feedback record &quot;billing retries&quot; --channel payments --not-helpful --comment &quot;bot answers there now&quot;
+</code></pre>
+<p>Review or undo what has been taught, and tune how hard votes move ranking:</p>
+<pre><code>whodar feedback list --pretty
+whodar feedback clear --person alice@corp.com
+whodar ask --feedback high &quot;billing retries&quot;
+</code></pre>
+<p>The web UI has the same buttons on every result. Votes live in
+<code>feedback.json</code> next to the index, separate on purpose: re-indexing rebuilds
+the graph but keeps what people taught it. Boosted or lowered results say so
+in their reasons, and a few votes adjust ranking without ever burying the
+underlying evidence.</p>
+<h2 id="llm-mode">LLM mode</h2>
+<p>LLM mode retrieves candidates with the index, then asks a local model to rank
+them and write a short recommendation. The model only ever sees the retrieved
+candidates, so it cannot invent a person or a channel.</p>
+<ol>
+<li>
+<p>Install Ollama from <a href="https://ollama.com">https://ollama.com</a> and start it.</p>
+</li>
+<li>
+<p>Pull a model:</p>
+<pre><code>ollama pull llama3.1
+</code></pre>
+</li>
+<li>
+<p>Ask:</p>
+<pre><code>whodar ask --mode llm &quot;who do I talk to about billing retries&quot;
+whodar ask --mode llm --model qwen2.5 &quot;where do I ask about kafka&quot;
+</code></pre>
+</li>
+</ol>
+<p>Ollama runs on your machine, so LLM mode is allowed under the default strict
+policy. Pointing <code>--ollama-url</code> at a non-local host counts as leaving the
+machine and is refused unless the policy permits it.</p>
+<h2 id="cloud-models-claude-gemini-openai-and-compatible-servers">Cloud models (Claude, Gemini, OpenAI, and compatible servers)</h2>
+<p>By default nothing leaves the machine. If you explicitly opt in, llm mode can
+use a cloud model instead of Ollama:</p>
+<pre><code>export WHODAR_ANTHROPIC_KEY=...
+whodar ask --mode llm --provider anthropic --policy redacted &quot;who owns billing&quot;
+
+export WHODAR_GEMINI_KEY=...
+whodar ask --mode llm --provider gemini --policy redacted &quot;who owns billing&quot;
+
+export WHODAR_OPENAI_KEY=...
+whodar ask --mode llm --provider openai --policy redacted &quot;who owns billing&quot;
+</code></pre>
+<p>The policy decides what the model sees. Under <code>--policy redacted</code>, the
+question goes out as you typed it, people leave as anonymized numbered roles
+(title, team, and matched query terms), and channels leave as numbered
+matched terms, with no names, no emails, no channel names, and no message
+text. The question is the one part you control: if you type a person's name
+into it, that name goes to the model. The model returns numbers, whodar maps
+them back, and the summary is written locally. Redacted egress is limited to
+the known provider hosts, so a remote <code>--openai-url</code> needs <code>--policy open</code>.
+Under <code>--policy open</code>, candidates go as-is. Under the default strict policy,
+cloud providers are refused, and a locked org policy can pin that permanently.</p>
+<p>The <code>openai</code> provider speaks the common chat-completions format, so
+<code>--openai-url</code> also points it at local servers like LM Studio or vLLM; a local
+URL needs no policy opt-in at all. Keys are read only from the environment and
+are never logged or stored.</p>
+<h2 id="semantic-search-meaning-mode-in-the-web-ui">Semantic search (Meaning mode in the web UI)</h2>
+<p>Keyword search matches words. Semantic search matches meaning, so &quot;who handles
+failed payments&quot; can find the person tagged with &quot;billing retries&quot; even with no
+shared word. It uses a local embedding model through Ollama.</p>
+<ol>
+<li>
+<p>Pull an embedding model:</p>
+<pre><code>ollama pull nomic-embed-text
+</code></pre>
+</li>
+<li>
+<p>Build the index with embeddings:</p>
+<pre><code>whodar index --source org-csv --file examples/people.csv --embed
+</code></pre>
+</li>
+<li>
+<p>Search by meaning, or let the LLM use semantic retrieval:</p>
+<pre><code>whodar ask --mode semantic &quot;who handles failed payments&quot;
+whodar ask --mode llm &quot;who handles failed payments&quot;
+</code></pre>
+</li>
+</ol>
+<p>Embeddings are stored in the index. The semantic mode ranks by them directly,
+and the llm mode uses them to retrieve candidates before the model ranks and
+summarizes. Set the model with --embed-model. The embedder runs locally, so it
+is allowed under the strict policy.</p>
+<h2 id="web-ui">Web UI</h2>
+<p>Prefer a search box to the terminal:</p>
+<pre><code>whodar serve
+</code></pre>
+<p>Open http://127.0.0.1:8765, type a question, and pick Keyword, Meaning, or
+AI. Picking AI reveals a provider choice (local Ollama, Claude, ChatGPT, or
+Gemini) with live readiness hints saying what each needs. The sidebar also
+browses everything indexed: people, channels, teams, and topics, each
+filterable, and clicking a topic asks about it.</p>
+<h3 id="serving-with-ai-enabled">Serving with AI enabled</h3>
+<p>An amber dot on a provider means it needs something; its tooltip says what.
+The recipes:</p>
+<p>Ollama (private, everything stays on this machine, allowed under the default
+strict policy):</p>
+<pre><code># install from ollama.com, then:
+ollama pull llama3.1
+whodar serve
+</code></pre>
+<p>Claude, ChatGPT, or Gemini (cloud): export the provider's key and start the
+server with a policy that permits cloud egress, since the default strict
+policy keeps everything local:</p>
+<pre><code>export WHODAR_ANTHROPIC_KEY=...   # or WHODAR_OPENAI_KEY / WHODAR_GEMINI_KEY
+whodar serve --policy redacted
+</code></pre>
+<p>Redacted sends the model only your question and anonymized numbered
+candidates; <code>--policy open</code> sends full candidate detail. Keys are read only
+from the environment and are never typed into the browser. The provider
+choice applies per question, and keyword mode keeps working no matter what.
+The same flags work on <code>whodar demo</code> if you want to try cloud AI against the
+sample company first.</p>
+<h3 id="meaning-mode">Meaning mode</h3>
+<p>Meaning mode matches by meaning instead of exact words, so &quot;failed payments&quot;
+can find the person tagged &quot;billing retries&quot;. It needs the index built once
+with <code>--embed</code>; see the Semantic search section below for the two commands. The
+server binds to localhost only, so it is not reachable from the network. Stop
+it with Ctrl-C; it shuts down cleanly. Change the address with <code>--addr</code>;
+binding beyond localhost requires <code>WHODAR_SERVE_TOKEN</code>, and every request
+must then carry the token. See docs/DEPLOY.md for the token flow.</p>
+<h2 id="claude-code-and-other-agents-mcp">Claude Code and other agents (MCP)</h2>
+<p>Let an agent ask whodar mid-conversation. The MCP server speaks stdio, so
+registration is one line:</p>
+<pre><code>claude mcp add whodar -- whodar mcp
+</code></pre>
+<p>For Claude Desktop, add this under <code>mcpServers</code> in
+<code>claude_desktop_config.json</code>:</p>
+<pre><code>{&quot;whodar&quot;: {&quot;command&quot;: &quot;whodar&quot;, &quot;args&quot;: [&quot;mcp&quot;]}}
+</code></pre>
+<p>The agent gets three tools: <code>whodar_ask</code> (ranked people and channels with
+reasons and confidence, keyword or semantic), <code>whodar_person</code> (a full
+profile), and <code>whodar_directory</code> (browse people, channels, teams, or
+topics). There is no llm mode over MCP on purpose: the calling agent is
+already a model, so it reads the ranked candidates itself.</p>
+<p>One thing to be clear-eyed about: answers flow to whichever agent you wire
+this into, and on to that agent's model. Registering the server is the
+opt-in.</p>
+<h2 id="slack-bot">Slack bot</h2>
+<p>Let your team ask whodar from Slack directly. They mention the bot in a channel
+or send it a direct message, and the bot replies in place. Adding <code>--llm</code> to a
+message uses the model for that answer, and <code>--keyword</code> forces the fast path.</p>
+<h3 id="scopes-and-events">Scopes and events</h3>
+<p>In addition to the read scopes from the Slack section, add the bot scopes
+<code>chat:write</code>, <code>app_mentions:read</code>, <code>im:history</code>, and <code>im:read</code>. Under Event
+Subscriptions, subscribe the bot to <code>app_mention</code> and <code>message.im</code>.</p>
+<h3 id="the-whodar-slash-command">The /whodar slash command</h3>
+<p>Ask from anywhere without mentioning the bot:</p>
+<pre><code>/whodar who owns billing retries
+</code></pre>
+<p>In the app config, open Slash Commands and create <code>/whodar</code>. Over Socket
+Mode it just works; the request URL field can hold any placeholder. Over the
+Events API, point the request URL at <code>https://your-host/slack/commands</code>; the
+same signing secret verifies it. The answer arrives through Slack's response
+URL, visible in the channel, and the <code>--llm</code>/<code>--keyword</code> hints work in the
+command text too.</p>
+<h3 id="socket-mode-no-public-url">Socket Mode (no public URL)</h3>
+<p>Best for a laptop or an internal host. Enable Socket Mode, create an app-level
+token that starts with <code>xapp-</code> with the <code>connections:write</code> scope, then run:</p>
+<pre><code>export WHODAR_SLACK_TOKEN=xoxb-...
+export WHODAR_SLACK_APP_TOKEN=xapp-...
+whodar bot --transport socket
+</code></pre>
+<h3 id="events-api-public-endpoint">Events API (public endpoint)</h3>
+<p>Best for a hosted deployment. Point the Slack request URL at
+https://your-host/slack/events and run:</p>
+<pre><code>export WHODAR_SLACK_TOKEN=xoxb-...
+export WHODAR_SLACK_SIGNING_SECRET=...
+whodar bot --transport events --addr 0.0.0.0:8766
+</code></pre>
+<p>The events transport verifies the Slack request signature and rejects requests
+with an old timestamp.</p>
+<h3 id="default-answer-mode">Default answer mode</h3>
+<p>By default the bot answers with the keyword resolver. Set <code>--mode llm</code> to make
+the model the default, in which case Ollama must run on the bot's host. Either
+way, a user overrides per message with a trailing <code>--llm</code> or <code>--keyword</code>.</p>
+<h2 id="github-jira-and-confluence">GitHub, Jira, and Confluence</h2>
+<p>Index code, tickets, and wiki pages to learn who works on what.</p>
+<p>GitHub needs a token in WHODAR_GITHUB_TOKEN with repository read access:</p>
+<pre><code>export WHODAR_GITHUB_TOKEN=ghp-...
+whodar index --source github --repo your-org/your-repo
+whodar index --source github --github-org your-org --github-emails
+</code></pre>
+<p>It reads contributors, pull request authors, reviewers, assignees, labels and
+titles, non-pull-request issues, repository topics, and CODEOWNERS, weighted by
+how much each person works on a topic.</p>
+<p>Jira needs a site URL and an API token, created at id.atlassian.com:</p>
+<pre><code>export WHODAR_JIRA_URL=https://your-site.atlassian.net
+export WHODAR_JIRA_EMAIL=you@example.com
+export WHODAR_JIRA_TOKEN=...
+whodar index --source jira --jira-project SEC --jira-project OPS
+</code></pre>
+<p>It reads issue assignees and reporters, weighted by components, labels, summary
+words, and project. Use --jira-jql for a custom query. When emails are visible,
+these people merge with Slack and the org chart by email.</p>
+<p>Confluence uses the same Atlassian site and token as Jira, so the Jira
+credentials work, or set WHODAR_CONFLUENCE_URL, WHODAR_CONFLUENCE_EMAIL, and
+WHODAR_CONFLUENCE_TOKEN:</p>
+<pre><code>whodar index --source confluence --confluence-space ENG --confluence-space OPS
+</code></pre>
+<p>It reads page creators and last editors, weighted by labels, title words, and
+space. Use --confluence-cql for a custom query.</p>
+<h2 id="pagerduty">PagerDuty</h2>
+<p>Index services and on-call schedules to learn who answers for what. Create a
+read-only API token in PagerDuty and export it:</p>
+<pre><code>export WHODAR_PAGERDUTY_TOKEN=...
+whodar index --source pagerduty --merge
+</code></pre>
+<p>It reads every service and the people currently on call, giving each on-call
+person the topics of the services they answer for.</p>
+<h2 id="git-history">Git history</h2>
+<p>Index who actually commits to what. No tokens, no API: it reads local clones
+directly, so it works for any repository you can <code>git clone</code>, including ones
+with no CODEOWNERS file.</p>
+<pre><code>whodar index --source git --repo-path ~/src/billing --repo-path ~/src/infra --merge
+</code></pre>
+<p>Each author gets the topics of the paths they touch, weighted by how often
+they touch them, so the person doing the work outranks a drive-by. Authors
+join other sources by commit email. Bot accounts such as dependabot are
+skipped. <code>--git-since-days</code> bounds the window (default 365) and
+<code>--max-commits</code> caps each repository (default 2000).</p>
+<h2 id="where-your-data-lives">Where your data lives</h2>
+<p>The index is written to <code>~/.whodar/index.json</code> by default, readable only by
+your user. Override the location with <code>--data-dir</code>. This file holds the
+indexed text, so treat it like the source data. It is never uploaded.</p>
+<h2 id="organization-policy">Organization policy</h2>
+<p>The policy governs model egress and is enforced, not advisory. The default is
+strict: answers are computed locally, and only the keyword resolver and a
+local model are allowed. Indexing is separate from the policy: it talks only
+to the sources you name, with your tokens, when you run it.</p>
+<p>An organization pins behavior with a policy file at <code>/etc/whodar/policy.json</code>.
+When that file sets <code>locked</code>, it wins over both the <code>--policy</code> flag and the
+<code>WHODAR_POLICY_FILE</code> environment variable, so a user cannot point whodar at a
+looser file. <code>WHODAR_POLICY_FILE</code> remains useful on unmanaged machines and in
+tests. See <code>examples/policy.json</code>:</p>
+<pre><code>{
+  &quot;mode&quot;: &quot;strict&quot;,
+  &quot;locked&quot;: true,
+  &quot;private_channels&quot;: &quot;deny&quot;
+}
+</code></pre>
+<p>With the file above, <code>--policy open</code> is ignored and <code>--include-private</code> is
+refused. The lock constrains the installed binary for regular users; it is
+not a security boundary against an administrator. This is how a cautious
+organization keeps a managed install locked down while an individual running
+their own copy stays free to opt in.</p>
+<h2 id="updating-the-index">Updating the index</h2>
+<p>By default a new run replaces the index, so people who left the org or channels
+that went away drop out and new ones appear. To combine sources instead, add
+<code>--merge</code> and the run adds onto the existing index. People merge by email, so one
+human stays one entry across the org chart, Slack, GitHub, Jira, Confluence,
+PagerDuty, and code ownership.</p>
+<p>Start with the org chart, then merge every other source onto it:</p>
+<pre><code>whodar index --source org-csv --file people.csv
+whodar index --source slack --merge
+whodar index --source github --github-org your-org --merge
+whodar index --source jira --jira-project PROJ --merge
+whodar index --source confluence --confluence-space ENG --merge
+whodar index --source pagerduty --merge
+whodar ask &quot;who knows the billing service&quot;
+</code></pre>
+<p>Each run prints what joined and left since the last index, for example
+&quot;+3 people, -1 people, +1 channels&quot;. Add <code>--changes-file changes.json</code> to write
+the full diff as JSON for a script or a report.</p>
+<h2 id="joining-one-person-across-sources">Joining one person across sources</h2>
+<p>People merge by email. When a source only knows a handle or an account id, such
+as a GitHub login without a public email or a CODEOWNERS <code>@handle</code>, the same
+human shows up as two entries. An alias file declares which identifiers belong
+to the same person:</p>
+<pre><code>{
+  &quot;alice@corp.com&quot;: [&quot;github:alice&quot;, &quot;codeowners:alice&quot;]
+}
+</code></pre>
+<p>Pass it once with <code>--aliases</code> and the index joins the entries, including ones
+indexed before the file existed:</p>
+<pre><code>whodar index --source github --github-org your-org --merge --aliases aliases.json
+</code></pre>
+<p>The mapping is saved in the index, so later runs keep joining without the flag.
+Joined identifiers appear in answers under <code>identities</code>, and a person's email
+always wins as the display identifier. See <code>examples/aliases.json</code>.</p>
+<h2 id="recent-activity-counts-more">Recent activity counts more</h2>
+<p>Activity ages. Someone who owned a topic three years ago is usually the wrong
+person to ask today, so dated records decay: a record loses half its weight per
+half-life, 180 days by default. Slack messages, GitHub pull requests and
+issues, Jira issues, and Confluence pages all carry their activity date. The
+org chart, CODEOWNERS, and PagerDuty on-call describe the present and never
+decay.</p>
+<p>Tune it at index time:</p>
+<pre><code>whodar index --source slack --merge --half-life-days 90
+</code></pre>
+<p>A shorter half-life favors the people active right now; <code>--half-life-days 0</code>
+turns decay off entirely.</p>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<table>
+<thead>
+<tr>
+<th>Message</th>
+<th>Cause</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>no index: run <code>whodar index</code> first</td>
+<td>No index built yet</td>
+<td>Run a <code>whodar index</code> command</td>
+</tr>
+<tr>
+<td>invalid arguments: set WHODAR_SLACK_TOKEN</td>
+<td>Slack token not exported</td>
+<td><code>export WHODAR_SLACK_TOKEN=xoxb-...</code></td>
+</tr>
+<tr>
+<td>private-channel ingest is disabled by policy</td>
+<td>Policy denies private channels</td>
+<td>Drop <code>--include-private</code> or adjust the policy</td>
+</tr>
+<tr>
+<td>llm host ...: policy: egress denied</td>
+<td>Non-local Ollama under strict</td>
+<td>Use a local URL or <code>--policy open</code></td>
+</tr>
+<tr>
+<td>llm: request to http://localhost:11434 ... refused</td>
+<td>Ollama is not running</td>
+<td>Start Ollama and pull a model</td>
+</tr>
+<tr>
+<td>slack ...: api error: invalid_auth</td>
+<td>Bad token or missing scope</td>
+<td>Recreate the token with the listed scopes</td>
+</tr>
+<tr>
+<td>--policy ignored; pinned by org policy</td>
+<td>A locked org policy is in effect</td>
+<td>Expected. Ask your administrator</td>
+</tr>
+</tbody>
+</table>
+<h2 id="command-reference">Command reference</h2>
+<ul>
+<li><code>whodar index --source org-csv --file FILE</code> builds the index from a CSV.</li>
+<li><code>whodar index --source slack [--include-private] [--since-days N] [--max-messages N]</code>
+builds the index from Slack.</li>
+<li><code>whodar index --source github (--repo owner/name | --github-org ORG)</code> indexes GitHub.</li>
+<li><code>whodar index --source jira (--jira-project KEY | --jira-jql JQL)</code> indexes Jira.</li>
+<li><code>whodar index --source confluence (--confluence-space KEY | --confluence-cql CQL)</code> indexes Confluence.</li>
+<li><code>whodar index --source pagerduty</code> indexes PagerDuty services and on-call.</li>
+<li><code>whodar index --source git --repo-path DIR [--git-since-days N] [--max-commits N]</code>
+indexes local git history.</li>
+<li><code>whodar demo</code> explores a simulated company in the web UI, no credentials.</li>
+<li><code>whodar index ... --merge</code> adds the source to the existing index instead of replacing it.</li>
+<li><code>whodar ask [--mode keyword|semantic|llm] [--limit N] [--pretty] QUESTION</code>
+answers a question.</li>
+<li><code>whodar index ... --embed</code> adds embeddings for semantic and llm retrieval.</li>
+<li><code>whodar feedback record QUESTION (--person ID | --channel NAME) (--helpful | --not-helpful) [--comment TEXT]</code>
+records a vote; <code>whodar feedback list</code> and <code>whodar feedback clear</code> review and
+undo votes.</li>
+<li><code>whodar serve [--addr HOST:PORT] [--mode keyword|llm]</code> runs the web UI.</li>
+<li><code>whodar bot [--transport socket|events] [--mode keyword|llm] [--addr HOST:PORT]</code>
+runs the Slack bot.</li>
+<li><code>whodar version</code> prints the version.</li>
+</ul>
+<p>Shared flags: <code>--data-dir</code> sets the index location, <code>--policy</code> sets the egress
+mode, <code>--pretty</code> indents JSON.</p>
+
+			<div class="doc-foot">
+				<span></span>
+				<a class="dpn next" href="/docs/connect"><span>Next →</span><b>Connect your tools</b></a>
+			</div>
+		</article>
+	</main>
+	
+	<footer class="footer">
+		<div class="wrap footer-inner">
+			<a class="brand" href="/" aria-label="whodar · know who knows">
+				<svg class="brand-mark mark" aria-hidden="true"><use href="#radar"/></svg>
+				<span class="brand-lockup"><span class="brand-word">who<b>dar</b></span><span class="brand-tag">know who knows</span></span>
+			</a>
+			<nav>
+				<a href="/docs/">Docs</a>
+				<a href="https://github.com/dcadolph/whodar">GitHub</a>
+				<a href="/docs/reference">Reference</a>
+				<a href="https://github.com/dcadolph/whodar/releases">Releases</a>
+				<a href="mailto:hello@switchtender.com">Contact</a>
+			</nav>
+			<span class="foot-note">Open source under the GNU AGPL v3.0. Copyright 2026 dcadolph.</span>
+		</div>
+	</footer>
+	<script src="/app.js?v=4"></script>
+
+</body>
+</html>

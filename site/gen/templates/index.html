@@ -1,0 +1,32 @@
+{{define "index"}}<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Documentation · whodar</title>
+	<meta name="description" content="whodar documentation: install, connect your tools, the command reference, architecture, deploying, and the roadmap.">
+	<meta property="og:title" content="Documentation · whodar">
+	<meta property="og:description" content="Install, connect your tools, reference, architecture, and more.">
+	<meta property="og:type" content="website">
+	<link rel="canonical" href="https://whodar.dev/docs/">
+	{{template "assets" .}}
+</head>
+<body class="docs">
+	{{template "header" .}}
+	<main class="wrap doc-index">
+		<div class="doc-index-head">
+			<span class="sec-eyebrow"><span class="n">//</span> Documentation</span>
+			<h1>The whole manual, on one page.</h1>
+			<p>The same docs that ship in the repository, rendered here as pages. New to whodar? Start with getting started, then wire in your tools.</p>
+		</div>
+		<div class="doc-cards">
+			{{range .Docs}}<a class="doc-card" href="/docs/{{.Slug}}">
+				<h3>{{.Title}}</h3>
+				<p>{{.Desc}}</p>
+				<span class="doc-card-go">Read →</span>
+			</a>{{end}}
+		</div>
+	</main>
+	{{template "footer" .}}
+</body>
+</html>{{end}}

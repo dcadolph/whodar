@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Reference · whodar docs</title>
+	<meta name="description" content="Every command, flag, source, and environment variable.">
+	<meta property="og:title" content="Reference · whodar">
+	<meta property="og:description" content="Every command, flag, source, and environment variable.">
+	<meta property="og:type" content="article">
+	<link rel="canonical" href="https://whodar.dev/docs/reference">
+	
+	<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Ccircle cx='24' cy='24' r='20' fill='none' stroke='%2314233a' stroke-width='3'/%3E%3Ccircle cx='24' cy='19.5' r='3.6' fill='%2314233a'/%3E%3Cpath d='M18 31 C18 25 30 25 30 31 Z' fill='%2314233a'/%3E%3Cline x1='37.5' y1='10.5' x2='28' y2='16.5' stroke='%2334e5c5' stroke-width='3.4' stroke-linecap='round'/%3E%3C/svg%3E">
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+	<link rel="stylesheet" href="/styles.css?v=4">
+	<link rel="stylesheet" href="/docs.css?v=1">
+
+</head>
+<body class="docs">
+	
+	<div class="bg" aria-hidden="true"></div>
+	<div class="bg-grid" aria-hidden="true"></div>
+
+	<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+		<defs>
+			<symbol id="radar" viewBox="0 0 48 48">
+				<circle class="ring" cx="24" cy="24" r="20" fill="none" stroke-width="3"/>
+				<circle class="person" cx="24" cy="19.5" r="3.6"/>
+				<path class="person" d="M18 31 C18 25 30 25 30 31 Z"/>
+				<line class="beam" x1="37.5" y1="10.5" x2="28" y2="16.5" stroke-width="3.4" stroke-linecap="round"/>
+			</symbol>
+		</defs>
+	</svg>
+
+	<header class="nav scrolled" id="nav">
+		<div class="wrap nav-inner">
+			<div class="menu" id="menu">
+				<button class="menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false" aria-controls="menu-drawer">
+					<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+				</button>
+				<div class="menu-drawer" id="menu-drawer" hidden>
+					<a class="mi" href="/docs/">
+						<svg class="mi-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/></svg>
+						<span><b>Docs</b><em>Guides and reference</em></span>
+					</a>
+					<a class="mi" href="https://github.com/dcadolph/whodar" target="_blank" rel="noopener">
+						<svg class="mi-ic octo" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+						<span><b>GitHub</b><em>Source, issues, releases</em></span>
+					</a>
+					<a class="mi" href="mailto:hello@switchtender.com">
+						<svg class="mi-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+						<span><b>Say hello</b><em>hello@switchtender.com</em></span>
+					</a>
+				</div>
+			</div>
+			<a class="brand" href="/" aria-label="whodar · know who knows">
+				<svg class="brand-mark mark" aria-hidden="true"><use href="#radar"/></svg>
+				<span class="brand-lockup"><span class="brand-word">who<b>dar</b></span><span class="brand-tag">know who knows</span></span>
+			</a>
+			<nav class="nav-links">
+				<a href="/#surfaces">Surfaces</a>
+				<a href="/#how">Pipeline</a>
+				<a href="/#privacy">Privacy</a>
+				<a href="/#modes">Ranking</a>
+				<a href="/docs/" class="on">Docs</a>
+				<a href="/#start">Install</a>
+			</nav>
+			<div class="nav-cta">
+				<a class="gh" href="https://github.com/dcadolph/whodar" target="_blank" rel="noopener" aria-label="whodar on GitHub">
+					<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+				</a>
+				<a class="btn" href="/#start">Get started</a>
+			</div>
+			<button class="nav-toggle" id="nav-toggle" aria-label="Menu">
+				<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="7" x2="21" y2="7"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="17" x2="21" y2="17"/></svg>
+			</button>
+		</div>
+	</header>
+
+	<main class="wrap doc-main">
+		<aside class="doc-side">
+			<div class="doc-side-h"><a href="/docs/">Documentation</a></div>
+			<nav><a href="/docs/getting-started">Getting started</a><a href="/docs/connect">Connect your tools</a><a href="/docs/reference" class="on" aria-current="page">Reference</a><a href="/docs/architecture">Architecture</a><a href="/docs/deploy">Deploying</a><a href="/docs/digest">Personal digest</a><a href="/docs/roadmap">Roadmap</a><a href="/docs/contributing">Contributing</a></nav>
+		</aside>
+		<article class="doc">
+<h1 id="reference">Reference</h1>
+<p>Every command, flag, source, and environment variable. For a guided
+walkthrough, start with <a href="/docs/getting-started">GETTING_STARTED.md</a> instead.</p>
+<h2 id="global-flags">Global flags</h2>
+<p>Every command accepts these.</p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--data-dir</code></td>
+<td><code>~/.whodar</code></td>
+<td>Directory holding the index and feedback files.   </td>
+</tr>
+<tr>
+<td><code>--policy</code></td>
+<td><code>strict</code></td>
+<td>Egress policy: <code>strict</code>, <code>redacted</code>, or <code>open</code>.</td>
+</tr>
+<tr>
+<td><code>--pretty</code></td>
+<td>off</td>
+<td>Indent JSON output.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="sources">Sources</h2>
+<p>Each source is one connector against a single interface; all of them merge
+into one index with <code>--merge</code>. People join across sources by email, or by an
+<a href="#identity-aliases">alias file</a> when a source only knows a handle.</p>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Reads</th>
+<th>Credentials</th>
+<th>Dated</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>org-csv</code></td>
+<td>Org chart CSV: names, titles, teams, topics</td>
+<td>none</td>
+<td>no</td>
+</tr>
+<tr>
+<td><code>codeowners</code></td>
+<td>CODEOWNERS paths per owner</td>
+<td>none</td>
+<td>no</td>
+</tr>
+<tr>
+<td><code>git</code></td>
+<td>Commit authors per changed path</td>
+<td>none</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>slack</code></td>
+<td>Users, channels, message history</td>
+<td><code>WHODAR_SLACK_TOKEN</code></td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>github</code></td>
+<td>Repos, contributors, PRs, issues, CODEOWNERS</td>
+<td><code>WHODAR_GITHUB_TOKEN</code></td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>jira</code></td>
+<td>Issue assignees and reporters</td>
+<td><code>WHODAR_JIRA_*</code></td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>confluence</code></td>
+<td>Page creators and editors</td>
+<td><code>WHODAR_CONFLUENCE_*</code></td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>pagerduty</code></td>
+<td>Services and current on-calls</td>
+<td><code>WHODAR_PAGERDUTY_TOKEN</code></td>
+<td>no</td>
+</tr>
+</tbody>
+</table>
+<p>Dated sources decay: see <a href="#recency">recency</a>. Undated sources describe the
+present and keep full weight. Bot accounts (dependabot and friends) are
+skipped in the git and github sources.</p>
+<h2 id="whodar-index">whodar index</h2>
+<p>Builds or extends the index from one source per run.</p>
+<pre><code>whodar index --source SOURCE [scope flags] [--merge]
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Applies to</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--source</code></td>
+<td><code>org-csv</code></td>
+<td>all</td>
+<td>Which source to ingest.</td>
+</tr>
+<tr>
+<td><code>--merge</code></td>
+<td>off</td>
+<td>all</td>
+<td>Add to the existing index instead of replacing.</td>
+</tr>
+<tr>
+<td><code>--aliases</code></td>
+<td></td>
+<td>all</td>
+<td>JSON alias file joining one person across sources.</td>
+</tr>
+<tr>
+<td><code>--half-life-days</code></td>
+<td><code>180</code></td>
+<td>all</td>
+<td>Days for a dated record's weight to halve; <code>0</code> disables decay.</td>
+</tr>
+<tr>
+<td><code>--changes-file</code></td>
+<td></td>
+<td>all</td>
+<td>Write the joiner and leaver diff as JSON.</td>
+</tr>
+<tr>
+<td><code>--embed</code></td>
+<td>off</td>
+<td>all</td>
+<td>Generate embeddings via Ollama for semantic search.</td>
+</tr>
+<tr>
+<td><code>--embed-model</code></td>
+<td></td>
+<td>all</td>
+<td>Ollama embed model (default <code>nomic-embed-text</code>).</td>
+</tr>
+<tr>
+<td><code>--ollama-url</code></td>
+<td>localhost</td>
+<td>all</td>
+<td>Ollama base URL for <code>--embed</code>.</td>
+</tr>
+<tr>
+<td><code>--file</code></td>
+<td></td>
+<td>org-csv, codeowners</td>
+<td>Path to the CSV or CODEOWNERS file (or repo root).</td>
+</tr>
+<tr>
+<td><code>--include-private</code></td>
+<td>off</td>
+<td>slack</td>
+<td>Ingest private channels if policy allows.</td>
+</tr>
+<tr>
+<td><code>--since-days</code></td>
+<td><code>180</code></td>
+<td>slack</td>
+<td>History window in days.</td>
+</tr>
+<tr>
+<td><code>--max-messages</code></td>
+<td><code>5000</code></td>
+<td>slack</td>
+<td>Message cap per channel.</td>
+</tr>
+<tr>
+<td><code>--repo</code></td>
+<td></td>
+<td>github</td>
+<td>Repo as <code>owner/name</code>, repeatable.</td>
+</tr>
+<tr>
+<td><code>--github-org</code></td>
+<td></td>
+<td>github</td>
+<td>Index every repository of an org.</td>
+</tr>
+<tr>
+<td><code>--max-repos</code></td>
+<td><code>0</code> = all</td>
+<td>github</td>
+<td>Cap repositories taken from <code>--github-org</code>.</td>
+</tr>
+<tr>
+<td><code>--github-emails</code></td>
+<td>off</td>
+<td>github</td>
+<td>Resolve user emails to join other sources.</td>
+</tr>
+<tr>
+<td><code>--jira-project</code></td>
+<td></td>
+<td>jira</td>
+<td>Project key, repeatable.</td>
+</tr>
+<tr>
+<td><code>--jira-jql</code></td>
+<td></td>
+<td>jira</td>
+<td>JQL query; overrides <code>--jira-project</code>.</td>
+</tr>
+<tr>
+<td><code>--jira-url</code></td>
+<td></td>
+<td>jira</td>
+<td>Site URL; or <code>WHODAR_JIRA_URL</code>.</td>
+</tr>
+<tr>
+<td><code>--max-issues</code></td>
+<td><code>1000</code></td>
+<td>jira</td>
+<td>Cap issues read.</td>
+</tr>
+<tr>
+<td><code>--confluence-space</code></td>
+<td></td>
+<td>confluence</td>
+<td>Space key, repeatable.</td>
+</tr>
+<tr>
+<td><code>--confluence-cql</code></td>
+<td></td>
+<td>confluence</td>
+<td>CQL query; overrides <code>--confluence-space</code>.</td>
+</tr>
+<tr>
+<td><code>--max-pages</code></td>
+<td><code>2000</code></td>
+<td>confluence</td>
+<td>Cap pages read.</td>
+</tr>
+<tr>
+<td><code>--repo-path</code></td>
+<td></td>
+<td>git</td>
+<td>Local repository root, repeatable.</td>
+</tr>
+<tr>
+<td><code>--git-since-days</code></td>
+<td><code>365</code></td>
+<td>git</td>
+<td>History window in days.</td>
+</tr>
+<tr>
+<td><code>--max-commits</code></td>
+<td><code>2000</code></td>
+<td>git</td>
+<td>Commit cap per repository.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="whodar-connect">whodar connect</h2>
+<p>Sets up a source interactively: it explains the source, shows how to create the
+credential, reads and validates it, runs the first index, and prints the <code>export</code>
+line to save. Credentials are validated in memory and never written to disk.
+connect needs a terminal; scripts use <code>whodar index</code>.</p>
+<pre><code>whodar connect [source]
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--status</code></td>
+<td>off</td>
+<td>Report which sources are configured, without prompting.</td>
+</tr>
+</tbody>
+</table>
+<p>With no argument it shows a menu of every source, marked configured or not. With a
+source (<code>org-csv</code>, <code>codeowners</code>, <code>git</code>, <code>slack</code>, <code>github</code>, <code>jira</code>, <code>confluence</code>, or
+<code>pagerduty</code>) it sets up just that one.</p>
+<h2 id="whodar-ask">whodar ask</h2>
+<p>Answers a question from the index.</p>
+<pre><code>whodar ask [flags] QUESTION
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--mode</code></td>
+<td><code>keyword</code></td>
+<td>Resolver: <code>keyword</code>, <code>semantic</code>, or <code>llm</code>.</td>
+</tr>
+<tr>
+<td><code>--limit</code></td>
+<td><code>5</code></td>
+<td>Maximum results per section.</td>
+</tr>
+<tr>
+<td><code>--provider</code></td>
+<td><code>ollama</code></td>
+<td>LLM provider: <code>ollama</code>, <code>anthropic</code>, <code>openai</code>, or <code>gemini</code>.</td>
+</tr>
+<tr>
+<td><code>--model</code></td>
+<td></td>
+<td>Chat model for llm mode (defaults per provider).</td>
+</tr>
+<tr>
+<td><code>--embed-model</code></td>
+<td></td>
+<td>Ollama embed model for semantic and llm modes.</td>
+</tr>
+<tr>
+<td><code>--ollama-url</code></td>
+<td>localhost</td>
+<td>Ollama base URL.</td>
+</tr>
+<tr>
+<td><code>--openai-url</code></td>
+<td></td>
+<td>OpenAI-compatible base URL including the version path, e.g. <code>http://localhost:1234/v1</code>.</td>
+</tr>
+<tr>
+<td><code>--feedback</code></td>
+<td><code>normal</code></td>
+<td>How hard votes move ranking: <code>off</code>, <code>low</code>, <code>normal</code>, <code>high</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>Modes: <code>keyword</code> needs no model and always works. <code>semantic</code> matches on
+meaning using embeddings built with <code>index --embed</code>. <code>llm</code> retrieves
+candidates, then a model re-ranks them and writes a short recommendation; it
+cannot invent people. The default provider is a local Ollama server. The
+<code>anthropic</code> (Claude), <code>openai</code>, and <code>gemini</code> providers are cloud models gated
+by the egress policy: strict refuses them, <code>--policy redacted</code> sends the question and
+anonymized numbered candidates (people as title, team, and matched terms;
+channels as matched terms only) and writes the summary locally, and
+<code>--policy open</code> sends candidates as-is. The <code>openai</code> provider
+also speaks to any compatible server via <code>--openai-url</code>; a local one, such as
+LM Studio, needs no policy opt-in, while a remote one needs <code>--policy open</code>.
+Each result carries a <code>confidence</code>
+from zero to one: query coverage scaled by evidence strength, where an
+explicit topic is proof, a title slightly less, a passing mention half.</p>
+<h2 id="whodar-feedback">whodar feedback</h2>
+<p>Records, reviews, and clears votes on answers.</p>
+<pre><code>whodar feedback record QUESTION (--person ID | --channel NAME) (--helpful | --not-helpful) [--comment TEXT]
+whodar feedback list [--query Q | --person ID | --channel NAME]
+whodar feedback clear (--query Q | --person ID | --channel NAME | --all)
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Applies to</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--person</code></td>
+<td>all</td>
+<td>Person identifier from the answer.</td>
+</tr>
+<tr>
+<td><code>--channel</code></td>
+<td>all</td>
+<td>Channel name from the answer.</td>
+</tr>
+<tr>
+<td><code>--query</code></td>
+<td>list, clear</td>
+<td>Match votes for this exact question.</td>
+</tr>
+<tr>
+<td><code>--helpful</code></td>
+<td>record</td>
+<td>The result answered the question.</td>
+</tr>
+<tr>
+<td><code>--not-helpful</code></td>
+<td>record</td>
+<td>The result was wrong for the question.</td>
+</tr>
+<tr>
+<td><code>--comment</code></td>
+<td>record</td>
+<td>Optional note explaining the vote.</td>
+</tr>
+<tr>
+<td><code>--all</code></td>
+<td>clear</td>
+<td>Clear every recorded vote.</td>
+</tr>
+</tbody>
+</table>
+<p>By default each net vote multiplies the result's score by 1.25 for that
+question and its close variants, clamped at three votes either way. Tune it
+with <code>--feedback off|low|normal|high</code> on <code>ask</code>, <code>serve</code>, and <code>bot</code>: low is a
+gentle 1.1x capped at two votes, high is 1.5x capped at four, off ignores
+votes entirely. Votes live in <code>feedback.json</code> under the data directory and
+survive re-indexing.</p>
+<h2 id="whodar-serve">whodar serve</h2>
+<p>Runs the local web UI over the same engine.</p>
+<pre><code>whodar serve [--addr HOST:PORT] [--mode keyword|semantic|llm]
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--addr</code></td>
+<td><code>127.0.0.1:8765</code></td>
+<td>Address to listen on.</td>
+</tr>
+<tr>
+<td><code>--mode</code></td>
+<td><code>keyword</code></td>
+<td>Default resolver.</td>
+</tr>
+<tr>
+<td><code>--provider</code></td>
+<td><code>ollama</code></td>
+<td>LLM provider: <code>ollama</code>, <code>anthropic</code>, <code>openai</code>, or <code>gemini</code>.</td>
+</tr>
+<tr>
+<td><code>--model</code></td>
+<td></td>
+<td>Ollama chat model for llm mode.</td>
+</tr>
+<tr>
+<td><code>--embed-model</code></td>
+<td></td>
+<td>Ollama embed model.</td>
+</tr>
+<tr>
+<td><code>--ollama-url</code></td>
+<td>localhost</td>
+<td>Ollama base URL.</td>
+</tr>
+<tr>
+<td><code>--openai-url</code></td>
+<td></td>
+<td>OpenAI-compatible base URL including the version path.</td>
+</tr>
+<tr>
+<td><code>--feedback</code></td>
+<td><code>normal</code></td>
+<td>How hard votes move ranking: <code>off</code>, <code>low</code>, <code>normal</code>, <code>high</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>Queries are shareable links: <code>/?q=who+owns+billing</code> runs on load. Every
+result has feedback buttons.</p>
+<h2 id="whodar-demo">whodar demo</h2>
+<p>Explores whodar on a simulated company: all eight sources are built in
+process and served in the web UI, with no credentials and nothing fetched
+from the network. Sample data only; it is discarded when the demo stops.</p>
+<pre><code>whodar demo
+</code></pre>
+<p>Takes the same flags as <code>serve</code>.</p>
+<h2 id="whodar-mcp">whodar mcp</h2>
+<p>Serves the index to MCP clients over stdio, so agents such as Claude Code
+and Claude Desktop can ask who knows what mid-conversation. Tools:
+<code>whodar_ask</code>, <code>whodar_person</code>, <code>whodar_directory</code>.</p>
+<pre><code>whodar mcp [--embed-model name] [--ollama-url url]
+</code></pre>
+<p>Register with <code>claude mcp add whodar -- whodar mcp</code>, or a <code>mcpServers</code>
+entry in Claude Desktop's config. Semantic mode works when the index was
+built with <code>--embed</code> and local Ollama is running; keyword needs nothing.</p>
+<h2 id="whodar-bot">whodar bot</h2>
+<p>Runs the Slack bot. Mention it, send it a direct message, or use the
+<code>/whodar</code> slash command; a trailing <code>--llm</code> or <code>--keyword</code> in the text
+overrides the mode for that answer. Each user gets ten questions a minute,
+Slack redeliveries are never answered twice, and a dropped connection
+reconnects with backoff.</p>
+<pre><code>whodar bot [--transport socket|events]
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--transport</code></td>
+<td><code>socket</code></td>
+<td><code>socket</code> needs no public URL; <code>events</code> serves HTTP.</td>
+</tr>
+<tr>
+<td><code>--addr</code></td>
+<td><code>127.0.0.1:8766</code></td>
+<td>Address for the events transport.</td>
+</tr>
+<tr>
+<td><code>--mode</code></td>
+<td><code>keyword</code></td>
+<td>Default answer mode.</td>
+</tr>
+<tr>
+<td><code>--limit</code></td>
+<td><code>5</code></td>
+<td>Maximum results per section.</td>
+</tr>
+<tr>
+<td><code>--provider</code></td>
+<td><code>ollama</code></td>
+<td>LLM provider: <code>ollama</code>, <code>anthropic</code>, <code>openai</code>, or <code>gemini</code>.</td>
+</tr>
+<tr>
+<td><code>--model</code></td>
+<td></td>
+<td>Ollama chat model for llm mode.</td>
+</tr>
+<tr>
+<td><code>--embed-model</code></td>
+<td></td>
+<td>Ollama embed model.</td>
+</tr>
+<tr>
+<td><code>--ollama-url</code></td>
+<td>localhost</td>
+<td>Ollama base URL.</td>
+</tr>
+<tr>
+<td><code>--openai-url</code></td>
+<td></td>
+<td>OpenAI-compatible base URL including the version path.</td>
+</tr>
+<tr>
+<td><code>--feedback</code></td>
+<td><code>normal</code></td>
+<td>How hard votes move ranking: <code>off</code>, <code>low</code>, <code>normal</code>, <code>high</code>.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="environment-variables">Environment variables</h2>
+<p>Credentials are read only from the environment, never from flags, and are
+never logged or stored.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Used by</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>WHODAR_SLACK_TOKEN</code></td>
+<td>slack source, bot</td>
+<td>Bot token (<code>xoxb-</code>).</td>
+</tr>
+<tr>
+<td><code>WHODAR_SLACK_APP_TOKEN</code></td>
+<td>bot (socket)</td>
+<td>App-level token (<code>xapp-</code>).</td>
+</tr>
+<tr>
+<td><code>WHODAR_SLACK_SIGNING_SECRET</code></td>
+<td>bot (events)</td>
+<td>Request signature secret.</td>
+</tr>
+<tr>
+<td><code>WHODAR_GITHUB_TOKEN</code></td>
+<td>github source</td>
+<td>Personal access token.</td>
+</tr>
+<tr>
+<td><code>WHODAR_JIRA_URL</code></td>
+<td>jira source</td>
+<td>Site URL, e.g. <code>https://x.atlassian.net</code>.</td>
+</tr>
+<tr>
+<td><code>WHODAR_JIRA_EMAIL</code></td>
+<td>jira source</td>
+<td>Account email for basic auth.</td>
+</tr>
+<tr>
+<td><code>WHODAR_JIRA_TOKEN</code></td>
+<td>jira source</td>
+<td>API token.</td>
+</tr>
+<tr>
+<td><code>WHODAR_CONFLUENCE_URL</code></td>
+<td>confluence source</td>
+<td>Site URL; falls back to <code>WHODAR_JIRA_URL</code>.</td>
+</tr>
+<tr>
+<td><code>WHODAR_CONFLUENCE_EMAIL</code></td>
+<td>confluence source</td>
+<td>Account email; falls back to Jira's.</td>
+</tr>
+<tr>
+<td><code>WHODAR_CONFLUENCE_TOKEN</code></td>
+<td>confluence source</td>
+<td>API token; falls back to Jira's.</td>
+</tr>
+<tr>
+<td><code>WHODAR_PAGERDUTY_TOKEN</code></td>
+<td>pagerduty source</td>
+<td>Read-only API token.</td>
+</tr>
+<tr>
+<td><code>WHODAR_ANTHROPIC_KEY</code></td>
+<td>llm anthropic provider</td>
+<td>Claude API key.</td>
+</tr>
+<tr>
+<td><code>WHODAR_OPENAI_KEY</code></td>
+<td>llm openai provider</td>
+<td>OpenAI-compatible API key.</td>
+</tr>
+<tr>
+<td><code>WHODAR_GEMINI_KEY</code></td>
+<td>llm gemini provider</td>
+<td>Gemini API key.</td>
+</tr>
+<tr>
+<td><code>WHODAR_SERVE_TOKEN</code></td>
+<td>serve, demo</td>
+<td>Bearer token; required to bind beyond localhost.</td>
+</tr>
+<tr>
+<td><code>WHODAR_POLICY_FILE</code></td>
+<td>all commands</td>
+<td>Extra policy file; a locked <code>/etc/whodar/policy.json</code> overrides it.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="identity-aliases">Identity aliases</h2>
+<p>Handles that clearly belong to one person join automatically: a handle-only
+identifier such as <code>codeowners:carol-lee</code> or <code>github:carollee</code> merges with the
+one person whose name or email local-part flattens to the same string, so
+Carol Lee, carol-lee, and <a href="mailto:carol.lee@example.com">carol.lee@example.com</a> stay one entry. A handle matching
+nobody, or matching more than one person, stays separate.</p>
+<p>An alias file joins the rest, when neither email nor name can. The file maps
+a canonical identifier to its aliases:</p>
+<pre><code>{&quot;angela.malone@example.com&quot;: [&quot;github:angela-malone&quot;, &quot;codeowners:angela-malone&quot;]}
+</code></pre>
+<p>Pass it once with <code>index --aliases</code>; the mapping persists in the index and
+joins entries indexed before the file existed. Joined identifiers appear in
+answers under <code>identities</code>. See <code>examples/aliases.json</code>.</p>
+<h2 id="ranking">Ranking</h2>
+<p>Keyword scores weight rarer query terms higher, then cap and saturate each
+term's accumulated weight, so repeating a word in chat all day cannot outrank
+the person with the explicit topic, title, or ownership signal. People with
+far more indexed text than average are further discounted for verbosity.
+Recency decay and feedback votes then scale the result.</p>
+<p>A term that matches nothing falls back to fuzzy matching: the closest indexed
+term within one edit (four-letter terms and up) or two edits (seven and up)
+scores instead, at a penalty per edit so an exact match always outranks a
+corrected one. Corrected terms say so in the reasons, e.g. <code>terrafrom (topic, fuzzy)</code>.</p>
+<h2 id="recency">Recency</h2>
+<p>Dated records lose half their weight per half-life, 180 days by default, so
+today's owner outranks one from years ago. Tune with <code>--half-life-days</code> at
+index time; <code>0</code> disables decay. Undated sources (org chart, CODEOWNERS,
+on-call) describe the present and never decay.</p>
+<h2 id="policy">Policy</h2>
+<p>The egress policy decides what whodar may send to a model. <code>strict</code> (default)
+permits nothing beyond a local model server; non-local <code>--ollama-url</code> and
+<code>--openai-url</code> values and the cloud providers count as egress and are refused.
+<code>redacted</code> permits only the known provider hosts (<code>api.anthropic.com</code>,
+<code>api.openai.com</code>, <code>generativelanguage.googleapis.com</code>) and strips identifiers:
+the question goes out as typed,
+people leave as numbered roles (title, team, matched terms), channels leave as
+numbered matched terms with no names or topics, the model returns numbers, and
+the summary is written locally. <code>open</code> sends full candidate detail to any
+host. The policy does not gate indexing, which talks only to the sources you
+name with your tokens when you run <code>whodar index</code>, or the bot posting answers
+back to your Slack workspace.</p>
+<p>An organization can pin the policy with a locked file. A locked
+<code>/etc/whodar/policy.json</code> always wins: <code>WHODAR_POLICY_FILE</code> and <code>--policy</code> are
+then ignored. The lock constrains the installed binary for regular users; it
+is not a security boundary against an administrator. Private-channel ingest
+can be denied the same way. See <code>examples/policy.json</code>.</p>
+<h2 id="files">Files</h2>
+<p>Everything lives under <code>--data-dir</code> (default <code>~/.whodar</code>):</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>What it holds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>index.json</code></td>
+<td>The graph, postings, embeddings, and identity aliases.</td>
+</tr>
+<tr>
+<td><code>feedback.json</code></td>
+<td>User votes, kept apart so they survive re-indexing.  </td>
+</tr>
+</tbody>
+</table>
+
+			<div class="doc-foot">
+				<a class="dpn prev" href="/docs/connect"><span>← Previous</span><b>Connect your tools</b></a>
+				<a class="dpn next" href="/docs/architecture"><span>Next →</span><b>Architecture</b></a>
+			</div>
+		</article>
+	</main>
+	
+	<footer class="footer">
+		<div class="wrap footer-inner">
+			<a class="brand" href="/" aria-label="whodar · know who knows">
+				<svg class="brand-mark mark" aria-hidden="true"><use href="#radar"/></svg>
+				<span class="brand-lockup"><span class="brand-word">who<b>dar</b></span><span class="brand-tag">know who knows</span></span>
+			</a>
+			<nav>
+				<a href="/docs/">Docs</a>
+				<a href="https://github.com/dcadolph/whodar">GitHub</a>
+				<a href="/docs/reference">Reference</a>
+				<a href="https://github.com/dcadolph/whodar/releases">Releases</a>
+				<a href="mailto:hello@switchtender.com">Contact</a>
+			</nav>
+			<span class="foot-note">Open source under the GNU AGPL v3.0. Copyright 2026 dcadolph.</span>
+		</div>
+	</footer>
+	<script src="/app.js?v=4"></script>
+
+</body>
+</html>

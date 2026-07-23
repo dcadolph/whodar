@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Connect your tools · whodar docs</title>
+	<meta name="description" content="A recipe for every source whodar reads, plus the connect wizard.">
+	<meta property="og:title" content="Connect your tools · whodar">
+	<meta property="og:description" content="A recipe for every source whodar reads, plus the connect wizard.">
+	<meta property="og:type" content="article">
+	<link rel="canonical" href="https://whodar.dev/docs/connect">
+	
+	<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Ccircle cx='24' cy='24' r='20' fill='none' stroke='%2314233a' stroke-width='3'/%3E%3Ccircle cx='24' cy='19.5' r='3.6' fill='%2314233a'/%3E%3Cpath d='M18 31 C18 25 30 25 30 31 Z' fill='%2314233a'/%3E%3Cline x1='37.5' y1='10.5' x2='28' y2='16.5' stroke='%2334e5c5' stroke-width='3.4' stroke-linecap='round'/%3E%3C/svg%3E">
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+	<link rel="stylesheet" href="/styles.css?v=4">
+	<link rel="stylesheet" href="/docs.css?v=1">
+
+</head>
+<body class="docs">
+	
+	<div class="bg" aria-hidden="true"></div>
+	<div class="bg-grid" aria-hidden="true"></div>
+
+	<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+		<defs>
+			<symbol id="radar" viewBox="0 0 48 48">
+				<circle class="ring" cx="24" cy="24" r="20" fill="none" stroke-width="3"/>
+				<circle class="person" cx="24" cy="19.5" r="3.6"/>
+				<path class="person" d="M18 31 C18 25 30 25 30 31 Z"/>
+				<line class="beam" x1="37.5" y1="10.5" x2="28" y2="16.5" stroke-width="3.4" stroke-linecap="round"/>
+			</symbol>
+		</defs>
+	</svg>
+
+	<header class="nav scrolled" id="nav">
+		<div class="wrap nav-inner">
+			<div class="menu" id="menu">
+				<button class="menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false" aria-controls="menu-drawer">
+					<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+				</button>
+				<div class="menu-drawer" id="menu-drawer" hidden>
+					<a class="mi" href="/docs/">
+						<svg class="mi-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/></svg>
+						<span><b>Docs</b><em>Guides and reference</em></span>
+					</a>
+					<a class="mi" href="https://github.com/dcadolph/whodar" target="_blank" rel="noopener">
+						<svg class="mi-ic octo" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+						<span><b>GitHub</b><em>Source, issues, releases</em></span>
+					</a>
+					<a class="mi" href="mailto:hello@switchtender.com">
+						<svg class="mi-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+						<span><b>Say hello</b><em>hello@switchtender.com</em></span>
+					</a>
+				</div>
+			</div>
+			<a class="brand" href="/" aria-label="whodar · know who knows">
+				<svg class="brand-mark mark" aria-hidden="true"><use href="#radar"/></svg>
+				<span class="brand-lockup"><span class="brand-word">who<b>dar</b></span><span class="brand-tag">know who knows</span></span>
+			</a>
+			<nav class="nav-links">
+				<a href="/#surfaces">Surfaces</a>
+				<a href="/#how">Pipeline</a>
+				<a href="/#privacy">Privacy</a>
+				<a href="/#modes">Ranking</a>
+				<a href="/docs/" class="on">Docs</a>
+				<a href="/#start">Install</a>
+			</nav>
+			<div class="nav-cta">
+				<a class="gh" href="https://github.com/dcadolph/whodar" target="_blank" rel="noopener" aria-label="whodar on GitHub">
+					<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+				</a>
+				<a class="btn" href="/#start">Get started</a>
+			</div>
+			<button class="nav-toggle" id="nav-toggle" aria-label="Menu">
+				<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="7" x2="21" y2="7"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="17" x2="21" y2="17"/></svg>
+			</button>
+		</div>
+	</header>
+
+	<main class="wrap doc-main">
+		<aside class="doc-side">
+			<div class="doc-side-h"><a href="/docs/">Documentation</a></div>
+			<nav><a href="/docs/getting-started">Getting started</a><a href="/docs/connect" class="on" aria-current="page">Connect your tools</a><a href="/docs/reference">Reference</a><a href="/docs/architecture">Architecture</a><a href="/docs/deploy">Deploying</a><a href="/docs/digest">Personal digest</a><a href="/docs/roadmap">Roadmap</a><a href="/docs/contributing">Contributing</a></nav>
+		</aside>
+		<article class="doc">
+<h1 id="connect-your-tools">Connect your tools</h1>
+<p>A copy-paste recipe for every source whodar can read. Each one is self-contained:
+what you get, the exact credential to create, the command to run, how to verify it
+worked, and the fixes for the errors you are most likely to hit.</p>
+<p>New to whodar? Read <a href="/docs/getting-started">GETTING_STARTED.md</a> first for the big
+picture, then come back here to wire in each tool.</p>
+<h2 id="the-pattern">The pattern</h2>
+<p>Every source works the same way. You index it, then you ask.</p>
+<pre><code>whodar index --source SOURCE [scope flags] --merge
+whodar ask &quot;who owns billing retries&quot;
+</code></pre>
+<p>Three things hold for all of them:</p>
+<ul>
+<li><strong><code>--merge</code> adds a source onto what you already have.</strong> Leave it off only on the
+first source, when you want a clean index. People join across every source by
+email, so one human stays one entry.</li>
+<li><strong>Credentials are read only from the environment, never a flag.</strong> Nothing is
+logged, and no token is written to disk. The index itself lives at
+<code>~/.whodar/index.json</code>, created readable only by you (mode <code>0600</code>), and is never
+uploaded. Everything whodar learns about your coworkers stays on your machine,
+so you can wire it into work tools and keep that data private.</li>
+<li><strong>Verify the same way every time.</strong> After any index, run a <code>whodar ask</code> and look
+for the people you expect. <code>whodar serve</code> opens the same data in a browser.</li>
+</ul>
+<p>A good order is org chart first, then everything else merged on top:</p>
+<pre><code>whodar index --source org-csv --file people.csv
+whodar index --source slack --merge
+whodar index --source github --github-org your-org --merge
+</code></pre>
+<h2 id="the-guided-way-whodar-connect">The guided way: <code>whodar connect</code></h2>
+<p>Rather be walked through it? <code>whodar connect</code> is an interactive wizard that does
+everything on this page for you, one source at a time. It explains the source,
+shows how to create the credential, reads the token without echoing it, validates
+it against the API before indexing, runs the first index, and prints the <code>export</code>
+line to save.</p>
+<pre><code>whodar connect            # menu of every source, marked configured or not
+whodar connect slack      # set up one source
+whodar connect --status   # report what is configured, without prompting
+</code></pre>
+<p>connect keeps the same privacy promise as everything else. The token you type is
+held in memory for that one run, never written to disk and never logged. connect
+prints the <code>export</code> line for you to add to your shell profile; it never edits your
+dotfiles for you. It needs a terminal, so scripts and CI keep using <code>whodar index</code>
+directly.</p>
+<p>The rest of this page is the reference connect automates, and the copy-paste path
+for when you would rather not use the wizard.</p>
+<h2 id="no-credentials-needed">No credentials needed</h2>
+<p>Start here. These read files or local clones and need no tokens.</p>
+<h3 id="org-chart-csv">Org chart (CSV)</h3>
+<p>What you get: the backbone of the graph. Names, titles, teams, and topics that
+every other source joins onto by email.</p>
+<pre><code>whodar index --source org-csv --file people.csv
+</code></pre>
+<p>The CSV needs a header row. Column order does not matter and names are matched
+loosely, so <code>Job Title</code> and <code>role</code> both map to title. A minimal file:</p>
+<pre><code>name,email,title,team,topics
+Angela Malone,angela@corp.com,Staff Engineer,Payments,billing;retries
+</code></pre>
+<p>Recognized columns: <code>name</code>, <code>email</code>, <code>title</code>, <code>team</code>, <code>org</code>, <code>manager</code>, and
+<code>topics</code> (semicolon-separated). A row needs at least a name or an email. See the
+full column table in <a href="/docs/getting-started#index-your-own-org-chart">GETTING_STARTED.md</a>.</p>
+<p>Verify:</p>
+<pre><code>whodar ask --pretty &quot;who do I talk to about billing retries&quot;
+</code></pre>
+<h3 id="codeowners">CODEOWNERS</h3>
+<p>What you get: who owns which paths, straight from a repository's CODEOWNERS file.</p>
+<pre><code>whodar index --source codeowners --file ~/src/your-repo --merge
+</code></pre>
+<p>Point <code>--file</code> at a repo root or directly at a CODEOWNERS file. Owners that are
+GitHub handles join real people through the <a href="/docs/reference#identity-aliases">alias file</a>.</p>
+<h3 id="git-history">Git history</h3>
+<p>What you get: who actually commits to what. Reads local clones directly, so it
+works for any repo you can clone, including ones with no CODEOWNERS.</p>
+<pre><code>whodar index --source git --repo-path ~/src/billing --repo-path ~/src/infra --merge
+</code></pre>
+<p>Each author gets the topics of the paths they touch, weighted by how often. Authors
+join other sources by their commit email. Bot accounts like dependabot are skipped.
+<code>--git-since-days</code> bounds the window (default 365) and <code>--max-commits</code> caps each repo
+(default 2000).</p>
+<h2 id="slack-index----5-minutes">Slack (index)  ·  5 minutes</h2>
+<p>What you get: the strongest single source. Which channels exist, what they are
+about, and who is active on each topic.</p>
+<p><strong>1. Create the app.</strong> Go to <a href="https://api.slack.com/apps">https://api.slack.com/apps</a>, choose <strong>Create New App</strong>,
+then <strong>From scratch</strong>, and pick your workspace.</p>
+<p><strong>2. Add bot scopes.</strong> Open <strong>OAuth &amp; Permissions</strong>. Under <strong>Bot Token Scopes</strong> add:</p>
+<pre><code>channels:read      channels:history      users:read      users:read.email
+</code></pre>
+<p>To index private channels too, also add <code>groups:read</code> and <code>groups:history</code>.</p>
+<p><strong>3. Install and copy the token.</strong> Click <strong>Install to Workspace</strong>, then copy the
+<strong>Bot User OAuth Token</strong>. It starts with <code>xoxb-</code>.</p>
+<p><strong>4. Connect:</strong></p>
+<pre><code>export WHODAR_SLACK_TOKEN=xoxb-your-token
+whodar index --source slack --merge
+</code></pre>
+<p>A bot only reads channels it has joined, so invite it to the ones that matter:
+<code>/invite @whodar</code>. Unreadable channels are skipped with a warning, never fatal.</p>
+<p>Tune the depth (defaults: public channels, last 180 days, 5000 messages per channel):</p>
+<pre><code>whodar index --source slack --merge --since-days 90 --max-messages 2000
+whodar index --source slack --merge --include-private
+</code></pre>
+<p>Verify:</p>
+<pre><code>whodar ask &quot;who owns billing retries&quot;
+</code></pre>
+<p>Common fixes:</p>
+<table>
+<thead>
+<tr>
+<th>Error</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>api error: invalid_auth</code></td>
+<td>Token is wrong or missing a scope. Recreate it with the four scopes above and re-export.</td>
+</tr>
+<tr>
+<td>A channel you expected is missing</td>
+<td>Invite the bot: <code>/invite @whodar</code> in that channel.</td>
+</tr>
+<tr>
+<td>Private channels not showing</td>
+<td>Add <code>groups:read</code> + <code>groups:history</code>, then <code>--include-private</code>. Denied if org policy pins <code>private_channels: deny</code>.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="github----5-minutes">GitHub  ·  5 minutes</h2>
+<p>What you get: contributors, PR authors, reviewers, assignees, labels and titles,
+issues, repo topics, and CODEOWNERS, weighted by how much each person works on a topic.</p>
+<p><strong>1. Create a token.</strong> Go to <a href="https://github.com/settings/tokens">https://github.com/settings/tokens</a> and create a token
+with read access to the repositories you want. A classic token needs the <code>repo</code>
+scope; a fine-grained token needs <strong>Read-only</strong> on <strong>Contents</strong>, <strong>Metadata</strong>,
+<strong>Pull requests</strong>, and <strong>Issues</strong> for the target repos. Copy it (<code>ghp_...</code> or
+<code>github_pat_...</code>).</p>
+<p><strong>2. Connect</strong> a single repo, or a whole org:</p>
+<pre><code>export WHODAR_GITHUB_TOKEN=ghp_your-token
+whodar index --source github --repo your-org/your-repo --merge
+whodar index --source github --github-org your-org --github-emails --merge
+</code></pre>
+<p><code>--repo</code> is repeatable. <code>--github-org</code> indexes every repo in the org; cap it with
+<code>--max-repos N</code>. <code>--github-emails</code> resolves user emails so GitHub people merge with
+Slack and the org chart.</p>
+<p>Verify:</p>
+<pre><code>whodar ask &quot;who knows the payments service&quot;
+</code></pre>
+<p>Common fixes:</p>
+<table>
+<thead>
+<tr>
+<th>Error</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>401</code> / <code>Bad credentials</code></td>
+<td>Token is wrong or expired. Recreate and re-export.</td>
+</tr>
+<tr>
+<td><code>404</code> on a private repo</td>
+<td>Token lacks read access to it. Add the repo (fine-grained) or the <code>repo</code> scope (classic).</td>
+</tr>
+<tr>
+<td>People show as handles</td>
+<td>Add <code>--github-emails</code>, or join handles with an <a href="/docs/reference#identity-aliases">alias file</a>.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="jira----5-minutes">Jira  ·  5 minutes</h2>
+<p>What you get: issue assignees and reporters, weighted by components, labels, summary
+words, and project.</p>
+<p><strong>1. Create an API token.</strong> Go to <a href="https://id.atlassian.com/manage-profile/security/api-tokens">https://id.atlassian.com/manage-profile/security/api-tokens</a>,
+click <strong>Create API token</strong>, and copy it.</p>
+<p><strong>2. Connect.</strong> Jira uses your site URL, your account email, and the token:</p>
+<pre><code>export WHODAR_JIRA_URL=https://your-site.atlassian.net
+export WHODAR_JIRA_EMAIL=you@example.com
+export WHODAR_JIRA_TOKEN=your-api-token
+whodar index --source jira --jira-project SEC --jira-project OPS --merge
+</code></pre>
+<p><code>--jira-project</code> is repeatable. For anything more specific, use <code>--jira-jql</code> with a
+raw JQL query. <code>--max-issues</code> caps how many issues are read (default 1000).</p>
+<p>Verify:</p>
+<pre><code>whodar ask &quot;who works on the OPS project&quot;
+</code></pre>
+<p>Common fixes:</p>
+<table>
+<thead>
+<tr>
+<th>Error</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>401</code> / <code>403</code></td>
+<td>Check <code>WHODAR_JIRA_EMAIL</code> matches the account that owns the token, and the URL has no trailing path.</td>
+</tr>
+<tr>
+<td>No people returned</td>
+<td>The project key is wrong or you lack access. Confirm the key in Jira and try <code>--jira-jql</code>.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="confluence----2-minutes-if-jira-is-already-set-up">Confluence  ·  2 minutes (if Jira is already set up)</h2>
+<p>What you get: page creators and last editors, weighted by labels, title words, and space.</p>
+<p>Confluence uses the <strong>same Atlassian site and token as Jira</strong>, so if you set up Jira
+above, the credentials already work:</p>
+<pre><code>whodar index --source confluence --confluence-space ENG --confluence-space OPS --merge
+</code></pre>
+<p>To use a different site or token, set the Confluence-specific variables (they fall
+back to the Jira ones when unset):</p>
+<pre><code>export WHODAR_CONFLUENCE_URL=https://your-site.atlassian.net
+export WHODAR_CONFLUENCE_EMAIL=you@example.com
+export WHODAR_CONFLUENCE_TOKEN=your-api-token
+</code></pre>
+<p><code>--confluence-space</code> is repeatable. Use <code>--confluence-cql</code> for a raw CQL query, and
+<code>--max-pages</code> to cap pages read (default 2000).</p>
+<p>Verify:</p>
+<pre><code>whodar ask &quot;who wrote the onboarding docs&quot;
+</code></pre>
+<h2 id="pagerduty----2-minutes">PagerDuty  ·  2 minutes</h2>
+<p>What you get: every service and the people currently on call, so each on-call person
+gets the topics of the services they answer for. This source describes the present,
+so it never decays.</p>
+<p><strong>1. Create a token.</strong> In PagerDuty, go to <strong>Integrations &gt; API Access Keys</strong> and
+create a read-only API key.</p>
+<p><strong>2. Connect:</strong></p>
+<pre><code>export WHODAR_PAGERDUTY_TOKEN=your-api-token
+whodar index --source pagerduty --merge
+</code></pre>
+<p>Verify:</p>
+<pre><code>whodar ask &quot;who is on call for search&quot;
+</code></pre>
+<h2 id="slack-bot----let-your-team-ask-from-slack">Slack bot  ·  let your team ask from Slack</h2>
+<p>Once the index is built, run the bot so teammates can ask whodar in Slack directly,
+by mentioning it, sending a direct message, or using <code>/whodar</code>. This is separate from
+indexing Slack: it needs a few more scopes on the same app.</p>
+<p><strong>1. Add bot scopes.</strong> On top of the read scopes above, add:</p>
+<pre><code>chat:write      app_mentions:read      im:history      im:read
+</code></pre>
+<p><strong>2. Subscribe to events.</strong> Under <strong>Event Subscriptions</strong>, subscribe the bot to
+<code>app_mention</code> and <code>message.im</code>.</p>
+<p><strong>3. Add the slash command (optional).</strong> Under <strong>Slash Commands</strong>, create <code>/whodar</code>.
+Over Socket Mode the request URL can be any placeholder; over the Events API, point it
+at <code>https://your-host/slack/commands</code>.</p>
+<p><strong>4. Run it.</strong> Pick a transport.</p>
+<p>Socket Mode needs no public URL, best for a laptop or internal host. Enable Socket
+Mode, create an app-level token (<code>xapp-</code>) with the <code>connections:write</code> scope, then:</p>
+<pre><code>export WHODAR_SLACK_TOKEN=xoxb-...
+export WHODAR_SLACK_APP_TOKEN=xapp-...
+whodar bot --transport socket
+</code></pre>
+<p>Events API serves a public HTTP endpoint, best for a hosted deployment. Point the
+Slack request URL at <code>https://your-host/slack/events</code>, then:</p>
+<pre><code>export WHODAR_SLACK_TOKEN=xoxb-...
+export WHODAR_SLACK_SIGNING_SECRET=...
+whodar bot --transport events --addr 0.0.0.0:8766
+</code></pre>
+<p>In Slack, <code>--llm</code> or <code>--keyword</code> at the end of a message picks the mode for that one
+answer. See <a href="/docs/getting-started#slack-bot">GETTING_STARTED.md</a> for the answer-mode and
+rate-limit details.</p>
+<h2 id="microsoft-teams">Microsoft Teams</h2>
+<p>On the roadmap, not yet available. whodar has no Teams connector today. If you want it,
+open an issue so it gets prioritized. In the meantime, the Slack bot and the web UI
+cover the same ask-from-chat need.</p>
+<h2 id="connect-everything">Connect everything</h2>
+<p>A full internal setup, org chart first, then every tool merged onto it:</p>
+<pre><code>export WHODAR_SLACK_TOKEN=xoxb-...
+export WHODAR_GITHUB_TOKEN=ghp_...
+export WHODAR_JIRA_URL=https://your-site.atlassian.net
+export WHODAR_JIRA_EMAIL=you@example.com
+export WHODAR_JIRA_TOKEN=...
+export WHODAR_PAGERDUTY_TOKEN=...
+
+whodar index --source org-csv --file people.csv
+whodar index --source slack      --merge
+whodar index --source github     --github-org your-org --github-emails --merge
+whodar index --source jira       --jira-project ENG --merge
+whodar index --source confluence --confluence-space ENG --merge
+whodar index --source pagerduty  --merge
+whodar index --source git        --repo-path ~/src/billing --merge
+
+whodar ask &quot;who knows the billing service&quot;
+whodar serve
+</code></pre>
+<p>Each run prints what joined and left since the last index, like <code>+3 people, -1 people, +1 channels</code>. Re-running any single source with <code>--merge</code> refreshes just that slice.</p>
+<h2 id="where-to-go-next">Where to go next</h2>
+<ul>
+<li><a href="/docs/reference">REFERENCE.md</a>: every command, flag, and environment variable.</li>
+<li><a href="/docs/getting-started">GETTING_STARTED.md</a>: the narrative walkthrough, ask modes,
+the web UI, MCP, and organization policy.</li>
+<li>Joining one person across sources: <a href="/docs/reference#identity-aliases">identity aliases</a>.</li>
+</ul>
+
+			<div class="doc-foot">
+				<a class="dpn prev" href="/docs/getting-started"><span>← Previous</span><b>Getting started</b></a>
+				<a class="dpn next" href="/docs/reference"><span>Next →</span><b>Reference</b></a>
+			</div>
+		</article>
+	</main>
+	
+	<footer class="footer">
+		<div class="wrap footer-inner">
+			<a class="brand" href="/" aria-label="whodar · know who knows">
+				<svg class="brand-mark mark" aria-hidden="true"><use href="#radar"/></svg>
+				<span class="brand-lockup"><span class="brand-word">who<b>dar</b></span><span class="brand-tag">know who knows</span></span>
+			</a>
+			<nav>
+				<a href="/docs/">Docs</a>
+				<a href="https://github.com/dcadolph/whodar">GitHub</a>
+				<a href="/docs/reference">Reference</a>
+				<a href="https://github.com/dcadolph/whodar/releases">Releases</a>
+				<a href="mailto:hello@switchtender.com">Contact</a>
+			</nav>
+			<span class="foot-note">Open source under the GNU AGPL v3.0. Copyright 2026 dcadolph.</span>
+		</div>
+	</footer>
+	<script src="/app.js?v=4"></script>
+
+</body>
+</html>
