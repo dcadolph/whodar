@@ -255,8 +255,8 @@ h1 .sig { color: var(--signal); text-shadow: 0 0 28px rgba(52, 229, 197, 0.4); }
 
 /* Sections */
 .section { padding: 96px 24px; }
-.sec-head { max-width: 680px; margin: 0 auto 54px; }
-.sec-head.mid { text-align: center; }
+.sec-head { max-width: 680px; margin: 0 0 54px; }
+.sec-head.mid { text-align: center; margin-inline: auto; }
 .sec-eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--signal); display: block; margin-bottom: 16px; }
 .sec-eyebrow .n { color: var(--muted); }
 .sec-head h2 { font-family: var(--disp); font-weight: 800; letter-spacing: -0.015em; font-size: clamp(28px, 4.2vw, 44px); line-height: 1.16; text-wrap: balance; }
