@@ -92,6 +92,8 @@ func docList(root string) []Doc {
 			"From nothing to a working setup: install, index a source, and ask."},
 		{filepath.Join(root, "docs", "CONNECT.md"), "connect", "Connect your tools",
 			"A recipe for every source whodar reads, plus the connect wizard."},
+		{filepath.Join(root, "docs", "PRIVACY.md"), "privacy", "Privacy and encryption",
+			"Where your data lives, encrypting the index at rest, and what a model sees."},
 		{filepath.Join(root, "docs", "REFERENCE.md"), "reference", "Reference",
 			"Every command, flag, source, and environment variable."},
 		{filepath.Join(root, "docs", "ARCHITECTURE.md"), "architecture", "Architecture",

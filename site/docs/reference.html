@@ -82,7 +82,7 @@
 	<main class="wrap doc-main">
 		<aside class="doc-side">
 			<div class="doc-side-h"><a href="/docs/">Documentation</a></div>
-			<nav><a href="/docs/getting-started">Getting started</a><a href="/docs/connect">Connect your tools</a><a href="/docs/reference" class="on" aria-current="page">Reference</a><a href="/docs/architecture">Architecture</a><a href="/docs/deploy">Deploying</a><a href="/docs/digest">Personal digest</a><a href="/docs/roadmap">Roadmap</a><a href="/docs/contributing">Contributing</a></nav>
+			<nav><a href="/docs/getting-started">Getting started</a><a href="/docs/connect">Connect your tools</a><a href="/docs/privacy">Privacy and encryption</a><a href="/docs/reference" class="on" aria-current="page">Reference</a><a href="/docs/architecture">Architecture</a><a href="/docs/deploy">Deploying</a><a href="/docs/digest">Personal digest</a><a href="/docs/roadmap">Roadmap</a><a href="/docs/contributing">Contributing</a></nav>
 		</aside>
 		<article class="doc">
 <h1 id="reference">Reference</h1>
@@ -381,6 +381,18 @@ connect needs a terminal; scripts use <code>whodar index</code>.</p>
 <p>With no argument it shows a menu of every source, marked configured or not. With a
 source (<code>org-csv</code>, <code>codeowners</code>, <code>git</code>, <code>slack</code>, <code>github</code>, <code>jira</code>, <code>confluence</code>, or
 <code>pagerduty</code>) it sets up just that one.</p>
+<h2 id="whodar-vault">whodar vault</h2>
+<p>Encrypts the on-disk index at rest so a stolen disk or a stray backup cannot read
+your people graph. Encryption turns on whenever a key is configured, through
+<code>WHODAR_INDEX_KEY</code> (a base64 32-byte key) or <code>WHODAR_INDEX_PASSPHRASE</code>.</p>
+<pre><code>whodar vault keygen     # print a fresh key as an export line
+whodar vault status     # report the key and whether the index is encrypted
+whodar vault encrypt    # encrypt an existing plain index in place
+whodar vault decrypt    # rewrite the index back to plain JSON
+</code></pre>
+<p>With a key set, every <code>whodar index</code> write is encrypted and every read decrypts.
+Reading an encrypted index without the key fails rather than exposing anything. See
+<a href="/docs/privacy">PRIVACY.md</a> for the full model.</p>
 <h2 id="whodar-ask">whodar ask</h2>
 <p>Answers a question from the index.</p>
 <pre><code>whodar ask [flags] QUESTION
@@ -742,6 +754,16 @@ never logged or stored.</p>
 <td>all commands</td>
 <td>Extra policy file; a locked <code>/etc/whodar/policy.json</code> overrides it.</td>
 </tr>
+<tr>
+<td><code>WHODAR_INDEX_KEY</code></td>
+<td>index encryption</td>
+<td>Base64 32-byte key that enables at-rest encryption.</td>
+</tr>
+<tr>
+<td><code>WHODAR_INDEX_PASSPHRASE</code></td>
+<td>index encryption</td>
+<td>Passphrase for at-rest encryption; prompted if unset on a terminal.</td>
+</tr>
 </tbody>
 </table>
 <h2 id="identity-aliases">Identity aliases</h2>
@@ -812,7 +834,7 @@ can be denied the same way. See <code>examples/policy.json</code>.</p>
 </table>
 
 			<div class="doc-foot">
-				<a class="dpn prev" href="/docs/connect"><span>← Previous</span><b>Connect your tools</b></a>
+				<a class="dpn prev" href="/docs/privacy"><span>← Previous</span><b>Privacy and encryption</b></a>
 				<a class="dpn next" href="/docs/architecture"><span>Next →</span><b>Architecture</b></a>
 			</div>
 		</article>

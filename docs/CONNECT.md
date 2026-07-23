@@ -23,7 +23,8 @@ Three things hold for all of them:
   logged, and no token is written to disk. The index itself lives at
   `~/.whodar/index.json`, created readable only by you (mode `0600`), and is never
   uploaded. Everything whodar learns about your coworkers stays on your machine,
-  so you can wire it into work tools and keep that data private.
+  so you can wire it into work tools and keep that data private. Encrypt the index
+  at rest with a key; see [PRIVACY.md](PRIVACY.md).
 - **Verify the same way every time.** After any index, run a `whodar ask` and look
   for the people you expect. `whodar serve` opens the same data in a browser.
 

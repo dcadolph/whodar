@@ -3,12 +3,12 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>Deploying · whodar docs</title>
-	<meta name="description" content="Run the web app and the Slack bot as long-running services.">
-	<meta property="og:title" content="Deploying · whodar">
-	<meta property="og:description" content="Run the web app and the Slack bot as long-running services.">
+	<title>Privacy and encryption · whodar docs</title>
+	<meta name="description" content="Where your data lives, encrypting the index at rest, and what a model sees.">
+	<meta property="og:title" content="Privacy and encryption · whodar">
+	<meta property="og:description" content="Where your data lives, encrypting the index at rest, and what a model sees.">
 	<meta property="og:type" content="article">
-	<link rel="canonical" href="https://whodar.dev/docs/deploy">
+	<link rel="canonical" href="https://whodar.dev/docs/privacy">
 	
 	<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Ccircle cx='24' cy='24' r='20' fill='none' stroke='%2314233a' stroke-width='3'/%3E%3Ccircle cx='24' cy='19.5' r='3.6' fill='%2314233a'/%3E%3Cpath d='M18 31 C18 25 30 25 30 31 Z' fill='%2314233a'/%3E%3Cline x1='37.5' y1='10.5' x2='28' y2='16.5' stroke='%2334e5c5' stroke-width='3.4' stroke-linecap='round'/%3E%3C/svg%3E">
 	<link rel="preconnect" href="https://fonts.googleapis.com">
@@ -82,50 +82,89 @@
 	<main class="wrap doc-main">
 		<aside class="doc-side">
 			<div class="doc-side-h"><a href="/docs/">Documentation</a></div>
-			<nav><a href="/docs/getting-started">Getting started</a><a href="/docs/connect">Connect your tools</a><a href="/docs/privacy">Privacy and encryption</a><a href="/docs/reference">Reference</a><a href="/docs/architecture">Architecture</a><a href="/docs/deploy" class="on" aria-current="page">Deploying</a><a href="/docs/digest">Personal digest</a><a href="/docs/roadmap">Roadmap</a><a href="/docs/contributing">Contributing</a></nav>
+			<nav><a href="/docs/getting-started">Getting started</a><a href="/docs/connect">Connect your tools</a><a href="/docs/privacy" class="on" aria-current="page">Privacy and encryption</a><a href="/docs/reference">Reference</a><a href="/docs/architecture">Architecture</a><a href="/docs/deploy">Deploying</a><a href="/docs/digest">Personal digest</a><a href="/docs/roadmap">Roadmap</a><a href="/docs/contributing">Contributing</a></nav>
 		</aside>
 		<article class="doc">
-<h1 id="deploying-whodar">Deploying whodar</h1>
-<p>whodar is a single binary. The web UI and the Slack bot are long-running; the CLI
-and indexing are one-shot. Build the index first, then run a frontend against it.</p>
-<h2 id="docker">Docker</h2>
-<p>Build the image:</p>
-<pre><code>docker build -t whodar .
+<h1 id="privacy-and-encryption">Privacy and encryption</h1>
+<p>whodar treats the people graph it builds as sensitive by construction. It runs on
+your machine, keeps the index on your disk, can encrypt that index at rest, and
+controls exactly what any AI model is allowed to see. This page collects those
+guarantees in one place.</p>
+<h2 id="where-your-data-lives">Where your data lives</h2>
+<ul>
+<li>The index lives at <code>~/.whodar/index.json</code>, on your machine, created readable only
+by you (mode <code>0600</code>). It is never uploaded.</li>
+<li>Credentials are read only from the environment, never from a flag. No token is
+written to disk and nothing is logged.</li>
+<li>Indexing talks only to the sources you name, with your own tokens.</li>
+</ul>
+<h2 id="encrypt-the-index-at-rest">Encrypt the index at rest</h2>
+<p>File permissions alone do not protect the index from a stolen disk, a stray backup,
+or another process running as you. Configure a key and whodar encrypts the index on
+every write and decrypts it on every read.</p>
+<p>Two ways to supply the key:</p>
+<pre><code># a base64 32-byte key, best for automation and servers
+export WHODAR_INDEX_KEY=$(whodar vault keygen | sed 's/^export [^=]*=//')
+
+# or a passphrase, prompted if unset when you run on a terminal
+export WHODAR_INDEX_PASSPHRASE='a long passphrase'
 </code></pre>
-<p>The image serves the web UI by default. Serving beyond localhost requires
-WHODAR_SERVE_TOKEN: the server refuses to start without it, and every request
-must carry the token as an Authorization bearer header or a token query
-parameter, which sets a session cookie for the browser. Generate a long random
-value, for example <code>openssl rand -hex 24</code>.</p>
-<p>Mount a data directory that holds a prebuilt index, or run the index command
-against the same volume first:</p>
-<pre><code>docker run --rm -p 8765:8765 -v whodar-data:/data \
-  -e WHODAR_SERVE_TOKEN=change-me \
-  whodar serve --addr 0.0.0.0:8765 --data-dir /data
+<p>With a key set, <code>whodar index</code> writes an encrypted file and every read decrypts it.
+The contents are sealed with AES-256-GCM, which authenticates the data so tampering
+is detected. A passphrase is stretched into a key with Argon2id and a per-file salt.</p>
+<p>Manage it with the <code>vault</code> command:</p>
+<pre><code>whodar vault keygen     # print a fresh export line to save
+whodar vault status     # is a key configured, is the index encrypted
+whodar vault encrypt    # encrypt an existing plain index in place
+whodar vault decrypt    # rewrite it back to plain JSON
 </code></pre>
-<p>Then open http://host:8765/?token=change-me once; the session cookie carries
-the rest. The token gates access, not transport: put TLS in front of the
-container for anything beyond a trusted network.</p>
-<p>For the Slack bot, run the bot subcommand instead and pass the tokens as
-environment variables.</p>
-<h2 id="systemd-slack-bot">systemd (Slack bot)</h2>
-<p>Install the binary at /usr/local/bin/whodar and build the index into
-/var/lib/whodar. Put the tokens in /etc/whodar/bot.env with mode 0600:</p>
-<pre><code>WHODAR_SLACK_TOKEN=xoxb-...
-WHODAR_SLACK_APP_TOKEN=xapp-...
-</code></pre>
-<p>Install the unit from deploy/whodar-bot.service, then enable it:</p>
-<pre><code>systemctl enable --now whodar-bot
-</code></pre>
-<p>The unit runs as a dedicated user, restarts on failure, and restricts filesystem
-access to the data directory.</p>
-<h2 id="organization-policy">Organization policy</h2>
-<p>To lock a managed deployment to strict egress, place a locked policy at
-/etc/whodar/policy.json. See docs/GETTING_STARTED.md for the format.</p>
+<p>Two things to know:</p>
+<ul>
+<li>Reading an encrypted index without the key fails cleanly. Nothing is exposed. On a
+terminal whodar prompts for the passphrase; in a script it points at the key
+variables and stops.</li>
+<li>The key is the only way back in. Losing it makes an encrypted index unrecoverable,
+so store it as carefully as any other secret and keep a backup.</li>
+</ul>
+<h2 id="control-what-a-model-sees">Control what a model sees</h2>
+<p>Answers are computed locally by default. When you opt into an AI model, an egress
+policy governs exactly what leaves the machine. The default is strict, and an
+administrator can pin the policy in a file that user flags and environment variables
+cannot loosen.</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>What leaves the machine</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>strict</code></td>
+<td>Nothing. Only the keyword engine and a local model are allowed.</td>
+</tr>
+<tr>
+<td><code>redacted</code></td>
+<td>The question and anonymized numbered candidates: title, team, and matched terms. Never names, emails, channel names, or message text. whodar re-maps the numbers to real people locally.</td>
+</tr>
+<tr>
+<td><code>open</code></td>
+<td>Full candidate detail, for teams that accept it and choose their own model.</td>
+</tr>
+</tbody>
+</table>
+<p>Local models through Ollama need no opt-in, since they run on hardware you control.
+Cloud models (Claude, Gemini, OpenAI) run only when you turn them on and only to
+their known hosts.</p>
+<h2 id="on-the-roadmap">On the roadmap</h2>
+<p>The <a href="/docs/roadmap">roadmap</a> carries this further: separating identities from ranking
+signal so redaction becomes structural rather than a filter, and a zero-knowledge
+design for the planned hosted tier so a managed whodar could store only ciphertext it
+cannot read.</p>
 
 			<div class="doc-foot">
-				<a class="dpn prev" href="/docs/architecture"><span>← Previous</span><b>Architecture</b></a>
-				<a class="dpn next" href="/docs/digest"><span>Next →</span><b>Personal digest</b></a>
+				<a class="dpn prev" href="/docs/connect"><span>← Previous</span><b>Connect your tools</b></a>
+				<a class="dpn next" href="/docs/reference"><span>Next →</span><b>Reference</b></a>
 			</div>
 		</article>
 	</main>

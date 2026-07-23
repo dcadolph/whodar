@@ -86,6 +86,21 @@ With no argument it shows a menu of every source, marked configured or not. With
 source (`org-csv`, `codeowners`, `git`, `slack`, `github`, `jira`, `confluence`, or
 `pagerduty`) it sets up just that one.
 
+## whodar vault
+
+Encrypts the on-disk index at rest so a stolen disk or a stray backup cannot read
+your people graph. Encryption turns on whenever a key is configured, through
+`WHODAR_INDEX_KEY` (a base64 32-byte key) or `WHODAR_INDEX_PASSPHRASE`.
+
+    whodar vault keygen     # print a fresh key as an export line
+    whodar vault status     # report the key and whether the index is encrypted
+    whodar vault encrypt    # encrypt an existing plain index in place
+    whodar vault decrypt    # rewrite the index back to plain JSON
+
+With a key set, every `whodar index` write is encrypted and every read decrypts.
+Reading an encrypted index without the key fails rather than exposing anything. See
+[PRIVACY.md](PRIVACY.md) for the full model.
+
 ## whodar ask
 
 Answers a question from the index.
@@ -231,6 +246,8 @@ never logged or stored.
 | `WHODAR_GEMINI_KEY`           | llm gemini provider    | Gemini API key.                       |
 | `WHODAR_SERVE_TOKEN`          | serve, demo        | Bearer token; required to bind beyond localhost. |
 | `WHODAR_POLICY_FILE`          | all commands       | Extra policy file; a locked `/etc/whodar/policy.json` overrides it. |
+| `WHODAR_INDEX_KEY`            | index encryption   | Base64 32-byte key that enables at-rest encryption. |
+| `WHODAR_INDEX_PASSPHRASE`     | index encryption   | Passphrase for at-rest encryption; prompted if unset on a terminal. |
 
 ## Identity aliases
 

@@ -304,6 +304,7 @@
 				<p>Indexed work data is sensitive, so whodar controls what a model can see. The default is strict: answers are computed locally and nothing is sent anywhere.</p>
 				<ul class="plist">
 					<li><b>Local by default.</b> Keyword answers need no model and no network. Nothing is uploaded, ever.</li>
+					<li><b>Encrypted at rest.</b> Set a key and the on-disk index is sealed with AES-256, so a stolen disk or a stray backup cannot read it.</li>
 					<li><b>Cloud models are opt-in.</b> Claude, Gemini, and OpenAI run only when you turn them on, and only to their known hosts.</li>
 					<li><b>Org lock.</b> An administrator can pin the policy in a file that user flags and environment variables cannot loosen.</li>
 				</ul>
