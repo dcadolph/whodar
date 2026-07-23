@@ -82,7 +82,7 @@ code, pre { font-family: var(--mono); }
 .nav.scrolled { background: rgba(5, 10, 18, 0.78); backdrop-filter: blur(14px); border-bottom-color: var(--line); }
 .nav-inner { display: flex; align-items: center; gap: 26px; height: 66px; }
 .brand { display: inline-flex; align-items: center; gap: 10px; }
-.brand-mark { width: 28px; height: 28px; display: block; }
+.brand-mark { width: 33px; height: 33px; display: block; }
 .brand-word { font-family: var(--mono); font-weight: 700; font-size: 17px; letter-spacing: -0.01em; color: var(--text); }
 .brand-word b { color: var(--signal); font-weight: 700; }
 .brand-lockup { display: flex; flex-direction: column; line-height: 1; }

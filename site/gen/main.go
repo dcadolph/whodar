@@ -25,8 +25,8 @@ import (
 // Asset cache-busting versions, mirrored in the landing page's link tags. Bump
 // stylesV when styles.css or app.js change, docsV when docs.css changes.
 const (
-	stylesV = "4"
-	docsV   = "1"
+	stylesV = "5"
+	docsV   = "2"
 )
 
 // tmplFS holds the page templates.

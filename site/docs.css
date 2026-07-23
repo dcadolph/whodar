@@ -109,7 +109,7 @@ body.docs .nav { background: rgba(5, 10, 18, 0.86); backdrop-filter: blur(14px);
 	letter-spacing: -0.015em; line-height: 1.12; margin: 0 0 12px; color: var(--text);
 }
 .doc-index-head p { color: var(--muted); font-size: 17px; }
-.doc-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(276px, 1fr)); gap: 16px; }
+.doc-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
 .doc-card {
 	display: flex; flex-direction: column; gap: 8px; padding: 22px;
 	border: 1px solid var(--line); border-radius: 12px; background: var(--panel);
@@ -131,3 +131,5 @@ body.docs .nav { background: rgba(5, 10, 18, 0.86); backdrop-filter: blur(14px);
 	.doc-side nav a.on { border-left: 0; border-bottom-color: var(--signal); }
 	.doc-index { padding-top: 96px; }
 }
+@media (max-width: 1040px) { .doc-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .doc-cards { grid-template-columns: 1fr; } }
