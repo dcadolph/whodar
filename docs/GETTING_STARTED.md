@@ -3,6 +3,11 @@
 This guide takes you from nothing to a working setup: build the tool, index a
 source, and ask "who do I talk to about X" from the terminal or a browser.
 
+In a hurry to wire in one tool? [CONNECT.md](CONNECT.md) has a short copy-paste
+recipe for each source (Slack, GitHub, Jira, Confluence, PagerDuty, git), with
+the exact credential to create and how to verify it worked. This guide is the
+fuller walkthrough with the concepts behind it.
+
 ## What whodar does
 
 You give whodar your work data (an org chart, a Slack workspace) and it builds a

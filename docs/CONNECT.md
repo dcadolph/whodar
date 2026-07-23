@@ -1,0 +1,301 @@
+# Connect your tools
+
+A copy-paste recipe for every source whodar can read. Each one is self-contained:
+what you get, the exact credential to create, the command to run, how to verify it
+worked, and the fixes for the errors you are most likely to hit.
+
+New to whodar? Read [GETTING_STARTED.md](GETTING_STARTED.md) first for the big
+picture, then come back here to wire in each tool.
+
+## The pattern
+
+Every source works the same way. You index it, then you ask.
+
+    whodar index --source SOURCE [scope flags] --merge
+    whodar ask "who owns billing retries"
+
+Three things hold for all of them:
+
+- **`--merge` adds a source onto what you already have.** Leave it off only on the
+  first source, when you want a clean index. People join across every source by
+  email, so one human stays one entry.
+- **Credentials are read only from the environment, never a flag.** Nothing is
+  logged, and nothing is written to disk. The index itself lives at
+  `~/.whodar/index.json`, readable only by you, and is never uploaded.
+- **Verify the same way every time.** After any index, run a `whodar ask` and look
+  for the people you expect. `whodar serve` opens the same data in a browser.
+
+A good order is org chart first, then everything else merged on top:
+
+    whodar index --source org-csv --file people.csv
+    whodar index --source slack --merge
+    whodar index --source github --github-org your-org --merge
+
+> Coming soon: `whodar connect <tool>` will walk you through each of these
+> interactively, so you will not have to remember scopes or flags.
+
+## No credentials needed
+
+Start here. These read files or local clones and need no tokens.
+
+### Org chart (CSV)
+
+What you get: the backbone of the graph. Names, titles, teams, and topics that
+every other source joins onto by email.
+
+    whodar index --source org-csv --file people.csv
+
+The CSV needs a header row. Column order does not matter and names are matched
+loosely, so `Job Title` and `role` both map to title. A minimal file:
+
+    name,email,title,team,topics
+    Angela Malone,angela@corp.com,Staff Engineer,Payments,billing;retries
+
+Recognized columns: `name`, `email`, `title`, `team`, `org`, `manager`, and
+`topics` (semicolon-separated). A row needs at least a name or an email. See the
+full column table in [GETTING_STARTED.md](GETTING_STARTED.md#index-your-own-org-chart).
+
+Verify:
+
+    whodar ask --pretty "who do I talk to about billing retries"
+
+### CODEOWNERS
+
+What you get: who owns which paths, straight from a repository's CODEOWNERS file.
+
+    whodar index --source codeowners --file ~/src/your-repo --merge
+
+Point `--file` at a repo root or directly at a CODEOWNERS file. Owners that are
+GitHub handles join real people through the [alias file](REFERENCE.md#identity-aliases).
+
+### Git history
+
+What you get: who actually commits to what. Reads local clones directly, so it
+works for any repo you can clone, including ones with no CODEOWNERS.
+
+    whodar index --source git --repo-path ~/src/billing --repo-path ~/src/infra --merge
+
+Each author gets the topics of the paths they touch, weighted by how often. Authors
+join other sources by their commit email. Bot accounts like dependabot are skipped.
+`--git-since-days` bounds the window (default 365) and `--max-commits` caps each repo
+(default 2000).
+
+## Slack (index)  ·  5 minutes
+
+What you get: the strongest single source. Which channels exist, what they are
+about, and who is active on each topic.
+
+**1. Create the app.** Go to https://api.slack.com/apps, choose **Create New App**,
+then **From scratch**, and pick your workspace.
+
+**2. Add bot scopes.** Open **OAuth & Permissions**. Under **Bot Token Scopes** add:
+
+    channels:read      channels:history      users:read      users:read.email
+
+To index private channels too, also add `groups:read` and `groups:history`.
+
+**3. Install and copy the token.** Click **Install to Workspace**, then copy the
+**Bot User OAuth Token**. It starts with `xoxb-`.
+
+**4. Connect:**
+
+    export WHODAR_SLACK_TOKEN=xoxb-your-token
+    whodar index --source slack --merge
+
+A bot only reads channels it has joined, so invite it to the ones that matter:
+`/invite @whodar`. Unreadable channels are skipped with a warning, never fatal.
+
+Tune the depth (defaults: public channels, last 180 days, 5000 messages per channel):
+
+    whodar index --source slack --merge --since-days 90 --max-messages 2000
+    whodar index --source slack --merge --include-private
+
+Verify:
+
+    whodar ask "who owns billing retries"
+
+Common fixes:
+
+| Error                              | Fix                                                  |
+| ---------------------------------- | ---------------------------------------------------- |
+| `api error: invalid_auth`          | Token is wrong or missing a scope. Recreate it with the four scopes above and re-export. |
+| A channel you expected is missing  | Invite the bot: `/invite @whodar` in that channel.   |
+| Private channels not showing       | Add `groups:read` + `groups:history`, then `--include-private`. Denied if org policy pins `private_channels: deny`. |
+
+## GitHub  ·  5 minutes
+
+What you get: contributors, PR authors, reviewers, assignees, labels and titles,
+issues, repo topics, and CODEOWNERS, weighted by how much each person works on a topic.
+
+**1. Create a token.** Go to https://github.com/settings/tokens and create a token
+with read access to the repositories you want. A classic token needs the `repo`
+scope; a fine-grained token needs **Read-only** on **Contents**, **Metadata**,
+**Pull requests**, and **Issues** for the target repos. Copy it (`ghp_...` or
+`github_pat_...`).
+
+**2. Connect** a single repo, or a whole org:
+
+    export WHODAR_GITHUB_TOKEN=ghp_your-token
+    whodar index --source github --repo your-org/your-repo --merge
+    whodar index --source github --github-org your-org --github-emails --merge
+
+`--repo` is repeatable. `--github-org` indexes every repo in the org; cap it with
+`--max-repos N`. `--github-emails` resolves user emails so GitHub people merge with
+Slack and the org chart.
+
+Verify:
+
+    whodar ask "who knows the payments service"
+
+Common fixes:
+
+| Error                    | Fix                                                          |
+| ------------------------ | ------------------------------------------------------------ |
+| `401` / `Bad credentials`| Token is wrong or expired. Recreate and re-export.           |
+| `404` on a private repo  | Token lacks read access to it. Add the repo (fine-grained) or the `repo` scope (classic). |
+| People show as handles   | Add `--github-emails`, or join handles with an [alias file](REFERENCE.md#identity-aliases). |
+
+## Jira  ·  5 minutes
+
+What you get: issue assignees and reporters, weighted by components, labels, summary
+words, and project.
+
+**1. Create an API token.** Go to https://id.atlassian.com/manage-profile/security/api-tokens,
+click **Create API token**, and copy it.
+
+**2. Connect.** Jira uses your site URL, your account email, and the token:
+
+    export WHODAR_JIRA_URL=https://your-site.atlassian.net
+    export WHODAR_JIRA_EMAIL=you@example.com
+    export WHODAR_JIRA_TOKEN=your-api-token
+    whodar index --source jira --jira-project SEC --jira-project OPS --merge
+
+`--jira-project` is repeatable. For anything more specific, use `--jira-jql` with a
+raw JQL query. `--max-issues` caps how many issues are read (default 1000).
+
+Verify:
+
+    whodar ask "who works on the OPS project"
+
+Common fixes:
+
+| Error                    | Fix                                                          |
+| ------------------------ | ------------------------------------------------------------ |
+| `401` / `403`            | Check `WHODAR_JIRA_EMAIL` matches the account that owns the token, and the URL has no trailing path. |
+| No people returned       | The project key is wrong or you lack access. Confirm the key in Jira and try `--jira-jql`. |
+
+## Confluence  ·  2 minutes (if Jira is already set up)
+
+What you get: page creators and last editors, weighted by labels, title words, and space.
+
+Confluence uses the **same Atlassian site and token as Jira**, so if you set up Jira
+above, the credentials already work:
+
+    whodar index --source confluence --confluence-space ENG --confluence-space OPS --merge
+
+To use a different site or token, set the Confluence-specific variables (they fall
+back to the Jira ones when unset):
+
+    export WHODAR_CONFLUENCE_URL=https://your-site.atlassian.net
+    export WHODAR_CONFLUENCE_EMAIL=you@example.com
+    export WHODAR_CONFLUENCE_TOKEN=your-api-token
+
+`--confluence-space` is repeatable. Use `--confluence-cql` for a raw CQL query, and
+`--max-pages` to cap pages read (default 2000).
+
+Verify:
+
+    whodar ask "who wrote the onboarding docs"
+
+## PagerDuty  ·  2 minutes
+
+What you get: every service and the people currently on call, so each on-call person
+gets the topics of the services they answer for. This source describes the present,
+so it never decays.
+
+**1. Create a token.** In PagerDuty, go to **Integrations > API Access Keys** and
+create a read-only API key.
+
+**2. Connect:**
+
+    export WHODAR_PAGERDUTY_TOKEN=your-api-token
+    whodar index --source pagerduty --merge
+
+Verify:
+
+    whodar ask "who is on call for search"
+
+## Slack bot  ·  let your team ask from Slack
+
+Once the index is built, run the bot so teammates can ask whodar in Slack directly,
+by mentioning it, sending a direct message, or using `/whodar`. This is separate from
+indexing Slack: it needs a few more scopes on the same app.
+
+**1. Add bot scopes.** On top of the read scopes above, add:
+
+    chat:write      app_mentions:read      im:history      im:read
+
+**2. Subscribe to events.** Under **Event Subscriptions**, subscribe the bot to
+`app_mention` and `message.im`.
+
+**3. Add the slash command (optional).** Under **Slash Commands**, create `/whodar`.
+Over Socket Mode the request URL can be any placeholder; over the Events API, point it
+at `https://your-host/slack/commands`.
+
+**4. Run it.** Pick a transport.
+
+Socket Mode needs no public URL, best for a laptop or internal host. Enable Socket
+Mode, create an app-level token (`xapp-`) with the `connections:write` scope, then:
+
+    export WHODAR_SLACK_TOKEN=xoxb-...
+    export WHODAR_SLACK_APP_TOKEN=xapp-...
+    whodar bot --transport socket
+
+Events API serves a public HTTP endpoint, best for a hosted deployment. Point the
+Slack request URL at `https://your-host/slack/events`, then:
+
+    export WHODAR_SLACK_TOKEN=xoxb-...
+    export WHODAR_SLACK_SIGNING_SECRET=...
+    whodar bot --transport events --addr 0.0.0.0:8766
+
+In Slack, `--llm` or `--keyword` at the end of a message picks the mode for that one
+answer. See [GETTING_STARTED.md](GETTING_STARTED.md#slack-bot) for the answer-mode and
+rate-limit details.
+
+## Microsoft Teams
+
+On the roadmap, not yet available. whodar has no Teams connector today. If you want it,
+open an issue so it gets prioritized. In the meantime, the Slack bot and the web UI
+cover the same ask-from-chat need.
+
+## Connect everything
+
+A full internal setup, org chart first, then every tool merged onto it:
+
+    export WHODAR_SLACK_TOKEN=xoxb-...
+    export WHODAR_GITHUB_TOKEN=ghp_...
+    export WHODAR_JIRA_URL=https://your-site.atlassian.net
+    export WHODAR_JIRA_EMAIL=you@example.com
+    export WHODAR_JIRA_TOKEN=...
+    export WHODAR_PAGERDUTY_TOKEN=...
+
+    whodar index --source org-csv --file people.csv
+    whodar index --source slack      --merge
+    whodar index --source github     --github-org your-org --github-emails --merge
+    whodar index --source jira       --jira-project ENG --merge
+    whodar index --source confluence --confluence-space ENG --merge
+    whodar index --source pagerduty  --merge
+    whodar index --source git        --repo-path ~/src/billing --merge
+
+    whodar ask "who knows the billing service"
+    whodar serve
+
+Each run prints what joined and left since the last index, like `+3 people, -1 people,
++1 channels`. Re-running any single source with `--merge` refreshes just that slice.
+
+## Where to go next
+
+- [REFERENCE.md](REFERENCE.md): every command, flag, and environment variable.
+- [GETTING_STARTED.md](GETTING_STARTED.md): the narrative walkthrough, ask modes,
+  the web UI, MCP, and organization policy.
+- Joining one person across sources: [identity aliases](REFERENCE.md#identity-aliases).

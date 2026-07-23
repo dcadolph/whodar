@@ -53,10 +53,10 @@ Then index something real:
     whodar index --source org-csv --file examples/people.csv
     whodar ask --pretty "who do I talk to about billing retries"
 
-Then merge in the rest of your tools, one source at a time:
+Then wire in the rest of your tools, one at a time. Each has a copy-paste recipe
+in [docs/CONNECT.md](docs/CONNECT.md), with the exact credential to create, the
+command to run, and how to verify it worked:
 `slack`, `github`, `jira`, `confluence`, `pagerduty`, `git`, and `codeowners`.
-Run `whodar index --help` or see [docs/REFERENCE.md](docs/REFERENCE.md) for
-every source, flag, and credential.
 
 ## How it works
 
@@ -87,6 +87,8 @@ environment variables cannot override.
 
 - [Getting started](docs/GETTING_STARTED.md): install, index each source, ask,
   serve, run the bot.
+- [Connect your tools](docs/CONNECT.md): a copy-paste recipe per source, with the
+  exact credential to create for Slack, GitHub, Jira, Confluence, and PagerDuty.
 - [Reference](docs/REFERENCE.md): every command, flag, source, and
   environment variable.
 - [Architecture](docs/ARCHITECTURE.md), [deploying](docs/DEPLOY.md),
