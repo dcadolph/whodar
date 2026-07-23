@@ -162,7 +162,7 @@
 									<a>Teams <span class="ct">6</span></a>
 									<a>Topics <span class="ct">56</span></a>
 								</nav>
-								<div class="am-foot"><span>Docs · GitHub</span><span>whodar v0.2.0</span></div>
+								<div class="am-foot"><span>Docs · GitHub</span><span>whodar v0.4.0</span></div>
 							</aside>
 							<div class="am-main">
 								<div class="am-search">
@@ -269,7 +269,7 @@
 					<span class="src">Confluence</span><span class="src">PagerDuty</span><span class="src">git</span>
 					<span class="src">CODEOWNERS</span><span class="src">org CSV</span>
 					</div>
-					<p class="note"><a href="https://github.com/dcadolph/whodar/blob/main/docs/CONNECT.md" target="_blank" rel="noopener">Copy-paste setup for each source, with the exact credential to create →</a></p>
+					<p class="note"><a href="https://github.com/dcadolph/whodar/blob/main/docs/CONNECT.md" target="_blank" rel="noopener">Set up any source with <code>whodar connect</code>, or copy-paste each one →</a></p>
 			</div>
 		</section>
 
@@ -371,7 +371,10 @@ docker run -p 8765:8765 <span class="o">-e WHODAR_SERVE_TOKEN=secret</span> \
 							<pre><code><span class="c"># try it with no setup</span>
 whodar demo
 
-<span class="c"># index a repo you already have, then ask</span>
+<span class="c"># set up any source with a guided wizard</span>
+whodar connect
+
+<span class="c"># or index directly, then ask</span>
 whodar index --source git --repo-path .
 whodar ask <span class="o">"who knows the billing code"</span></code></pre>
 						</div>
