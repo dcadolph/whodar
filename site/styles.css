@@ -311,7 +311,7 @@ h1 .sig { color: var(--signal); text-shadow: 0 0 28px rgba(52, 229, 197, 0.4); }
 .privacy h2 { font-family: var(--disp); font-weight: 800; letter-spacing: -0.015em; font-size: clamp(28px, 4.2vw, 44px); line-height: 1.16; margin-bottom: 16px; }
 .privacy > div > p { color: var(--muted); font-size: 17px; }
 .pgrace { color: var(--signal); text-shadow: 0 0 24px rgba(52, 229, 197, 0.35); }
-.plist { list-style: none; margin-top: 26px; display: grid; gap: 15px; }
+.plist { list-style: none; margin-top: 26px; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto; grid-auto-flow: column; gap: 18px 30px; }
 .plist li { padding-left: 30px; position: relative; color: var(--muted); font-size: 15px; }
 .plist li b { color: var(--text); }
 .plist li::before {
@@ -397,6 +397,7 @@ h1 .sig { color: var(--signal); text-shadow: 0 0 28px rgba(52, 229, 197, 0.4); }
 	.hero-shot { order: 2; }
 	.scope, .log { margin-inline: auto; }
 	.privacy { grid-template-columns: 1fr; gap: 34px; }
+	.plist { grid-template-columns: 1fr; grid-auto-flow: row; }
 	.cards { grid-template-columns: repeat(2, 1fr); }
 	.flow { grid-template-columns: 1fr; }
 	.flow-arrow { transform: rotate(90deg); }
